@@ -8,6 +8,9 @@ channels:
 dependencies:
   - r-base=3.6.2
   - r-devtools
+  - r-doparallel=1.0.14
+  - r-dorng=1.7.1
+  - r-foreach=1.4.4
   - conda-forge::r-readr
   - conda-forge::r-biocmanager
   - conda-forge::r-downloader
@@ -15,3 +18,4 @@ dependencies:
   - bioconda::bioconductor-edger
   - bioconda::bioconductor-biomart
   - conda-forge::r-dbi=1.1.0
+  - bioconda::bioconductor-genefilter=1.68.0
