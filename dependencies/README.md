@@ -1,31 +1,49 @@
-# Create a `requirements.txt` from the output of `conda list -e`
+# Starting in a new Jupyter Lab session in CloudOS
 
-1. Capture conda installed packages 
+After your Notebook Session has initilased in CloudOS, open a terminal type the following command:
 
 ```bash
-conda list > dependencies/conda_list.txt
-```    
+git clone https://github.com/TheJacksonLaboratory/lifebitCloudOSDRE.git
 
-2. Reformat to create a requirement.txt files
-
-```R 
-library(readr)
-conda_list              <- read_table2("dependencies/conda_list.txt", col_names = FALSE, comment = "#")
-colnames(conda_list)    <- c('package', 'version', 'build', 'channel')
-conda_list$requirements <- paste0(conda_list$channel, "::", conda_list$package, "=", conda_list$version)
-data.table::fwrite(conda_list[,'requirements'], file = "dependencies/requirements.txt", quote = FALSE, col.names = FALSE)
 ```
+
+Follow the instructions to configure the git config, your GitHub associated email and name.
+
+# `cd` into the `lifebitCloudOSDRE` directory
+
+```bash
+
+cd lifebitCloudOSDRE
+git checkout cristina-jupyter
+
+```
+
+# Initialise your environment
+
+Open a terminal and type the following command:
+
+```bash
+
+conda init
+
+```
+
+This will prepare your environment to be able to use `conda`. After the command has been executed, close this terminal and open a fresh one.
+You might be prompted to do so by `conda` as well.
 
 
 # Update the `base` conda environment
 
 ```bash
 
+cd lifebitCloudOSDRE
 conda env update --name base --file dependencies/requirements.txt 
-
+conda activate base
 ```
 
 #  Install `TheJacksonLaboratory/yarn`
+
+Along with some other dependencies:
 
 
 ```bash
@@ -33,3 +51,8 @@ conda env update --name base --file dependencies/requirements.txt
 Rscript dependencies/install.R 
 
 ```
+
+
+# Ready!
+
+Your environment is ready now, you can start working on the Jupyter Notebook.
