@@ -1,6 +1,4 @@
-# packages in environment at /opt/conda:
-#
-# Name                    Version                   Build  Channel
+Name                    Version                   Build  Channel
 _libgcc_mutex             0.1                 conda_forge    conda-forge
 _openmp_mutex             4.5                       0_gnu    conda-forge
 _r-mutex                  1.0.1               anacondar_1    conda-forge
