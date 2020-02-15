@@ -1,5 +1,5 @@
 # Starting in a new Jupyter Lab session in CloudOS
-
+For this paper, start a fairly large instance if running from scratch, say about an r2.8xlarge (8 cpus with 61 GB RAM).
 After your Notebook Session has initilased in CloudOS, open a terminal type the following command:
 
 ```bash
