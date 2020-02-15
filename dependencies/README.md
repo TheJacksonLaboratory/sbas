@@ -1,10 +1,9 @@
 # Starting in a new Jupyter Lab session in CloudOS
-For this paper, start a fairly large instance if running from scratch, say about an r2.8xlarge (8 cpus with 61 GB RAM).
+For this step of the analysis, start a fairly large instance if running from scratch, say about an r2.8xlarge (8 cpus with 61 GB RAM).
 After your Notebook Session has initilased in CloudOS, open a terminal type the following command:
 
 ```bash
 git clone https://github.com/TheJacksonLaboratory/lifebitCloudOSDRE.git
-
 ```
 
 Follow the instructions to configure the git config, your GitHub associated email and name.
@@ -14,7 +13,6 @@ Follow the instructions to configure the git config, your GitHub associated emai
 ```bash
 
 cd lifebitCloudOSDRE
-git checkout cristina-jupyter
 
 ```
 
@@ -39,6 +37,7 @@ You might be prompted to do so by `conda` as well.
 cd lifebitCloudOSDRE
 conda env update --name base --file dependencies/requirements.txt 
 conda activate base
+
 ```
 
 #  Install `TheJacksonLaboratory/yarn`
@@ -51,7 +50,6 @@ Along with some other dependencies:
 Rscript dependencies/install.R 
 
 ```
-
 
 # Ready!
 
