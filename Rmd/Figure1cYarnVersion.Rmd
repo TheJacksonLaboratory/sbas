@@ -35,6 +35,7 @@ library(biomaRt)
 library(DBI) # v >= 1.1.0 required for biomaRt
 library(devtools)
 library(yarn)
+library(statmod)
 Sys.setenv(TAR = "/bin/tar") # for gzfile
 ```
 
@@ -44,69 +45,68 @@ Begin here if you have already run this and created the `data/gtex.rds` file
 Please `git clone` the repository and start working after changing to this as your working directory (`cd lifebitCloudOSDRE`). The `data` subdirectory, along with all other paths used in this Notebook are relative to the `lifebitCloudOSDRE` repository.
 
 ```{r}
-# CAUTION! It requires some minutes to complete, also memory and enough storage
+#NOTE TO USERS:
+#
+# Either run option 1 or option 2
+#
+# 1. CAUTION! It requires some minutes to complete, also memory and enough storage
+#
 obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+saveRDS(obj, file = "../data/gtex.rds")
+#
+# or
+#
+# 2. Retrieve the released location the already generated gtex.rds
+# 
+#    Run the following line in the data directory prior to the next line if you wish to use the already
+#    generated file.
+# 
+#    and then run this line.
+#   
+#    To Run option 2 -- launch a terminal window 
+#    and change to the 'data' subdirectory
+#
+#    cd lifebitCloudOSDRE/data
+#
+#    and run this command
+#
+#    wget https://github.com/lifebit-ai/lifebitCloudOSDREgtex/releases/download/gtex_archive/gtex.rds
+#  
+#    Then come back to this R code and uncomment this line.
+#
+#    obj <- readRDS("../data/gtex.rds")
 ```
 
-This uploaded object is available by long names -- which might be nice to simplify ....
-
 ```{r}
+# Confirm that it is an expression set.
+# and check the dimensions of the objects, and the phenotype information of the objects
 class(obj)
-```
-
-```{r}
-saveRDS(obj, file = "../data/ExpressionSetobj.rds")
-```
-
-```{r}
 dim(phenoData(obj))
-```
-
-```{r}
-# for later - not sure attributes are actually successfully being added
-#ensembl = useMart("ensembl",dataset="hsapiens_gene_ensembl")
-#attributes = listAttributes(ensembl)
-```
-
-```{r}
 dim(obj)
 ```
 
 ```{r}
+#Okay - for some reason our phenotype data is larger than our expression data - I've written Joe Paulson about that.
+#In the meantime, make sure that the two sets are aligned.
 sample_names=as.vector(as.character(colnames(exprs(obj))))
 head(sample_names)
 length(sample_names)
-```
 
-```{r}
 pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
 head(pheno_sample_names)
 length(pheno_sample_names)
-```
 
-Okay - for some reason our phenotype data is larger than our expression data - I've written Joe Paulson about that.
-In the meantime, make sure that the two sets are aligned.
-
-```{r}
 logical_match_names=pheno_sample_names %in% sample_names
 length(logical_match_names)
-```
-
-```{r}
 table(logical_match_names)
-
-```
-
-```{r}
 pData(obj) <- (pData(obj)[logical_match_names==TRUE,])
-```
-
-```{r}
 dim(pData(obj))
 dim(obj)
 ```
 
-Now we want to replace all *dashes* with _underscores_
+```{r}
+#  Now we want to replace all *dashes* with _underscores_
+```
 
 ```{r}
 newSampID <- gsub('-','\\.',pData(obj)$SAMPID)
@@ -128,7 +128,9 @@ colnames(pData(obj))
 head(exprs(obj))
 ```
 
-Now let us do the differential analysis - using EdgeR
+```{r}
+#  Now let us do the differential analysis - using EdgeR
+```
 
 ```{r}
 x <- exprs(obj)
@@ -138,61 +140,88 @@ x <- exprs(obj)
 dim(x)
 ```
 
-To use the DGEList function from EdgeR, we need to transpose our x so that the length of group is equal
-to the number of columns in our counts (x).
-
-You will get an error in DGEList (counts = x, group = group) if the length of group is not equal to the number of columns in counts
+```{r}
+# To use the DGEList function from EdgeR, we need to transpose our x so that the length of group is equal
+# to the number of columns in our counts (x).
+# You will get an error in DGEList (counts = x, group = group) if the length of group is not equal to the number of columns in counts
+```
 
 ```{r}
 group <- factor(pData(obj)$SEX)
 ```
 
 ```{r}
-y <- DGEList(counts=x, group=group)
+table(group)
 ```
 
-I keep running out of memory on this step - so on my laptop after calculating the DGEList
-I saved it and now I uploaded it to this larger memory machine
-
 ```{r}
+#caution this step takes a lot of memory and time - so do one of two things again:
+#
+# 1. You can either run this step from scratch and save the rds object for next time.
+#
+#y <- DGEList(counts=x, group=group)
+#y <- calcNormFactors(y)
+#saveRDS(y, file = "../data/DGENormFactorsy.rds")
+#
+# 2. or if you have already run this step and want to retrieve it again
+# you can read this from the saved rds object
+#
+y <- readRDS("../data/DGENormFactorsy.rds")
 attributes(y)
 ```
 
 ```{r}
-#caution this step takes a lot of memory and time
-```
-
-```{r}
-y <- calcNormFactors(y)
-```
-
-```{r}
-saveRDS(y, file = "../data/DGENormFactorsy.rds")
+dim(y$counts)
 ```
 
 ```{r}
 # For Guy -- does this do what you are expecting -- I am confused because what you get when you
 #        ask for the min (table(groups)) is the smaller sized group -- which in this case is 
 #        female -- it will help the reader to know what you are doing here with the statement.
-#        one can read what it is doing but not understand your objective.
-```
-
-```{r}
-groups <- pData(obj)$SEX
+#        one can read what it is doing but not understand your objective.groups <- pData(obj)$SEX
+# keep.events <- rep(TRUE, nrow(y))
+#for (group in c(1,2)) {
+#    keep.events <- keep.events & 
+#                   rowSums(cpm(y[,groups %in% group]) > 1) >= 0.25*min(table(groups))
+#}
+#
+#  From Anne - I believe the objective in this step is to keep only those genes that are in the
+#    that are above the threshold of expression for the lower quartile of all sex specific genes.
+#    groups = (1,2) -- lots of confusion in logic between groups and group and male and female
+#    I recommend we use male and female.
+#    two errors then in the above loop - 
+#     1. min(table(groups)) will always return the
+#        length of the number of samples that are female 
+#        (which is 5978 for this v8 GTEx)
+#     2. sum(table(group)) will return the number of samples that are either male or female
+#        depending upon whether you are in the loop for male or female consideration.
+#
+#    If my assumption is true - I recommend replacing it with the following.
+#
+#  this should be relaced 
+#
 keep.events <- rep(TRUE, nrow(y))
-for (group in c(1,2)) {
-    keep.events <- keep.events & 
-                   rowSums(cpm(y[,groups %in% group]) > 1) >= 0.25*min(table(groups))
-}
-
+nrow(y)
+table(pData(obj)$SEX)
+table(group)
+#
+# first keep all the events for the male subsets meeting our threshold criteria
+#
+keep.events  <- keep.events & rowSums(cpm(y$counts[,group == 1]) > 1) >= 0.25*length(group==1)
+#
+# now keep all the male subsets or the female subsets meeting our criteria
+#
+keep.events2 <- keep.events | rowSums(cpm(y$counts[,group == 2]) > 1) >= 0.25*length(group==2)
+table(keep.events)
+table(keep.events2)
 ```
 
 ```{r}
-reduced_y<- y[keep.events,]
+reduced_y<- y[keep.events2,]
 ```
 
 ```{r}
-reduced_obj <- obj[keep.events==TRUE,]
+reduced_obj <- obj[keep.events2==TRUE,]
 ```
 
 ```{r}
@@ -200,63 +229,16 @@ dim(reduced_obj)
 ```
 
 ```{r}
-#saveRDS(reduced_y, file = "../data/reduced_y.rds")
-#saveRDS(reduced_obj, file = "../data/reduced_obj.rds")
-reduced_obj <- readRDS(file = "../data/reduced_obj.rds")
-reduced_y   <- readRDS(file = "../data/reduced_y.rds")
+# if you have generated these before
+saveRDS(reduced_y, file = "../data/reduced_y.rds")
+saveRDS(reduced_obj, file = "../data/reduced_obj.rds")
+#reduced_obj <- readRDS(file = "../data/reduced_obj.rds")
+#reduced_y   <- readRDS(file = "../data/reduced_y.rds")
 
-```
-
-```{r}
-# make the design based upon sex 
-design <- model.matrix(~factor(pData(obj)$SEX))
-```
-
-```{r}
-# From voom function description, we see ‘voom’ is an acronym for mean-variance modelling at the
-#     observational level. The idea is to estimate the mean-variance
-#     relationship in the data, then use this to compute an appropriate
-#     precision weight for each observation. 
-#     ‘voom’ performs the following specific calculations. First, the
-#     counts are converted to logCPM values, adding 0.5 to all the
-#     counts to avoid taking the logarithm of zero. 
-```
-
-```{r}
-v <- voom (reduced_y, design)
-```
-
-```{r}
-# make a linear fit model based upon the model.matrix
-```
-
-```{r}
-fit <- lmFit(v, design)
-```
-
-```{r}
-#install.packages("statmod")
-library(statmod)
-```
-
-```{r}
-fit <- eBayes(fit, robust=TRUE)
-```
-
-```{r}
-# extract a table of the top-ranked genes from a linear fit model.
-results = topTable(fit, coef='factor(pData(obj)$SEX)2',number=nrow(reduced_y))
-
-```
-
-```{r}
-write.table(results,'../data/all_FC_results.txt',sep='\t',quote = F)
 ```
 
 ```{r}
 # separate the analysis by male and by female
-# then do the differential analysis regarding tissue
-# then do the differential analysis male tissue vs female tissue
 ```
 
 ```{r}
@@ -275,8 +257,9 @@ dim(reduced_obj_female)
 ```
 
 ```{r}
-tissue_groups_male <- factor(pData(reduced_obj_male)$SMTS)
-tissue_groups_female <- factor(pData(reduced_obj_female)$SMTS)
+# changing from SMTS to SMTSD - more granularity -- but we could produce both figures
+tissue_groups_male <- factor(pData(reduced_obj_male)$SMTSD)
+tissue_groups_female <- factor(pData(reduced_obj_female)$SMTSD)
 ```
 
 ```{r}
@@ -297,7 +280,7 @@ table(tissue_groups_female)
 ```
 
 ```{r}
-tissue_groups <- factor(pData(reduced_obj)$SMTS)
+tissue_groups <- factor(pData(reduced_obj)$SMTSD)
 ```
 
 ```{r}
@@ -317,28 +300,40 @@ sex = factor(pData(reduced_obj)$SEX)
 ```
 
 ```{r}
-#tissue_shared_male_female
-for (tissue in tissue_shared_male_female) {
-# missing: Bladder
-    tissue        <- 'Bladder'
-    tissue_true   <- pData(reduced_obj)$SMTS==tissue
-    tissue_obj    <- reduced_obj[,tissue_true==TRUE]
+library(stringr)
+```
+
+```{r}
+#
+# define a function that takes two inputs, the tissue and an object
+#    and createe teh model matrix based upon that tissue's sex
+#    perform a linear fit after calculating normal factors (based upon library size)
+#    and calculate the dispersion using voom (mean variance model of dispersion)
+#    grab the results - save the results for prosperity and make a variable
+#
+fit_tissue <- function (tissue, obj) {
+    tissue_true   <- pData(obj)$SMTSD == tissue
+    tissue_obj    <- obj[,tissue_true ==TRUE]
     tissue_sex    <- factor(pData(tissue_obj)$SEX)
     tissue_design <- model.matrix(~tissue_sex)
-#    dim(tissue_obj)
-#    head(tissue_design)
     y_tissue      <- DGEList(counts=exprs(tissue_obj), group=tissue_sex)
-    tissue_sex_array <- lapply(pData(reduced_obj)$SMTS, factor())
-    y_tissue_array <- lapply(pData(reduced_obj)$SMTS,DGEList(counts=exprs(tissue_obj), group=tissue_sex)
     y_tissue      <- calcNormFactors(y_tissue)
-    y_tissue_voom <- voom (y_tissue, tissue_design)
+    y_tissue_voom <- voom(y_tissue, tissue_design)
     fit_tissue    <- lmFit(y_tissue_voom, tissue_design)
     fit_tissue    <- eBayes(fit_tissue, robust=TRUE)
-    results_tissue<- topTable(fit_tissue, coef='tissue_sex2', number=nrow(y_tissue))
-    assign(paste("results",tissue, sep="_"),results_tissue)
-    filename = paste(paste("../data", tissue,sep="/"),"DGE.txt",sep="_")
-    write.table(results_tissue,filename,sep='\t',quote = F)
-#}
+    results_tissue <- topTable (fit_tissue, coef='tissue_sex2', number=nrow(y_tissue))
+    filename = paste(paste("../data",tissue, sep="/"),"DGE.txt", sep="_")
+    write.table(results_tissue, filename, sep='\t', quote=FALSE)
+    return (results_tissue)
+}
+```
+
+```{r}
+# debugging with using the 'Thyroid' tissue
+#thyroid_logFC <- fit_tissue('Thyroid',reduced_obj)
+#thyroid_logFC
+# 
+all_logFC <- lapply(X=levels(tissue_shared_male_female), FUN=fit_tissue, obj=reduced_obj)
 ```
 
 ```{r}
@@ -347,184 +342,59 @@ filenames <- list.files("../data", pattern="*_DGE.txt", all.files=FALSE,
 ```
 
 ```{r}
-#library(stringr)
-#for (file in filenames) {
-#    newname <- str_replace(file, '_DGE.txt', '')
-#    assign(paste(as.character(newname), "DGE",sep="_"),newname)
-#    newname <- str_replace(newname,' ','_')
-#    newname_file <- paste("../data",file,sep="/")
-#    assign(newname <- read.delim2(newname_file)
-#}
-#adipose_tissue_logFC <- read.delim2("../data/Adipose\ Tissue_DGE.txt")
-#head(adipose_tissue_logFC)
-filenames
+# preserve the ordered rownames for later assignment to matrix
+fullfilename <- paste('../data',filenames[1],sep="/")
+logFC_mat <- read.delim2(fullfilename, stringsAsFactors=FALSE)
+logFC_mat <- logFC_mat[order(rownames(logFC_mat)),]
+logFC_mat_rownames <- as.character(rownames(logFC_mat)) 
 ```
 
 ```{r}
-adipose_tissue_logFC_mat <- read.delim2("../data/Adipose\ Tissue_DGE.txt",stringsAsFactors = FALSE)
-adrenal_gland_logFC_mat  <- read.delim2("../data/Adrenal\ Gland_DGE.txt",stringsAsFactors = FALSE)
-bladder_logFC_mat        <- read.delim2("../data/Bladder_DGE.txt",stringsAsFactors = FALSE)
-blood_logFC_mat          <- read.delim2("../data/Blood_DGE.txt",stringsAsFactors = FALSE)
-blood_vessel_logFC_mat   <- read.delim2("../data/Blood\ Vessel_DGE.txt",stringsAsFactors = FALSE) 
-brain_logFC_mat          <- read.delim2("../data/Brain_DGE.txt",stringsAsFactors = FALSE)
-breast_logFC_mat         <- read.delim2("../data/Breast_DGE.txt",stringsAsFactors = FALSE)
-colon_logFC_mat          <- read.delim2("../data/Colon_DGE.txt",stringsAsFactors = FALSE)
-esophagus_logFC_mat      <- read.delim2("../data/Esophagus_DGE.txt",stringsAsFactors = FALSE)
-heart_logFC_mat          <- read.delim2("../data/Heart_DGE.txt",stringsAsFactors = FALSE)
-kidney_logFC_mat         <- read.delim2("../data/Kidney_DGE.txt",stringsAsFactors = FALSE)
-liver_logFC_mat          <- read.delim2("../data/Liver_DGE.txt",stringsAsFactors = FALSE)
-lung_logFC_mat           <- read.delim2("../data/Lung_DGE.txt",stringsAsFactors = FALSE)
-muscle_logFC_mat         <- read.delim2("../data/Muscle_DGE.txt",stringsAsFactors = FALSE)
-nerve_logFC_mat          <- read.delim2("../data/Nerve_DGE.txt",stringsAsFactors = FALSE)
-pancreas_logFC_mat       <- read.delim2("../data/Pancreas_DGE.txt",stringsAsFactors = FALSE)
-pituitary_logFC_mat      <- read.delim2("../data/Pituitary_DGE.txt",stringsAsFactors = FALSE)
-salivary_gland_logFC_mat <- read.delim2("../data/Salivary\ Gland_DGE.txt",stringsAsFactors = FALSE)
-skin_logFC_mat           <- read.delim2("../data/Skin_DGE.txt",stringsAsFactors = FALSE)
-small_intestine_logFC_mat<- read.delim2("../data/Small\ Intestine_DGE.txt",stringsAsFactors = FALSE)
-spleen_logFC_mat         <- read.delim2("../data/Spleen_DGE.txt",stringsAsFactors = FALSE)
-stomach_logFC_mat        <- read.delim2("../data/Stomach_DGE.txt",stringsAsFactors = FALSE)
-thyroid_logFC_mat        <- read.delim2("../data/Thyroid_DGE.txt",stringsAsFactors = FALSE)
+# Make a matrix for each of the tissues
+# from what files are saved
+
+make_tissue_matrix_ready <- function (file, obj) {
+    filename        <- paste('../data',file,sep="/")
+    logFC_mat       <- read.delim2(filename, stringsAsFactors = FALSE)
+    logFC_mat       <- logFC_mat[order(rownames(logFC_mat)),]
+    logFC           <- as.matrix(as.numeric(logFC_mat$logFC),nrow=dim(obj)[2],ncol=1)
+    rownames(logFC) <- rownames(logFC_mat)
+    return(logFC)
+}
 ```
 
 ```{r}
-adipose_tissue_logFC <- as.matrix(as.numeric(adipose_tissue_logFC_mat$logFC),nrow=16794,ncol=1)
-
-m <- adipose_tissue_logFC[order(rownames(adipose_tissue_logFC_mat)),]
+matrix_list <- lapply(X=filenames, FUN=make_tissue_matrix_ready, obj=reduced_obj)
 ```
 
 ```{r}
-adipose_tissue_logFC_mat       <- adipose_tissue_logFC_mat[order(rownames(adipose_tissue_logFC_mat)),]
-adipose_tissue_logFC           <- as.matrix(as.numeric(adipose_tissue_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(adipose_tissue_logFC) <- rownames(adipose_tissue_logFC_mat)
-
-adrenal_gland_logFC_mat       <- adrenal_gland_logFC_mat[order(rownames(adrenal_gland_logFC_mat)),]
-adrenal_gland_logFC           <- as.matrix(as.numeric(adrenal_gland_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(adrenal_gland_logFC) <- rownames(adrenal_gland_logFC_mat)
-
-bladder_logFC_mat       <- bladder_logFC_mat[order(rownames(bladder_logFC_mat)),]
-bladder_logFC           <- as.matrix(as.numeric(bladder_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(bladder_logFC) <- rownames(bladder_logFC_mat)
-
-blood_logFC_mat       <- blood_logFC_mat[order(rownames(blood_logFC_mat)),]
-blood_logFC           <- as.matrix(as.numeric(blood_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(blood_logFC) <- rownames(blood_logFC_mat)
-
-blood_vessel_logFC_mat       <- blood_vessel_logFC_mat[order(rownames(blood_vessel_logFC_mat)),]
-blood_vessel_logFC           <- as.matrix(as.numeric(blood_vessel_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(blood_vessel_logFC) <- rownames(blood_vessel_logFC_mat)
-
-brain_logFC_mat      <- brain_logFC_mat[order(rownames(brain_logFC_mat)),]
-brain_logFC          <- as.matrix(as.numeric(brain_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(brain_logFC)<- rownames(brain_logFC_mat)
-
-breast_logFC_mat       <- breast_logFC_mat[order(rownames(breast_logFC_mat)),]
-breast_logFC           <- as.matrix(as.numeric(breast_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(breast_logFC) <- rownames(breast_logFC_mat)
-
-colon_logFC_mat       <- colon_logFC_mat[order(rownames(colon_logFC_mat)),]
-colon_logFC           <- as.matrix(as.numeric(colon_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(colon_logFC) <- rownames(colon_logFC_mat)
-
-esophagus_logFC_mat       <- esophagus_logFC_mat[order(rownames(esophagus_logFC_mat)),]
-esophagus_logFC           <- as.matrix(as.numeric(esophagus_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(esophagus_logFC) <- rownames(esophagus_logFC_mat)
-
-heart_logFC_mat       <- heart_logFC_mat[order(rownames(heart_logFC_mat)),]
-heart_logFC           <- as.matrix(as.numeric(heart_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(heart_logFC) <- rownames(heart_logFC_mat)
-
-kidney_logFC_mat       <- kidney_logFC_mat[order(rownames(kidney_logFC_mat)),]
-kidney_logFC           <- as.matrix(as.numeric(kidney_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(kidney_logFC) <- rownames(kidney_logFC_mat)
-
-liver_logFC_mat       <- liver_logFC_mat[order(rownames(liver_logFC_mat)),]
-liver_logFC           <- as.matrix(as.numeric(liver_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(liver_logFC) <- rownames(liver_logFC_mat)
-
-lung_logFC_mat       <- lung_logFC_mat[order(rownames(lung_logFC_mat)),]
-lung_logFC           <- as.matrix(as.numeric(lung_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(lung_logFC) <- rownames(lung_logFC_mat)
-
-muscle_logFC_mat      <- muscle_logFC_mat[order(rownames(muscle_logFC_mat)),]
-muscle_logFC          <- as.matrix(as.numeric(muscle_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(muscle_logFC)<- rownames(muscle_logFC_mat)
-
-nerve_logFC_mat       <- nerve_logFC_mat[order(rownames(nerve_logFC_mat)),]
-nerve_logFC           <- as.matrix(as.numeric(nerve_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(nerve_logFC) <- rownames(nerve_logFC_mat)
-
-pancreas_logFC_mat       <- pancreas_logFC_mat[order(rownames(pancreas_logFC_mat)),]
-pancreas_logFC           <- as.matrix(as.numeric(pancreas_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(pancreas_logFC) <- rownames(pancreas_logFC_mat)
-
-pituitary_logFC_mat       <- pituitary_logFC_mat[order(rownames(pituitary_logFC_mat)),]
-pituitary_logFC           <- as.matrix(as.numeric(pituitary_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(pituitary_logFC) <- rownames(pituitary_logFC_mat)
-
-salivary_gland_logFC_mat       <- salivary_gland_logFC_mat[order(rownames(salivary_gland_logFC_mat)),]
-salivary_gland_logFC           <- as.matrix(as.numeric(salivary_gland_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(salivary_gland_logFC) <- rownames(salivary_gland_logFC_mat)
-
-skin_logFC_mat       <- skin_logFC_mat[order(rownames(skin_logFC_mat)),]
-skin_logFC           <- as.matrix(as.numeric(skin_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(skin_logFC) <- rownames(skin_logFC_mat)
-
-small_intestine_logFC_mat       <- small_intestine_logFC_mat[order(rownames(small_intestine_logFC_mat)),]
-small_intestine_logFC           <- as.matrix(as.numeric(small_intestine_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(small_intestine_logFC) <- rownames(small_intestine_logFC_mat)
-
-spleen_logFC_mat       <- spleen_logFC_mat[order(rownames(spleen_logFC_mat)),]
-spleen_logFC           <- as.matrix(as.numeric(spleen_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(spleen_logFC) <- rownames(spleen_logFC_mat)
-
-stomach_logFC_mat       <- stomach_logFC_mat[order(rownames(stomach_logFC_mat)),]
-stomach_logFC           <- as.matrix(as.numeric(stomach_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(stomach_logFC) <- rownames(stomach_logFC_mat)
-
-thyroid_logFC_mat       <- thyroid_logFC_mat[order(rownames(thyroid_logFC_mat)),]
-thyroid_logFC           <- as.matrix(as.numeric(thyroid_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(thyroid_logFC) <- rownames(thyroid_logFC_mat)
-
+length(matrix_list)
+logFC_mat = as.matrix(lapply(X=matrix_list, FUN=cbind),nrow=dim(reduced_obj)[2], ncol=length(matrix_list))
 ```
 
 ```{r}
-logFC_mat = as.matrix(cbind(adipose_tissue_logFC,
-             adrenal_gland_logFC,
-             bladder_logFC,
-             blood_logFC,
-             blood_vessel_logFC,
-             brain_logFC,
-             breast_logFC,
-             colon_logFC,
-             esophagus_logFC,
-             heart_logFC,
-             kidney_logFC,
-             liver_logFC,
-             lung_logFC,
-             muscle_logFC,
-             nerve_logFC,
-             pancreas_logFC,
-             pituitary_logFC,
-             salivary_gland_logFC,
-             skin_logFC,
-             small_intestine_logFC,
-             spleen_logFC,
-             stomach_logFC,
-             thyroid_logFC),nrow=16794,ncol=23)
-
+get_tissue_name <- function (tissue_name) {
+    tissue <- str_replace(tissue_name,'_DGE.txt','')
+    return(tissue)
+}
 ```
 
 ```{r}
-rownames(logFC_mat) <- rownames(thyroid_logFC)
-colnames(logFC_mat) <- c("adipose","adrenal_gland","bladder","blood","blood_vessel",
-                        "brain","breast","colon","esophagus","heart","kidney",
-                        "liver","lung","muscle","nerve","pancreas","pitutary",
-                        "salivary_gland","skin","small_intestine",
-                        "spleen","stomach","thyroid")
+tissue_list <- lapply(X=levels(tissue_shared_male_female), FUN=get_tissue_name)
+length(tissue_list)
+head(tissue_list)
+```
+
+```{r}
+logFC_mat = as.matrix(as.numeric(unlist(matrix_list[1]),nrow=dim(reduced_obj)[2], ncol=1))
+for (i in (2:length(matrix_list))) {
+    n= as.matrix(as.numeric(unlist(matrix_list[i]),nrow=dim(reduced_obj)[2], ncol=1))
+    logFC_mat = cbind(logFC_mat,n)
+}
 dim(logFC_mat)
+rownames(logFC_mat) = logFC_mat_rownames
+colnames(logFC_mat) = tissue_list
 head(logFC_mat)
-
-
 ```
 
 ```{r}
@@ -532,7 +402,15 @@ logFC_mat_NQ <- normalizeQuantiles(logFC_mat)
 ```
 
 ```{r}
+head(logFC_mat_NQ)
+```
+
+```{r}
 dist_mat <- as.matrix(cor(logFC_mat_NQ))
+```
+
+```{r}
+head(dist_mat)
 ```
 
 ```{r}
@@ -542,19 +420,7 @@ colnames(dist_mat) <- colnames(logFC_mat)
 
 ```{r}
 library(pheatmap)
-hm <- pheatmap(as.matrix(dist_mat))
-
-```
-
-```{r}
-class(hm)
-```
-
-```{r}
-pheatmap(as.matrix(dist_mat),main="Tissue Specific Log Fold Change Sex Differences", filename = '../pdf/Figure1c.pdf')
-
-```
-
-```{r}
-
+pheatmap(as.matrix(dist_mat),  fontsize = 6)
+hm.parameters <- list(dist_mat, fontsize=6)
+do.call("pheatmap", c(hm.parameters, filename="../pdf/Figure1c.pdf"))
 ```
