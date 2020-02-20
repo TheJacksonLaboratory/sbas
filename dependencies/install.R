@@ -1,5 +1,5 @@
 Sys.setenv(TAR = "/bin/tar")
-devtools::install_github("ropensci/piggyback")
+devtools::install_github("ropensci/piggyback@patch")
 BiocManager::install(c('bumphunter' , 'GenomeInfoDb', 'GenomeInfoDbData', 'edgeR', 'statmod'))
 install.packages(c('doParallel', 'doRNG', 'foreach', 'stringi', 'pheatmap'), repo = 'https://cran.r-project.org')
 devtools::install_github("TheJacksonLaboratory/yarn", ref = "annes-changes", upgrade="never")
