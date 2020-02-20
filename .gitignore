@@ -1,0 +1,7 @@
+**/.ipynb_checkpoints
+data/*
+# Added with usethis::git_vaccinate()
+.Rproj.user
+.Rhistory
+.Rdata
+.DS_Store
