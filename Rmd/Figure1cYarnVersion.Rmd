@@ -18,11 +18,9 @@ jupyter:
 A `heatplot` representing similarity in the fold-changes between male and female samples, with the values in the heatmap being the correlation between the vectors of fold changes of the tissues. </b>
 
 
-We downloaded the GTEx version 8.0 RNA-seq and genotype data (phs000424.v8.v2), released 2019-08-26.
-We used YARN (https://bioconductor.org/packages/release/bioc/html/yarn.html), uploading the downloadGTEx function
-to download this release, and used it to perform quality control, gene filtering and normalization pre-processing on the
-GTEx RNA-seq data, as described in (Paulson et al, 2017).   This pipelines tested for sample sex-misidentification, 
-merged related sub-tissues, performed tissue-aware normalization using qsmooth (Hicks et al, 2017).
+## **NOTE**:
+
+We assume that you have cloned the analysis repository and have `cd` into the parent directory. Before starting with the analysis make sure you have first completed the dependencies set up by following the instructions described in the **`dependencies/README.md`** document. All paths defined in this Notebook are relative to the parent directory (repository). Please close this Notebook and start again by following the above guidelines if you have not completed the aforementioned steps.
 
 
 ## Loading dependencies
@@ -35,89 +33,112 @@ library(biomaRt)
 library(DBI) # v >= 1.1.0 required for biomaRt
 library(devtools)
 library(yarn)
+library(statmod)
+library(piggyback)
+library(snakecase)
+library(stringr)
+library(pheatmap)
+library(magrittr)
 Sys.setenv(TAR = "/bin/tar") # for gzfile
 ```
 
-Begin here if you have already run this and created the `data/gtex.rds` file
+# Retrieving the GTEx archive
+
+We used the R package [{yarn}](https://bioconductor.org/packages/release/bioc/html/yarn.html) to retrieve the GTEx Biobank data. In order to downloaded the latest GTEx version 8.0 for RNA-seq and genotype data (phs000424.v8.v2), released 2019-08-26, we created a fork of the package's GitHub repository and created a new version of the function **`yarn::downloadGTEx()`**, namely **`yarn::downloadGTExV8()`** to download this release. 
+
+We used the function to perform quality control, gene filtering and normalization pre-processing on the GTEx RNA-seq data, as described in (Paulson et al, 2017). This pipeline tested for sample sex-misidentification, merged related sub-tissues and performed tissue-aware normalization using the **`{yarn::qsmooth}`**  function (Hicks et al, 2017).
+
+We have archived the output of the **`yarn::downloadGTExV8()`** function, which is an `ExpressionSet` object in the repo `lifebitai/lifebitCloudOSDREgtex` for replicability and decreasing the runtime of this analysis. Below we retrieve this `gtex.rds` object from the GitHub releases using the **`{ropensci/piggyback}`** package, but we have also added the relevant command to retrieve the data from GTEx and generate the `ExpressionSet` object using  **`yarn::downloadGTExV8()`**. For the current analysis we are utilising a compute resource with 8 vCPUs and 60 GB of memory available.
 
 
-Please `git clone` the repository and start working after changing to this as your working directory (`cd lifebitCloudOSDRE`). The `data` subdirectory, along with all other paths used in this Notebook are relative to the `lifebitCloudOSDRE` repository.
 
 ```{r}
-# CAUTION! It requires some minutes to complete, also memory and enough storage
-obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+# Load with readRDS() if gtex.rds available in data/
+if ("gtex.rds" %in% list.files("../data/")) {
+    message("Loading GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
+    obj <- readRDS(file = "../data/gtex.rds" )
+    message("Done!\n")
+    message("Generating sha256sum for gtex.rds ..\n")    
+    message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+    message("Done!\n")
+}
+
+# Download from archive if not available in ../data
+if (!("gtex.rds" %in% list.files("../data/"))) {
+    message("Downloading GTEx v8 from GitHub Releases archive into the ../data/ directory ..\n")
+    piggyback::pb_download(file = "gtex.rds", 
+                                repo = "lifebit-ai/lifebitCloudOSDREgtex", 
+                                tag  = "fig1c_archive", 
+                                dest = "../data/")
+    message("Generating sha256sum for gtex.rds ..")    
+    message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+    message("Done!\n")    
+    message("Loading GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")    
+    obj <- readRDS(file = "../data/gtex.rds" )
+    message("Done!\n")
+}
+
+# Download with yarn if you wish, this requires several minutes to complete
+if (!("gtex.rds" %in% list.files("../data/"))) {
+    message("Downloading GTEx v8 with 'yarn::downloadGTExV8()'")
+    obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+    message("Done!")
+
+}
 ```
 
-This uploaded object is available by long names -- which might be nice to simplify ....
-
 ```{r}
-class(obj)
-```
-
-```{r}
-saveRDS(obj, file = "../data/ExpressionSetobj.rds")
-```
-
-```{r}
+# Confirm that it is an expression set.
+# and check the dimensions of the objects, and the phenotype information of the objects
+class(obj) 
 dim(phenoData(obj))
-```
-
-```{r}
-# for later - not sure attributes are actually successfully being added
-#ensembl = useMart("ensembl",dataset="hsapiens_gene_ensembl")
-#attributes = listAttributes(ensembl)
-```
-
-```{r}
 dim(obj)
 ```
 
+### NOTE: 
+
+We observe above that our phenotype data have 2 more observations than our expression data,  let's inspect what are these samples:
+
 ```{r}
 sample_names=as.vector(as.character(colnames(exprs(obj))))
-head(sample_names)
 length(sample_names)
-```
 
-```{r}
 pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
-head(pheno_sample_names)
 length(pheno_sample_names)
+
+if (length(pheno_sample_names) > length(sample_names)) {
+    superset <- pheno_sample_names
+    subset   <- sample_names    
+} 
+
+if (length(pheno_sample_names) < length(sample_names)) {
+    superset <- sample_names
+    subset   <- pheno_sample_names   
+} 
+
+non_overlaps <- setdiff( superset, subset)
+
+message("The non-overlapping IDs between pheno and count data are:\n\n", 
+        paste(non_overlaps, collapse = "\n") )
 ```
 
-Okay - for some reason our phenotype data is larger than our expression data - I've written Joe Paulson about that.
-In the meantime, make sure that the two sets are aligned.
+Let's keep only the overlapping IDs:
 
 ```{r}
 logical_match_names=pheno_sample_names %in% sample_names
 length(logical_match_names)
-```
-
-```{r}
 table(logical_match_names)
-
-```
-
-```{r}
 pData(obj) <- (pData(obj)[logical_match_names==TRUE,])
-```
-
-```{r}
 dim(pData(obj))
 dim(obj)
 ```
 
-Now we want to replace all *dashes* with _underscores_
+#  Now we want to replace all *dashes* with **dots "."**
 
 ```{r}
-newSampID <- gsub('-','\\.',pData(obj)$SAMPID)
-```
-
-```{r}
-head (newSampID)
-```
-
-```{r}
-pData(obj)$SAMPID <- newSampID
+pData(obj)$SAMPID[1]
+pData(obj)$SAMPID <- gsub('-','\\.',pData(obj)$SAMPID)
+pData(obj)$SAMPID[1]
 ```
 
 ```{r}
@@ -128,136 +149,143 @@ colnames(pData(obj))
 head(exprs(obj))
 ```
 
-Now let us do the differential analysis - using EdgeR
+#  Differential Expression using `{edgeR}`
 
 ```{r}
-x <- exprs(obj)
+transcript_counts_matrix <- exprs(obj)
 ```
 
 ```{r}
-dim(x)
+dim(transcript_counts_matrix)
 ```
 
-To use the DGEList function from EdgeR, we need to transpose our x so that the length of group is equal
-to the number of columns in our counts (x).
-
-You will get an error in DGEList (counts = x, group = group) if the length of group is not equal to the number of columns in counts
+To use the **`edgeR::DGEList()`** function, we need to transpose our `transcript_counts_matrix` so that the length of group is equal to the number of columns in our counts (`transcript_counts_matrix`). You will get an error from the   **`edgeR::DGEList()`** function (counts = x, group = group) if the length of group is not equal to the number of columns in counts.
 
 ```{r}
 group <- factor(pData(obj)$SEX)
 ```
 
 ```{r}
-y <- DGEList(counts=x, group=group)
+table(group)
 ```
 
-I keep running out of memory on this step - so on my laptop after calculating the DGEList
-I saved it and now I uploaded it to this larger memory machine
+### NOTE: 
+
+This step takes several minutes to complete. If you have **not** applied other filtering options or you are coming back to your analysis and want to continue from this step, feel free to use the cached version using the following command:
+
+```
+# Load with readRDS() if `../data/DGENormFactorsy.rds` available in data/
+if ("DGENormFactorsy.rds" %in% list.files("../data/")) {
+    message("Loading  `../data/DGENormFactorsy.rds` object with `readRDS()` from ../data/ \n")    
+    y <- readRDS("../data/DGENormFactorsy.rds")
+    message("Done!")    
+}
+```
+
+By default, these objects will be regenarated the making sure the changes from above are applied to these objects as well.
 
 ```{r}
+# Download if not available in ../data
+if (!("DGENormFactorsy.rds" %in% list.files("../data/"))) {
+    message("Creating `DGEList` object from counts matrix with 'edgeR::DGEList()' ..")
+    y <- edgeR::DGEList(counts = transcript_counts_matrix, 
+                        group  = group)
+    message("Done!\n")    
+
+    message("Calculating normalization factors on `DGEList` object to scale the raw library sizes with 'edgeR::DGEList()' ..")    
+    y <- edgeR::calcNormFactors(y)
+    message("Done!\n")    
+    message("Saving normalization factors object in '../data/DGENormFactorsy.rds' ..")        
+    saveRDS(y, file = "../data/DGENormFactorsy.rds")
+    message("Done!\n")    
+    message("Generating sha256sum for DGENormFactorsy.rds ..\n")    
+    message(system("sha256sum ../data/DGENormFactorsy.rds", intern = TRUE))
+    message("Done!\n")
+}
+
 attributes(y)
 ```
 
 ```{r}
-#caution this step takes a lot of memory and time
-```
-
-```{r}
-y <- calcNormFactors(y)
-```
-
-```{r}
-saveRDS(y, file = "../data/DGENormFactorsy.rds")
+dim(y$counts)
 ```
 
 ```{r}
 # For Guy -- does this do what you are expecting -- I am confused because what you get when you
 #        ask for the min (table(groups)) is the smaller sized group -- which in this case is 
 #        female -- it will help the reader to know what you are doing here with the statement.
-#        one can read what it is doing but not understand your objective.
+#        one can read what it is doing but not understand your objective.groups <- pData(obj)$SEX
+# keep.events <- rep(TRUE, nrow(y))
+# for (group in c(1,2)) {
+#    keep.events <- keep.events & 
+#                   rowSums(cpm(y[,groups %in% group]) > 1) >= 0.25*min(table(groups))
+# }
+
+#  From Anne - I believe the objective in this step is to keep only those genes that are in the
+#    that are above the threshold of expression for the lower quartile of all sex specific genes.
+#    groups = (1,2) -- lots of confusion in logic between groups and group and male and female
+#    I recommend we use male and female.
+#    two errors then in the above loop - 
+#     1. min(table(groups)) will always return the
+#        length of the number of samples that are female 
+#        (which is 5978 for this v8 GTEx)
+#     2. sum(table(group)) will return the number of samples that are either male or female
+#        depending upon whether you are in the loop for male or female consideration.
+
+#    If my assumption is true - I recommend replacing it with the following.
+
+#  this should be replaced 
+
 ```
 
 ```{r}
-groups <- pData(obj)$SEX
 keep.events <- rep(TRUE, nrow(y))
-for (group in c(1,2)) {
-    keep.events <- keep.events & 
-                   rowSums(cpm(y[,groups %in% group]) > 1) >= 0.25*min(table(groups))
+nrow(y)
+table(pData(obj)$SEX)
+table(group)
+#
+# first keep all the events for the male subsets meeting our threshold criteria
+#
+keep.events  <- keep.events & rowSums(edgeR::cpm(y$counts[,group == 1]) > 1) >= 0.25*length(group==1)
+#
+# now keep all the male subsets or the female subsets meeting our criteria
+#
+keep.events2 <- keep.events | rowSums(edgeR::cpm(y$counts[,group == 2]) > 1) >= 0.25*length(group==2)
+table(keep.events)
+table(keep.events2)
+```
+
+```{r}
+# Load with readRDS() if `../data/reduced_y.rds` available in data/
+if  ( ('reduced_y.rds' %in% list.files("../data/")) && ('reduced_obj' %in% list.files("../data/"))) {
+    message("Loading  `reduced_y.rds` and  `reduced_obj` objects with `readRDS()` from ../data/ \n")    
+    reduced_obj <- readRDS(file = "../data/reduced_obj.rds")
+    reduced_y   <- readRDS(file = "../data/reduced_y.rds")
+    message("Done!")    
 }
 
-```
 
-```{r}
-reduced_y<- y[keep.events,]
-```
+# Create if not available in ../data
+if  ( !(('reduced_y.rds' %in% list.files("../data/")) && ('reduced_obj' %in% list.files("../data/")))) {
 
-```{r}
-reduced_obj <- obj[keep.events==TRUE,]
-```
+    message("Creating `reduced_y` keeping only rows that match `keep.events2` list ..")
+    reduced_y<- y[keep.events2,]
+    message("Done!\n")    
+    
+    message("Creating `reduced_obj` keeping only rows that match `keep.events2` list ..")    
+    reduced_obj <- obj[keep.events2==TRUE,]
+    message("Done!\n")    
+    
+    message("Saving `reduced_y.rds`, `reduced_obj.rds` in '../data/' ..")        
+    saveRDS(reduced_y, file = "../data/reduced_y.rds")
+    saveRDS(reduced_obj, file = "../data/reduced_obj.rds")
+    message("Done!\n")     
+}
 
-```{r}
 dim(reduced_obj)
 ```
 
-```{r}
-#saveRDS(reduced_y, file = "../data/reduced_y.rds")
-#saveRDS(reduced_obj, file = "../data/reduced_obj.rds")
-reduced_obj <- readRDS(file = "../data/reduced_obj.rds")
-reduced_y   <- readRDS(file = "../data/reduced_y.rds")
-
-```
-
-```{r}
-# make the design based upon sex 
-design <- model.matrix(~factor(pData(obj)$SEX))
-```
-
-```{r}
-# From voom function description, we see ‘voom’ is an acronym for mean-variance modelling at the
-#     observational level. The idea is to estimate the mean-variance
-#     relationship in the data, then use this to compute an appropriate
-#     precision weight for each observation. 
-#     ‘voom’ performs the following specific calculations. First, the
-#     counts are converted to logCPM values, adding 0.5 to all the
-#     counts to avoid taking the logarithm of zero. 
-```
-
-```{r}
-v <- voom (reduced_y, design)
-```
-
-```{r}
-# make a linear fit model based upon the model.matrix
-```
-
-```{r}
-fit <- lmFit(v, design)
-```
-
-```{r}
-#install.packages("statmod")
-library(statmod)
-```
-
-```{r}
-fit <- eBayes(fit, robust=TRUE)
-```
-
-```{r}
-# extract a table of the top-ranked genes from a linear fit model.
-results = topTable(fit, coef='factor(pData(obj)$SEX)2',number=nrow(reduced_y))
-
-```
-
-```{r}
-write.table(results,'../data/all_FC_results.txt',sep='\t',quote = F)
-```
-
-```{r}
-# separate the analysis by male and by female
-# then do the differential analysis regarding tissue
-# then do the differential analysis male tissue vs female tissue
-```
+# Separate the analysis by male and by female
 
 ```{r}
 reduced_male   <- pData(reduced_obj)$SEX==1
@@ -275,8 +303,9 @@ dim(reduced_obj_female)
 ```
 
 ```{r}
-tissue_groups_male <- factor(pData(reduced_obj_male)$SMTS)
-tissue_groups_female <- factor(pData(reduced_obj_female)$SMTS)
+# changing from SMTS to SMTSD - more granularity -- but we could produce both figures
+tissue_groups_male <- factor(pData(reduced_obj_male)$SMTSD)
+tissue_groups_female <- factor(pData(reduced_obj_female)$SMTSD)
 ```
 
 ```{r}
@@ -289,15 +318,11 @@ table (tissue_groups_male)
 table(tissue_groups_female)
 ```
 
-```{r}
-# Reproducing Guys results using the yarn expression object
-# loop through the tissues and for those tissues that are shared between the two sexes
-# perform a differential gene analysis on a per tissue basis
+Reproducing previous results using the `yarn` expression object, loop through the tissues and for those tissues that are shared between the two sexes perform a differential gene analysis on a per tissue basis.
 
-```
 
 ```{r}
-tissue_groups <- factor(pData(reduced_obj)$SMTS)
+tissue_groups <- factor(pData(reduced_obj)$SMTSD)
 ```
 
 ```{r}
@@ -316,215 +341,100 @@ table(tissue_shared_male_female)
 sex = factor(pData(reduced_obj)$SEX)
 ```
 
+Let's now define a function named `fit_tissue()`that accepts two arguments, the `tissue` and an `object` and create the **model matrix** based  that tissue's sex. We will perform a linear fit after calculating normal factors (based on the library size) and calculate the dispersion using `{voom}` (mean variance model of dispersion). We are saving the resulting matrixes as files.
+
+
 ```{r}
-#tissue_shared_male_female
-for (tissue in tissue_shared_male_female) {
-# missing: Bladder
-    tissue        <- 'Bladder'
-    tissue_true   <- pData(reduced_obj)$SMTS==tissue
-    tissue_obj    <- reduced_obj[,tissue_true==TRUE]
-    tissue_sex    <- factor(pData(tissue_obj)$SEX)
-    tissue_design <- model.matrix(~tissue_sex)
-#    dim(tissue_obj)
-#    head(tissue_design)
-    y_tissue      <- DGEList(counts=exprs(tissue_obj), group=tissue_sex)
-    tissue_sex_array <- lapply(pData(reduced_obj)$SMTS, factor())
-    y_tissue_array <- lapply(pData(reduced_obj)$SMTS,DGEList(counts=exprs(tissue_obj), group=tissue_sex)
-    y_tissue      <- calcNormFactors(y_tissue)
-    y_tissue_voom <- voom (y_tissue, tissue_design)
-    fit_tissue    <- lmFit(y_tissue_voom, tissue_design)
-    fit_tissue    <- eBayes(fit_tissue, robust=TRUE)
-    results_tissue<- topTable(fit_tissue, coef='tissue_sex2', number=nrow(y_tissue))
-    assign(paste("results",tissue, sep="_"),results_tissue)
-    filename = paste(paste("../data", tissue,sep="/"),"DGE.txt",sep="_")
-    write.table(results_tissue,filename,sep='\t',quote = F)
-#}
+fit_tissue <- function (tissue, obj) {
+    tissue_true    <- pData(obj)$SMTSD == tissue
+    tissue_obj     <- obj[,tissue_true ==TRUE]
+    tissue_sex     <- factor(pData(tissue_obj)$SEX)
+    tissue_design  <- model.matrix(~tissue_sex)
+    y_tissue       <- DGEList(counts=exprs(tissue_obj), group=tissue_sex)
+    y_tissue       <- calcNormFactors(y_tissue)
+    y_tissue_voom  <- voom(y_tissue, tissue_design)
+    fit_tissue     <- lmFit(y_tissue_voom, tissue_design)
+    fit_tissue     <- eBayes(fit_tissue, robust=TRUE)
+    results_tissue <- topTable (fit_tissue, coef='tissue_sex2', number=nrow(y_tissue))
+    filename = paste(paste("../data",gsub(" ","",tissue), sep="/"),"DGE.csv", sep="_")    
+    write.table(results_tissue, filename, sep=',', quote=FALSE)
+    return (results_tissue)
+}
 ```
 
 ```{r}
-filenames <- list.files("../data", pattern="*_DGE.txt", all.files=FALSE,
-    full.names=FALSE)
+# debugging with using the 'Thyroid' tissue
+#thyroid_logFC <- fit_tissue('Thyroid',reduced_obj)
+#thyroid_logFC
+# 
+all_logFC <- lapply(X=levels(tissue_shared_male_female), FUN=fit_tissue, obj=reduced_obj)
 ```
 
 ```{r}
-#library(stringr)
-#for (file in filenames) {
-#    newname <- str_replace(file, '_DGE.txt', '')
-#    assign(paste(as.character(newname), "DGE",sep="_"),newname)
-#    newname <- str_replace(newname,' ','_')
-#    newname_file <- paste("../data",file,sep="/")
-#    assign(newname <- read.delim2(newname_file)
-#}
-#adipose_tissue_logFC <- read.delim2("../data/Adipose\ Tissue_DGE.txt")
-#head(adipose_tissue_logFC)
-filenames
+filenames <- list.files("../data", pattern="*_DGE.csv", all.files=FALSE, full.names=TRUE)
+(filenames)
 ```
 
 ```{r}
-adipose_tissue_logFC_mat <- read.delim2("../data/Adipose\ Tissue_DGE.txt",stringsAsFactors = FALSE)
-adrenal_gland_logFC_mat  <- read.delim2("../data/Adrenal\ Gland_DGE.txt",stringsAsFactors = FALSE)
-bladder_logFC_mat        <- read.delim2("../data/Bladder_DGE.txt",stringsAsFactors = FALSE)
-blood_logFC_mat          <- read.delim2("../data/Blood_DGE.txt",stringsAsFactors = FALSE)
-blood_vessel_logFC_mat   <- read.delim2("../data/Blood\ Vessel_DGE.txt",stringsAsFactors = FALSE) 
-brain_logFC_mat          <- read.delim2("../data/Brain_DGE.txt",stringsAsFactors = FALSE)
-breast_logFC_mat         <- read.delim2("../data/Breast_DGE.txt",stringsAsFactors = FALSE)
-colon_logFC_mat          <- read.delim2("../data/Colon_DGE.txt",stringsAsFactors = FALSE)
-esophagus_logFC_mat      <- read.delim2("../data/Esophagus_DGE.txt",stringsAsFactors = FALSE)
-heart_logFC_mat          <- read.delim2("../data/Heart_DGE.txt",stringsAsFactors = FALSE)
-kidney_logFC_mat         <- read.delim2("../data/Kidney_DGE.txt",stringsAsFactors = FALSE)
-liver_logFC_mat          <- read.delim2("../data/Liver_DGE.txt",stringsAsFactors = FALSE)
-lung_logFC_mat           <- read.delim2("../data/Lung_DGE.txt",stringsAsFactors = FALSE)
-muscle_logFC_mat         <- read.delim2("../data/Muscle_DGE.txt",stringsAsFactors = FALSE)
-nerve_logFC_mat          <- read.delim2("../data/Nerve_DGE.txt",stringsAsFactors = FALSE)
-pancreas_logFC_mat       <- read.delim2("../data/Pancreas_DGE.txt",stringsAsFactors = FALSE)
-pituitary_logFC_mat      <- read.delim2("../data/Pituitary_DGE.txt",stringsAsFactors = FALSE)
-salivary_gland_logFC_mat <- read.delim2("../data/Salivary\ Gland_DGE.txt",stringsAsFactors = FALSE)
-skin_logFC_mat           <- read.delim2("../data/Skin_DGE.txt",stringsAsFactors = FALSE)
-small_intestine_logFC_mat<- read.delim2("../data/Small\ Intestine_DGE.txt",stringsAsFactors = FALSE)
-spleen_logFC_mat         <- read.delim2("../data/Spleen_DGE.txt",stringsAsFactors = FALSE)
-stomach_logFC_mat        <- read.delim2("../data/Stomach_DGE.txt",stringsAsFactors = FALSE)
-thyroid_logFC_mat        <- read.delim2("../data/Thyroid_DGE.txt",stringsAsFactors = FALSE)
+# preserve the ordered rownames for later assignment to matrix
+fullfilename <-filenames[1]
+logFC_mat    <- read.csv(fullfilename)
+logFC_mat    <- logFC_mat[order(rownames(logFC_mat)),]
+logFC_mat_rownames <- as.character(rownames(logFC_mat)) 
 ```
 
 ```{r}
-adipose_tissue_logFC <- as.matrix(as.numeric(adipose_tissue_logFC_mat$logFC),nrow=16794,ncol=1)
+# Make a matrix for each of the tissues
+# from what files are saved
 
-m <- adipose_tissue_logFC[order(rownames(adipose_tissue_logFC_mat)),]
+make_tissue_matrix_ready <- function (file, obj) {
+    filename        <- paste('../data',file,sep="/")
+    logFC_mat       <- read.csv(filename)
+    logFC_mat       <- logFC_mat[order(rownames(logFC_mat)),]
+    logFC           <- as.matrix(as.numeric(logFC_mat$logFC),nrow=dim(obj)[2],ncol=1)
+    rownames(logFC) <- rownames(logFC_mat)
+    return(logFC)
+}
 ```
 
 ```{r}
-adipose_tissue_logFC_mat       <- adipose_tissue_logFC_mat[order(rownames(adipose_tissue_logFC_mat)),]
-adipose_tissue_logFC           <- as.matrix(as.numeric(adipose_tissue_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(adipose_tissue_logFC) <- rownames(adipose_tissue_logFC_mat)
-
-adrenal_gland_logFC_mat       <- adrenal_gland_logFC_mat[order(rownames(adrenal_gland_logFC_mat)),]
-adrenal_gland_logFC           <- as.matrix(as.numeric(adrenal_gland_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(adrenal_gland_logFC) <- rownames(adrenal_gland_logFC_mat)
-
-bladder_logFC_mat       <- bladder_logFC_mat[order(rownames(bladder_logFC_mat)),]
-bladder_logFC           <- as.matrix(as.numeric(bladder_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(bladder_logFC) <- rownames(bladder_logFC_mat)
-
-blood_logFC_mat       <- blood_logFC_mat[order(rownames(blood_logFC_mat)),]
-blood_logFC           <- as.matrix(as.numeric(blood_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(blood_logFC) <- rownames(blood_logFC_mat)
-
-blood_vessel_logFC_mat       <- blood_vessel_logFC_mat[order(rownames(blood_vessel_logFC_mat)),]
-blood_vessel_logFC           <- as.matrix(as.numeric(blood_vessel_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(blood_vessel_logFC) <- rownames(blood_vessel_logFC_mat)
-
-brain_logFC_mat      <- brain_logFC_mat[order(rownames(brain_logFC_mat)),]
-brain_logFC          <- as.matrix(as.numeric(brain_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(brain_logFC)<- rownames(brain_logFC_mat)
-
-breast_logFC_mat       <- breast_logFC_mat[order(rownames(breast_logFC_mat)),]
-breast_logFC           <- as.matrix(as.numeric(breast_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(breast_logFC) <- rownames(breast_logFC_mat)
-
-colon_logFC_mat       <- colon_logFC_mat[order(rownames(colon_logFC_mat)),]
-colon_logFC           <- as.matrix(as.numeric(colon_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(colon_logFC) <- rownames(colon_logFC_mat)
-
-esophagus_logFC_mat       <- esophagus_logFC_mat[order(rownames(esophagus_logFC_mat)),]
-esophagus_logFC           <- as.matrix(as.numeric(esophagus_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(esophagus_logFC) <- rownames(esophagus_logFC_mat)
-
-heart_logFC_mat       <- heart_logFC_mat[order(rownames(heart_logFC_mat)),]
-heart_logFC           <- as.matrix(as.numeric(heart_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(heart_logFC) <- rownames(heart_logFC_mat)
-
-kidney_logFC_mat       <- kidney_logFC_mat[order(rownames(kidney_logFC_mat)),]
-kidney_logFC           <- as.matrix(as.numeric(kidney_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(kidney_logFC) <- rownames(kidney_logFC_mat)
-
-liver_logFC_mat       <- liver_logFC_mat[order(rownames(liver_logFC_mat)),]
-liver_logFC           <- as.matrix(as.numeric(liver_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(liver_logFC) <- rownames(liver_logFC_mat)
-
-lung_logFC_mat       <- lung_logFC_mat[order(rownames(lung_logFC_mat)),]
-lung_logFC           <- as.matrix(as.numeric(lung_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(lung_logFC) <- rownames(lung_logFC_mat)
-
-muscle_logFC_mat      <- muscle_logFC_mat[order(rownames(muscle_logFC_mat)),]
-muscle_logFC          <- as.matrix(as.numeric(muscle_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(muscle_logFC)<- rownames(muscle_logFC_mat)
-
-nerve_logFC_mat       <- nerve_logFC_mat[order(rownames(nerve_logFC_mat)),]
-nerve_logFC           <- as.matrix(as.numeric(nerve_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(nerve_logFC) <- rownames(nerve_logFC_mat)
-
-pancreas_logFC_mat       <- pancreas_logFC_mat[order(rownames(pancreas_logFC_mat)),]
-pancreas_logFC           <- as.matrix(as.numeric(pancreas_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(pancreas_logFC) <- rownames(pancreas_logFC_mat)
-
-pituitary_logFC_mat       <- pituitary_logFC_mat[order(rownames(pituitary_logFC_mat)),]
-pituitary_logFC           <- as.matrix(as.numeric(pituitary_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(pituitary_logFC) <- rownames(pituitary_logFC_mat)
-
-salivary_gland_logFC_mat       <- salivary_gland_logFC_mat[order(rownames(salivary_gland_logFC_mat)),]
-salivary_gland_logFC           <- as.matrix(as.numeric(salivary_gland_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(salivary_gland_logFC) <- rownames(salivary_gland_logFC_mat)
-
-skin_logFC_mat       <- skin_logFC_mat[order(rownames(skin_logFC_mat)),]
-skin_logFC           <- as.matrix(as.numeric(skin_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(skin_logFC) <- rownames(skin_logFC_mat)
-
-small_intestine_logFC_mat       <- small_intestine_logFC_mat[order(rownames(small_intestine_logFC_mat)),]
-small_intestine_logFC           <- as.matrix(as.numeric(small_intestine_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(small_intestine_logFC) <- rownames(small_intestine_logFC_mat)
-
-spleen_logFC_mat       <- spleen_logFC_mat[order(rownames(spleen_logFC_mat)),]
-spleen_logFC           <- as.matrix(as.numeric(spleen_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(spleen_logFC) <- rownames(spleen_logFC_mat)
-
-stomach_logFC_mat       <- stomach_logFC_mat[order(rownames(stomach_logFC_mat)),]
-stomach_logFC           <- as.matrix(as.numeric(stomach_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(stomach_logFC) <- rownames(stomach_logFC_mat)
-
-thyroid_logFC_mat       <- thyroid_logFC_mat[order(rownames(thyroid_logFC_mat)),]
-thyroid_logFC           <- as.matrix(as.numeric(thyroid_logFC_mat$logFC),nrow=16794,ncol=1)
-rownames(thyroid_logFC) <- rownames(thyroid_logFC_mat)
-
+matrix_list <- lapply(X=filenames, FUN=make_tissue_matrix_ready, obj=reduced_obj)
 ```
 
 ```{r}
-logFC_mat = as.matrix(cbind(adipose_tissue_logFC,
-             adrenal_gland_logFC,
-             bladder_logFC,
-             blood_logFC,
-             blood_vessel_logFC,
-             brain_logFC,
-             breast_logFC,
-             colon_logFC,
-             esophagus_logFC,
-             heart_logFC,
-             kidney_logFC,
-             liver_logFC,
-             lung_logFC,
-             muscle_logFC,
-             nerve_logFC,
-             pancreas_logFC,
-             pituitary_logFC,
-             salivary_gland_logFC,
-             skin_logFC,
-             small_intestine_logFC,
-             spleen_logFC,
-             stomach_logFC,
-             thyroid_logFC),nrow=16794,ncol=23)
-
+length(matrix_list)
+logFC_mat = as.matrix(lapply(X   = matrix_list, 
+                             FUN = cbind),
+                      nrow = dim(reduced_obj)[2], 
+                      ncol = length(matrix_list))
+length(logFC_mat)
 ```
 
 ```{r}
-rownames(logFC_mat) <- rownames(thyroid_logFC)
-colnames(logFC_mat) <- c("adipose","adrenal_gland","bladder","blood","blood_vessel",
-                        "brain","breast","colon","esophagus","heart","kidney",
-                        "liver","lung","muscle","nerve","pancreas","pitutary",
-                        "salivary_gland","skin","small_intestine",
-                        "spleen","stomach","thyroid")
+get_tissue_name <- function (tissue_name) {
+            tissue <- str_replace(tissue_name,'_DGE.txt','')
+            return(tissue)
+}
+```
+
+```{r}
+tissue_list <- lapply(X=levels(tissue_shared_male_female), FUN=get_tissue_name)
+length(tissue_list)
+head(tissue_list)
+```
+
+```{r}
+logFC_mat = as.matrix(as.numeric(unlist(matrix_list[1]),nrow=dim(reduced_obj)[2], ncol=1))
+
+for (i in (2:length(matrix_list))) {
+    n = as.matrix(as.numeric(unlist(matrix_list[i]),nrow=dim(reduced_obj)[2], ncol=1))
+    logFC_mat = cbind(logFC_mat, n)
+}
+
 dim(logFC_mat)
+rownames(logFC_mat) = logFC_mat_rownames
+colnames(logFC_mat) = tissue_list
 head(logFC_mat)
-
-
 ```
 
 ```{r}
@@ -532,29 +442,116 @@ logFC_mat_NQ <- normalizeQuantiles(logFC_mat)
 ```
 
 ```{r}
+head(logFC_mat_NQ)
+```
+
+```{r}
 dist_mat <- as.matrix(cor(logFC_mat_NQ))
+```
+
+```{r}
+head(dist_mat)
 ```
 
 ```{r}
 rownames(dist_mat) <- colnames(logFC_mat)
 colnames(dist_mat) <- colnames(logFC_mat)
+
+message("Saving dist_mat object")
+saveRDS(object = dist_mat, file = "../data/dist_mat.rds")
+message("Done!")
 ```
 
 ```{r}
 library(pheatmap)
-hm <- pheatmap(as.matrix(dist_mat))
+pheatmap(as.matrix(dist_mat),   fontsize = 6)
+hm.parameters <- list(dist_mat, fontsize = 6)
+do.call("pheatmap", c(hm.parameters,  filename="../pdf/Figure1c.pdf"))
+```
+
+## Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+
+### 1. Checksums with the sha256 algorithm
+
+```{r}
+message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
+system("cd ../data/ && sha256sum * > ../metadata/sha256sums.txt", intern = TRUE)
+message("Done!\n")
+
+data.table::fread("../metadata/sha256sums.txt", header = FALSE, col.names = c("sha256sum", "file"))
+```
+
+### 2. Libraries metadata
+
+```{r}
+session_info <- devtools::session_info()
+message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
+saveRDS(session_info, file = "../metadata/devtools_session_info.rds")
+message("Done!\n")
+
+message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
+saveRDS(session_info, file = "../metadata/utils_info.rds")
+message("Done!\n")
+
+session_info$platform
+
+session_info$packages[session_info$packages$attached==TRUE, ]
+```
+
+## Archive artefacts in GitHub releases using **`{ropensci/piggyback}`**
+
+
+### Create a tarball of all the light .csv file
+
+```{r}
+message("Creating tarball of .csv files and removing files ..\n")
+system("cd ../data/ && tar -czvf csv.tar.gz *csv && rm *csv", intern = TRUE)
+message("Done!\n")
+
+
+```
+
+## Create a new release in the repository of choice (or ignore if this cannot be completed)
+
+```{r}
+# Define a function to attempt archive creation via try or ignore and move on
+
+create_piggyback_archive <- function(repo, tag){
+        message(paste0("Trying to create a new tag in GitHub releases named ", tag_new, " ..\n"))
+        piggyback::pb_new_release(repo = repo_archive, tag  = tag_new)
+        message(paste0("Done..!\n"))
+    }
 
 ```
 
 ```{r}
-class(hm)
-```
+library(magrittr)
 
-```{r}
-pheatmap(as.matrix(dist_mat),main="Tissue Specific Log Fold Change Sex Differences", filename = '../pdf/Figure1c.pdf')
+tag_new      <- paste("figure1c", system("git config user.name", intern = TRUE), snakecase::to_snake_case(as.character(format(Sys.time(), "%H"))), sep = "_")
+repo_archive <- "lifebit-ai/lifebitCloudOSDREgtex"
 
-```
 
-```{r}
+run_pb <- try(create_piggyback_archive(repo = repo_archive, tag = tag_new), silent = FALSE) 
 
+if (class(run_pb) != "try-error") {
+    message(paste0("Uploading the following files to the GitHub Release with tag '", 
+                   tag_new,
+                   "' (", 
+                   repo_archive, 
+                   "): \n\n", 
+                   paste0(paste("- ",list.files("../data/"), collapse = "\n"))), "\n")
+    piggyback::pb_track() %>% piggyback::pb_upload(repo = repo_archive, tag = tag_new)
+    message("Done! \n'")
+    message(paste0("Paste the following link in your browser to look at the attached files to the GitHub Release (tag:", tag_new, ") \n\n", 
+                   "https://github.com/", 
+                   repo_archive, 
+                   "/releases/tag/",
+                   tag_new, "\n"))
+}
 ```
