@@ -2,4 +2,4 @@
 
 CloudOS Digital Research Environment at The Jackson Laboratory
 
-![Network Diagram](assets/lifebit_diagram.jpeg)
+![Network Diagram](assets/lifebit_diagram.png)
