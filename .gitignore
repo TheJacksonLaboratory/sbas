@@ -1,0 +1,12 @@
+**/.ipynb_checkpoints
+data/*
+# For protecting secrets
+.Renviron
+# Added with usethis::git_vaccinate()
+.Rproj.user
+.Rhistory
+.Rdata
+.DS_Store
+manifest.json
+**/*.gz
+**/*.rds

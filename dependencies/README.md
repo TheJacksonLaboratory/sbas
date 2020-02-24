@@ -2,6 +2,10 @@
 For this step of the analysis, start a fairly large instance if running from scratch, say about an r2.8xlarge (8 cpus with 61 GB RAM).
 After your Notebook Session has initilased in CloudOS, open a terminal type the following command:
 
+
+Postpone opening an `.ipynb` file until you have completed all teh following steps, to make sure your Notebook environment is the updated one, after the installations have been successfully completed.
+
+
 ```bash
 git clone https://github.com/TheJacksonLaboratory/lifebitCloudOSDRE.git
 ```
@@ -35,7 +39,7 @@ You might be prompted to do so by `conda` as well.
 ```bash
 
 cd lifebitCloudOSDRE
-conda env update --name base --file dependencies/requirements.txt 
+conda env update --name base --file dependencies/requirements.txt
 conda activate base
 
 ```
@@ -46,11 +50,11 @@ Along with some other dependencies:
 
 
 ```bash
-
+cd lifebitCloudOSDRE
 Rscript dependencies/install.R 
 
 ```
 
 # Ready!
 
-Your environment is ready now, you can start working on the Jupyter Notebook.
+Your environment is ready now, you can open your  `.ipynb` file and start working on your Jupyter Notebook.

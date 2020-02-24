@@ -1,4 +1,5 @@
 Sys.setenv(TAR = "/bin/tar")
-BiocManager::install(c('bumphunter' , 'GenomeInfoDb', 'GenomeInfoDbData'))
-install.packages(c('doParallel', 'doRNG', 'foreach', 'stringi'), repo = 'https://cran.r-project.org')
-devtools::install_github("TheJacksonLaboratory/yarn", ref = "annes-changes", upgrade="never")
+BiocManager::install(c('bumphunter' , 'GenomeInfoDb', 'GenomeInfoDbData', 'edgeR', 'statmod'))
+install.packages(c('doParallel', 'doRNG', 'foreach', 'stringi', 'pheatmap'), repo = 'https://cran.r-project.org')
+devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0", upgrade="never")
+devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
