@@ -50,7 +50,7 @@ Along with some other dependencies:
 
 
 ```bash
-
+cd lifebitCloudOSDRE
 Rscript dependencies/install.R 
 
 ```

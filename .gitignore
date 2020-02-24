@@ -7,4 +7,6 @@ data/*
 .Rhistory
 .Rdata
 .DS_Store
-
+manifest.json
+**/*.gz
+**/*.rds
