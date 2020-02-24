@@ -1,0 +1,186 @@
+Tissue	ASE	Counts
+Adipose - Subcutaneous	A3SS	2
+Adipose - Subcutaneous	A5SS	4
+Adipose - Subcutaneous	MXE	0
+Adipose - Subcutaneous	RI	2
+Adipose - Subcutaneous	SE	44
+Adipose - Visceral (Omentum)	A3SS	2
+Adipose - Visceral (Omentum)	A5SS	1
+Adipose - Visceral (Omentum)	MXE	1
+Adipose - Visceral (Omentum)	RI	1
+Adipose - Visceral (Omentum)	SE	4
+Adrenal Gland	A3SS	2
+Adrenal Gland	A5SS	4
+Adrenal Gland	MXE	3
+Adrenal Gland	RI	2
+Adrenal Gland	SE	136
+Artery - Aorta	A3SS	2
+Artery - Aorta	A5SS	3
+Artery - Aorta	MXE	0
+Artery - Aorta	RI	8
+Artery - Aorta	SE	18
+Artery - Coronary	A3SS	2
+Artery - Coronary	A5SS	2
+Artery - Coronary	MXE	0
+Artery - Coronary	RI	0
+Artery - Coronary	SE	2
+Artery - Tibial	A3SS	3
+Artery - Tibial	A5SS	2
+Artery - Tibial	MXE	0
+Artery - Tibial	RI	3
+Artery - Tibial	SE	13
+Bladder	A3SS	0
+Bladder	A5SS	0
+Bladder	MXE	0
+Bladder	RI	0
+Bladder	SE	0
+Brain - Amygdala.Brain - Hippocampus	A3SS	1
+Brain - Amygdala.Brain - Hippocampus	A5SS	0
+Brain - Amygdala.Brain - Hippocampus	MXE	0
+Brain - Amygdala.Brain - Hippocampus	RI	0
+Brain - Amygdala.Brain - Hippocampus	SE	2
+Brain - Caudate (basal ganglia).Brain - Nucleus accumbens (basal ganglia).Brain - Putamen (basal ganglia)	A3SS	1
+Brain - Caudate (basal ganglia).Brain - Nucleus accumbens (basal ganglia).Brain - Putamen (basal ganglia)	A5SS	3
+Brain - Caudate (basal ganglia).Brain - Nucleus accumbens (basal ganglia).Brain - Putamen (basal ganglia)	MXE	1
+Brain - Caudate (basal ganglia).Brain - Nucleus accumbens (basal ganglia).Brain - Putamen (basal ganglia)	RI	2
+Brain - Caudate (basal ganglia).Brain - Nucleus accumbens (basal ganglia).Brain - Putamen (basal ganglia)	SE	4
+Brain - Cerebellum.Brain - Cerebellar Hemisphere	A3SS	1
+Brain - Cerebellum.Brain - Cerebellar Hemisphere	A5SS	0
+Brain - Cerebellum.Brain - Cerebellar Hemisphere	MXE	5
+Brain - Cerebellum.Brain - Cerebellar Hemisphere	RI	1
+Brain - Cerebellum.Brain - Cerebellar Hemisphere	SE	11
+Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)	A3SS	4
+Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)	A5SS	0
+Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)	MXE	3
+Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)	RI	1
+Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)	SE	369
+Brain - Hypothalamus	A3SS	1
+Brain - Hypothalamus	A5SS	0
+Brain - Hypothalamus	MXE	0
+Brain - Hypothalamus	RI	1
+Brain - Hypothalamus	SE	0
+Brain - Spinal cord (cervical c-1)	A3SS	2
+Brain - Spinal cord (cervical c-1)	A5SS	1
+Brain - Spinal cord (cervical c-1)	MXE	0
+Brain - Spinal cord (cervical c-1)	RI	0
+Brain - Spinal cord (cervical c-1)	SE	0
+Brain - Substantia nigra	A3SS	2
+Brain - Substantia nigra	A5SS	0
+Brain - Substantia nigra	MXE	0
+Brain - Substantia nigra	RI	1
+Brain - Substantia nigra	SE	1
+Breast - Mammary Tissue	A3SS	143
+Breast - Mammary Tissue	A5SS	156
+Breast - Mammary Tissue	MXE	56
+Breast - Mammary Tissue	RI	176
+Breast - Mammary Tissue	SE	1541
+Cells - EBV-transformed lymphocytes	A3SS	1
+Cells - EBV-transformed lymphocytes	A5SS	4
+Cells - EBV-transformed lymphocytes	MXE	0
+Cells - EBV-transformed lymphocytes	RI	0
+Cells - EBV-transformed lymphocytes	SE	1
+Cells - Transformed fibroblasts	A3SS	0
+Cells - Transformed fibroblasts	A5SS	4
+Cells - Transformed fibroblasts	MXE	0
+Cells - Transformed fibroblasts	RI	5
+Cells - Transformed fibroblasts	SE	21
+Colon - Sigmoid	A3SS	2
+Colon - Sigmoid	A5SS	1
+Colon - Sigmoid	MXE	0
+Colon - Sigmoid	RI	0
+Colon - Sigmoid	SE	5
+Colon - Transverse	A3SS	1
+Colon - Transverse	A5SS	0
+Colon - Transverse	MXE	0
+Colon - Transverse	RI	0
+Colon - Transverse	SE	0
+Esophagus - Gastroesophageal Junction.Esophagus - Muscularis	A3SS	2
+Esophagus - Gastroesophageal Junction.Esophagus - Muscularis	A5SS	4
+Esophagus - Gastroesophageal Junction.Esophagus - Muscularis	MXE	0
+Esophagus - Gastroesophageal Junction.Esophagus - Muscularis	RI	3
+Esophagus - Gastroesophageal Junction.Esophagus - Muscularis	SE	7
+Esophagus - Mucosa	A3SS	2
+Esophagus - Mucosa	A5SS	2
+Esophagus - Mucosa	MXE	0
+Esophagus - Mucosa	RI	0
+Esophagus - Mucosa	SE	4
+Heart - Atrial Appendage	A3SS	1
+Heart - Atrial Appendage	A5SS	1
+Heart - Atrial Appendage	MXE	0
+Heart - Atrial Appendage	RI	0
+Heart - Atrial Appendage	SE	3
+Heart - Left Ventricle	A3SS	130
+Heart - Left Ventricle	A5SS	333
+Heart - Left Ventricle	MXE	16
+Heart - Left Ventricle	RI	70
+Heart - Left Ventricle	SE	3619
+Kidney - Cortex	A3SS	0
+Kidney - Cortex	A5SS	0
+Kidney - Cortex	MXE	0
+Kidney - Cortex	RI	0
+Kidney - Cortex	SE	0
+Liver	A3SS	1
+Liver	A5SS	0
+Liver	MXE	0
+Liver	RI	0
+Liver	SE	4
+Lung	A3SS	1
+Lung	A5SS	3
+Lung	MXE	0
+Lung	RI	1
+Lung	SE	7
+Minor Salivary Gland	A3SS	1
+Minor Salivary Gland	A5SS	0
+Minor Salivary Gland	MXE	0
+Minor Salivary Gland	RI	0
+Minor Salivary Gland	SE	0
+Muscle - Skeletal	A3SS	5
+Muscle - Skeletal	A5SS	2
+Muscle - Skeletal	MXE	2
+Muscle - Skeletal	RI	1
+Muscle - Skeletal	SE	34
+Nerve - Tibial	A3SS	2
+Nerve - Tibial	A5SS	0
+Nerve - Tibial	MXE	0
+Nerve - Tibial	RI	0
+Nerve - Tibial	SE	7
+Pancreas	A3SS	0
+Pancreas	A5SS	2
+Pancreas	MXE	0
+Pancreas	RI	0
+Pancreas	SE	1
+Pituitary	A3SS	2
+Pituitary	A5SS	0
+Pituitary	MXE	0
+Pituitary	RI	58
+Pituitary	SE	16
+Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)	A3SS	3
+Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)	A5SS	1
+Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)	MXE	0
+Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)	RI	2
+Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)	SE	20
+Small Intestine - Terminal Ileum	A3SS	2
+Small Intestine - Terminal Ileum	A5SS	0
+Small Intestine - Terminal Ileum	MXE	0
+Small Intestine - Terminal Ileum	RI	0
+Small Intestine - Terminal Ileum	SE	1
+Spleen	A3SS	0
+Spleen	A5SS	1
+Spleen	MXE	0
+Spleen	RI	0
+Spleen	SE	1
+Stomach	A3SS	1
+Stomach	A5SS	2
+Stomach	MXE	2
+Stomach	RI	0
+Stomach	SE	3
+Thyroid	A3SS	1
+Thyroid	A5SS	0
+Thyroid	MXE	2
+Thyroid	RI	3
+Thyroid	SE	25
+Whole Blood	A3SS	0
+Whole Blood	A5SS	2
+Whole Blood	MXE	0
+Whole Blood	RI	1
+Whole Blood	SE	1

@@ -1,0 +1,46 @@
+Brain - Cerebellum.Brain - Cerebellar Hemisphere 34
+Brain - Caudate (basal ganglia).Brain - Nucleus accumbens (basal ganglia).Brain - Putamen (basal ganglia) 8
+Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24) 282
+Brain - Amygdala.Brain - Hippocampus 8
+Esophagus - Gastroesophageal Junction.Esophagus - Muscularis 24
+Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic) 20
+Testis 0
+Thyroid 112
+Stomach 10
+Esophagus - Mucosa 12
+Lung 10
+Artery - Aorta 44
+Heart - Left Ventricle 2037
+Pancreas 6
+Adrenal Gland 1379
+Breast - Mammary Tissue 1338
+Prostate 0
+Colon - Sigmoid 10
+Colon - Transverse 4
+Spleen 7
+Muscle - Skeletal 31
+Bladder 0
+Ovary 0
+Liver 4
+Uterus 0
+Brain - Substantia nigra 2
+Pituitary 223
+Kidney - Cortex 2
+Artery - Coronary 14
+Heart - Atrial Appendage 9
+Small Intestine - Terminal Ileum 11
+Minor Salivary Gland 4
+Vagina 0
+Adipose - Visceral (Omentum) 16
+Cells - EBV-transformed lymphocytes 15
+Adipose - Subcutaneous 74
+Artery - Tibial 16
+Whole Blood 10
+Brain - Spinal cord (cervical c-1) 3
+Brain - Hypothalamus 2
+Cells - Leukemia cell line (CML) 0
+Nerve - Tibial 14
+Cells - Transformed fibroblasts 49
+Fallopian Tube 0
+Cervix - Ectocervix 0
+Cervix - Endocervix 0
