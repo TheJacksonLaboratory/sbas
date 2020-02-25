@@ -7,16 +7,16 @@ Postpone opening an `.ipynb` file until you have completed all teh following ste
 
 
 ```bash
-git clone https://github.com/TheJacksonLaboratory/lifebitCloudOSDRE.git
+git clone https://github.com/TheJacksonLaboratory/sbas.git
 ```
 
 Follow the instructions to configure the git config, your GitHub associated email and name.
 
-# `cd` into the `lifebitCloudOSDRE` directory
+# `cd` into the `sbas` directory
 
 ```bash
 
-cd lifebitCloudOSDRE
+cd sbas
 
 ```
 
@@ -38,7 +38,7 @@ You might be prompted to do so by `conda` as well.
 
 ```bash
 
-cd lifebitCloudOSDRE
+cd sbas
 conda env update --name base --file dependencies/requirements.txt
 conda activate base
 
@@ -50,7 +50,7 @@ Along with some other dependencies:
 
 
 ```bash
-cd lifebitCloudOSDRE
+cd sbas
 Rscript dependencies/install.R 
 
 ```
