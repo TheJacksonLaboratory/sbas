@@ -491,9 +491,13 @@ data.table::fread("../metadata/sha256sums.txt", header = FALSE, col.names = c("s
 
 ```{r}
 session_info <- devtools::session_info()
+
 message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
 saveRDS(session_info, file = "../metadata/devtools_session_info.rds")
 message("Done!\n")
+
+
+session_info <- utils::sessionInfo()
 
 message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
 saveRDS(session_info, file = "../metadata/utils_info.rds")
