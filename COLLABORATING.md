@@ -66,13 +66,48 @@ For decreasing the execution time of your notebook, especially in obtaining the 
  } 
 ```
 
-## Archiving dependencies metadata
+## Archiving dependencies 
 
-In the folder `metadata` we keep metadata about the artefacts and the environment where the latest analysis has been successfully completed. We keep the following metadata:
+In the folder `metadata` we keep metadata about the artefacts and the environment where the latest analysis has been successfully completed. Please include the name of the figure that these dependencies refer to, by following the convention in the filename: 
+
+#### `**"../metadata/" + figure_id + "_" + "*session_info.rds"**`
+
+We keep the following metadata:
 
 - the `utils::sessionInfo()` as an .rds file
-- the `devtools::session_info` as an .rds file
+- the `devtools::session_info()` as an .rds file
+
+You can do so in R with the following snippet:
+
+
+```r
+### 2. Libraries metadata
+
+figure_id <- "figure1b"
+
+dev_session_info <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
+saveRDS(session_info, file = paste0("../metadata/", figure_id, "_",  "devtools_session_info.rds")
+saveRDS(session_info, file = paste0("../metadata/", figure_id, "_", "utils_session_info.rds")
+```
+
+## Archiving file metadata
+Similarly, we capture `sha256sum` hashes for the artefacts generated during the analysis, that are temporarily stored in the data folder before transfering to GitHub Releases via `{piggyback}`. To do so please write the `sha256sum` hashes in a .txt file.
+
 - a `sha256sums.txt` with the `sha256sum` of each of the artefacts that our analysis has produced.
+
+You can do so in R with the following snippet:
+
+
+```r
+### 1. Checksums with the sha256 algorithm
+
+message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
+system("cd ../data/ && sha256sum * > ../metadata/figure_1b_sha256sums.txt", intern = TRUE)
+message("Done!\n")
+data.table::fread("../metadata/figure_1b_sha256sums.txt", header = FALSE, col.names = c("sha256sum", "file"))
+```
 
 It is advised that you append a sesction that captures metadata to the end of your R kernel `.ipynb` Notebook.
 For an example have a look [here](https://github.com/TheJacksonLaboratory/lifebitCloudOSDRE/blob/e20eb44f4a9c341f8a3b08b71e007730fc8120d9/Rmd/Figure1cYarnVersion.Rmd#L472-L505).
