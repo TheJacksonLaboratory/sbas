@@ -9,7 +9,7 @@ library(scales)
 
 
 
-totals <- read.table("Totals_by_tissue_annotated.txt", sep = "\t", quote = NULL, header = T)
+totals <- read.table("figures/figure1/Totals_by_tissue_annotated.txt", sep = "\t", quote = NULL, header = T)
 
 
 totals_s <- totals %>% arrange(Total)
