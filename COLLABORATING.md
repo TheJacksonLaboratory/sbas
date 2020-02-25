@@ -29,6 +29,20 @@ As a collaborator of this project, to extend functionality to an existing script
  Best practice is that pull requests are first merged into the `dev` branch. Subsequently the `dev` branch is merge into `master`. 
  Why? To perform some tests and also allow for better handling of conflicts when both you and  one of your other team members apply changes on the same file(s).
 
+### The `templates` folder
+
+To create a new Jupyter Notebook, copy the `template.ipynb` file located in the folder `templates` into the `jupyter` folder. Rename your file to be easy for your team to understand what figure of the publication this Notebooks addresses. Make sure the filename that you choose follows the convention `figure_id.ipynb` eg. `figure1c.ipynb`.
+
+A typical workflow to create a new Notebook would look like this:
+
+```bash
+git clone https://github.com/TheJacksonLaboratory/sbas.git
+cd sbas
+git checkout my-branch
+
+cp templates/template.ipynb jupyter/figure7g.ipynb
+```
+
 ## Configuring environment (dependencies)
 
 For detailed instructions on how to install the required dependencies please refer to the [dependencies/README.md](dependencies/README.md)
