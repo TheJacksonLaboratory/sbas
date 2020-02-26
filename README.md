@@ -1,4 +1,4 @@
-## lifebitCloudOSDRE
+## CloudOS Digital Research Environment implemented on the JAX Google Cloud VPN
 
 CloudOS Digital Research Environment at The Jackson Laboratory
 
