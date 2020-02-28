@@ -1,0 +1,6 @@
+conda-forge::pandas=1.0.1
+conda-forge::numpy=1.18.1
+plotly::plotly=4.5.2
+plotly::plotly-orca=1.2.1
+ 
+ 
