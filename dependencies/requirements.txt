@@ -414,3 +414,4 @@ conda-forge::r-visdat=0.5.3
 conda-forge::r-patchwork=1.0.0
 conda-forge::r-ggsci=2.9
 conda-forge::r-compute.es=0.2_4
+conda-forge::r-gridextra=2.3
