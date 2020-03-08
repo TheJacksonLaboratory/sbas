@@ -6,7 +6,7 @@ We track the progress of this project using issues. Feel free to add a new issue
 
 ## Extending functionality
 
-As a collaborator of this project, to extend functionality to an existing script or notebook of this repo or add something new, please follow the `user-feature-branch  >> dev >> master` workflow described below.
+As a collaborator of this project, to extend functionality to an existing script or notebook of this repo or add something new, please follow the `user-feature-branch  >> master` workflow described below.
 
 
  1. **Clone** this repo locally

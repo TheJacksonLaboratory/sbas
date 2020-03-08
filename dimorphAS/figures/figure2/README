@@ -1,8 +1,6 @@
-Current panels (Nov 17):
-- [] 2a. Seems to be lost??
-
-- [] 2b. eventsPerChromosome.R
-- [] 2c. tissueBarChart.R
-- [] 2d. genesByAsCount.R
-- [] 2e distributionOfAsTypes.R
-
+Current panels:
+- [ ] 2a. Status pending competion (new matrices needed)
+- [x] 2b. eventsPerChromosome.R
+- [x] 2c. tissueBarChart.R
+- [x] 2d. genesByAsCount.R
+- [x] 2e distributionOfAsTypes.R
