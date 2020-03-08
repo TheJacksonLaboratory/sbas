@@ -1,0 +1,5 @@
+- [ ] 2a. Status pending competion (new matrices needed)
+- [x] 2b. [eventsPerChromosome.R](dimorphAS/figures/figure2/eventsPerChromosome.R)
+- [x] 2c. [tissueBarChart.R](dimorphAS/figures/figure2/tissueBarChart.R)
+- [x] 2d. [genesByAsCount.R](dimorphAS/figures/figure2/genesByAsCount.R)
+- [x] 2e [distributionOfAsTypes.R](dimorphAS/figures/figure2/distributionOfAsTypes.R)
