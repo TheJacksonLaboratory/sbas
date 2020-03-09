@@ -12,22 +12,7 @@ jupyter:
     name: ir
 ---
 
-# Figures 3c, 3d: 
-
-**EDIT**: 
-This code comes from `dimorphAS/notebook/figure4a` but corresponds to the figure **`Figure 3c, 3d`** of the publication.
-
-
-## Questions:
-
-- Are these plots only for specific tissues?
-- Is the tissue defined inside the [`parseMT.pl`]() script?
-- What are the `mt.txt` and `lv.txt` referring to? Is that tissues?
-
- - (lv <- left ventricle)
- - (mt <- mammary tissue)
- 
-Why only these tissues?
+# Figure 3 Hierarchical Bayesian Modelling.
 
 
 ## **NOTE**:
@@ -54,6 +39,11 @@ library(rjags)
 library(runjags)
 library(compute.es)
 ```
+
+##  Figure 3a
+
+This figure is not a plot generated from code, but a diagram to explain the modeling.
+
 
 ##  Figure 3b
 
@@ -103,10 +93,10 @@ dim(all.genes)
 head(all.genes)
 ```
 
-## Filtering out of duplicate trabsripts ids
+## Filtering out duplicate transcripts ids
 
 ```{r}
-all.genes<-all.genes[!duplicated(all.genes$Description),]
+all.genes <- all.genes[!duplicated(all.genes$Description),]
 ```
 
 ```{r}
@@ -125,7 +115,7 @@ if (!("RBP_PSSMs" %in% list.files("../data/"))) {
 ```
 
 ```{r}
-rbp.names<-unique(gsub('_.*','',list.files('../RBP_PSSMs/')))
+rbp.names <- unique(gsub('_.*','',list.files('../data/RBP_PSSMs/')))
 ```
 
 ```{r}
@@ -133,7 +123,8 @@ length(rbp.names)
 ```
 
 ```{r}
-summary.tab<-matrix(ncol=7,nrow=0)
+summary.tab<-matrix(ncol=7,
+                    nrow=0)
 ```
 
 ```{r}
@@ -171,7 +162,7 @@ head(tissue)
 
 ## `{Missing files!}`  Dimorph/McmcMostVaryingMoreSigs_'
 
-```{r}
+```{r active="", eval=FALSE}
 load(paste('/Users/karleg/Dimorph/McmcMostVaryingMoreSigs_',tissue,'.Rdata',sep=''))
   
 mcmcCoda<-mcmcCoda[,which(grepl('beta2\\[101,87\\]',varnames(mcmcCoda))),drop=FALSE]
@@ -298,9 +289,7 @@ if ( (!("lv.txt" %in% list.files("../data/"))) | (!("mt.txt" %in% list.files("..
 
 ```
 
-# {placeholder }
-
-Description what does the following code block do
+# Left ventricle data from `lv.txt`
 
 ```{r}
 dat           <- utils::read.table("../data/lv.txt", header=FALSE, sep = "\t", col.names = c("RBP", "Expression"))
@@ -324,10 +313,10 @@ summary(d2)
 ```
 
 ```{r}
-dat <- dat[order(dat$Expression),]
+dat        <- dat[order(dat$Expression),]
 with_zeros <- visdat::vis_expect(dat, ~dat$Expression != 0,  show_perc = TRUE)
 no_zeros   <- visdat::vis_expect(d2, ~d2$Expression != 0, show_perc = TRUE)
-both <- with_zeros + no_zeros
+both       <- with_zeros + no_zeros
 
 message(paste0("\n", round((nrow(d2)/nrow(dat)), 2),"% ","of rows in the dataframe were filtered out because they contained 0 values\n"))
 
@@ -347,7 +336,6 @@ rsquared <-round(LM$r.squared,digits=2)
 
 ```{r}
 lm <- report(lm_fit)
-lm$texts$text_long
 lm$tables$table_long
 ```
 
@@ -359,23 +347,29 @@ predicted_df <- data.frame(expr_pred = predict(lm_fit, d2), RBP=d2$RBP)
 ```
 
 ```{r}
+options(repr.plot.width=3.5, repr.plot.height=5)
 mypal <- ggsci::pal_npg("nrc", alpha = 0.7)(9)
 
 
 p<-ggplot(dat, aes(x=RBP, y=Expression)) + geom_point(shape=21,fill = mypal[3],size=3) +  theme_bw()
 #+ scale_fill_npg() 
-p <- p + theme(axis.text = element_text(size=32, hjust=0.5),
-               axis.title.x=element_text(size=24),
-               axis.title.y = element_text(size=24),
-               axis.text.y = element_text(size=32),
+p <- p + theme(axis.text = element_text(size=12, 
+                                        hjust=0.5),
+               axis.title.x=element_text(size=12),
+               axis.title.y = element_text(size=12),
+               axis.text.y = element_text(size=12),
                panel.grid.major = element_blank(), 
                panel.grid.minor = element_blank()) 
 p <- p +  geom_hline(yintercept=0, linetype="dashed", color = mypal[4])
 p <- p +xlab('\U27F6 \n Sum of RBP effect magnitude')+ylab('Expression\ninclusion \U27F5 effect \U27F6 skipping')
 p <- p+ geom_line(color='red',data = predicted_df, aes(y=expr_pred, x=RBP))
 mylabel<-paste(italic(r)^2~"="~rsquared) 
-p <- p+ geom_text(x = 3, y = 0.45, label = as.character(paste( "r^2==",rsquared)), size=7, parse = TRUE)
-p
+p1 <- p+ geom_text(x = 5, 
+                   y = 0.45, 
+                   label = as.character(paste( "r^2==",rsquared)), 
+                   size=6, 
+                   parse = TRUE)
+p1
 ```
 
 ### (3c) Predicted effects of gene expression vs. RBP levels on exon inclusion in 100 sex-biased SE events in the left ventricle. 
@@ -390,17 +384,18 @@ no effect of gene expression was predicted (flat line at y=0.0).
 For the remaining genes there was a correlation with **`R2=0.35 (p=7.98x10-5).`**
 
 
-##  Figure 4b
+##  Figure 3d
 
 
 
-This should be run after the `figure4a.R` script (see above code chunks) 
+This should be run after the `figure4a.R` script corrsponding to the figure 3b in the manuscript (see above code chunks) 
 
 ```{r}
 dat <- read.table("../data/mt.txt", header=FALSE, sep = "\t", col.names = c("RBP", "Expression"))
 ```
 
 ```{r}
+options(repr.plot.width=3.5, repr.plot.height=5)
 mypal = pal_npg("nrc", alpha = 0.7)(9)
 d2<-dat[dat$Expression!=0,]
 lm_fit <- lm(d2$Expression ~ d2$RBP, data=d2)
@@ -414,23 +409,33 @@ predicted_df <- data.frame(expr_pred = predict(lm_fit, d2), RBP=d2$RBP)
 
 p<-ggplot(dat, aes(x=RBP, y=Expression)) + geom_point(shape=21,fill = mypal[3],size=3) +  theme_bw()
  #+ scale_fill_npg() 
-p <- p + theme(axis.text = element_text(size=32, hjust=0.5),
-               axis.title.x=element_text(size=24),
-               axis.title.y = element_text(size=24),
-               axis.text.y = element_text(size=32),
+p <- p + theme(axis.text = element_text(size=12, 
+                                        hjust=0.5),
+               axis.title.x=element_text(size=12),
+               axis.title.y = element_text(size=12),
+               axis.text.y = element_text(size=12),
                panel.grid.major = element_blank(), 
                panel.grid.minor = element_blank()) 
 p <- p +  geom_hline(yintercept=0, linetype="dashed", color = mypal[4])
-p <- p +xlab('\U27F6 \n Sum of RBP effect magnitude')+ylab('Expression\ninclusion \U27F5 effect \U27F6 skipping')
+p <- p +xlab('\U27F6 \n Sum of RBP effect magnitude')+ ylab('')
 p <- p+ geom_line(color='red',data = predicted_df, aes(y=expr_pred, x=RBP))
 mylabel<-paste(italic(r)^2~"="~rsquared) 
-p <- p+ geom_text(x = 15, y = 3.2, label = as.character(paste( "r^2==",rsquared)), size=7, parse = TRUE)
-p
+p2 <- p+ geom_text(x = 15, 
+                   y = 3.2, 
+                   label = as.character(paste( "r^2==",rsquared)), 
+                   size=6, 
+                   parse = TRUE)
+p2
 ```
 
-## (3d) A similar correlation was found in mammary tissue, with R2=0.33 (p=3.6x10-12).
+#### (3d) A similar correlation was found in mammary tissue, with R2=0.33 (p=3.6x10-12).
 
 
+```{r}
+options(repr.plot.width=7.5, repr.plot.height=4)
+
+p1 + p2
+```
 
 ## Metadata
 
