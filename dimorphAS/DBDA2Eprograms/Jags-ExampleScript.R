@@ -7,7 +7,7 @@
 graphics.off() # This closes all of R's graphics windows.
 rm(list=ls())  # Careful! This clears all of R's memory!
 
-setwd('/Users/karleg/Downloads/DBDA2Eprograms')
+setwd('dimorphAS/DBDA2Eprograms')
 
 # Load the functions used below:
 source("DBDA2E-utilities.R") # Must be in R's current working directory.

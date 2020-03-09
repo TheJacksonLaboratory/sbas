@@ -2,7 +2,7 @@
 # Accompanies the book:
 #   Kruschke, J. K. (2015). Doing Bayesian Data Analysis, Second Edition: 
 #   A Tutorial with R, JAGS, and Stan. Academic Press / Elsevier.
-setwd('/Users/karleg/Downloads/DBDA2Eprograms/')
+setwd('dimorphAS/DBDA2Eprograms/')
 source("DBDA2E-utilities.R")
 
 #===============================================================================
