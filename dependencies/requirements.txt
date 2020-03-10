@@ -354,6 +354,7 @@ conda-forge::r-utf8=1.1.4
 conda-forge::r-uuid=0.1_2
 conda-forge::r-vctrs=0.2.2
 conda-forge::r-viridislite=0.3.0
+conda-forge::r-viridis=0.5.1
 conda-forge::r-whisker=0.4
 conda-forge::r-withr=2.1.2
 conda-forge::r-xfun=0.12

@@ -372,6 +372,7 @@ dependencies:
   - r-utf8=1.1.4=r36hcdcec82_1001
   - r-uuid=0.1_2=r36hcdcec82_1002
   - r-vctrs=0.2.2=r36hcdcec82_0
+  - r-viridis=0.5.1=r36h6115d3f_1003
   - r-viridislite=0.3.0=r36h6115d3f_1002
   - r-visdat=0.5.3=r36h6115d3f_1001
   - r-whisker=0.4=r36h6115d3f_0
