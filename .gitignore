@@ -1,4 +1,4 @@
-**/.ipynb_checkpoints
+**/*.ipynb_checkpoints
 data/*
 # For protecting secrets
 .Renviron
@@ -9,4 +9,3 @@ data/*
 .DS_Store
 manifest.json
 **/*.gz
-**/*.rds
