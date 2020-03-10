@@ -1,0 +1,566 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.3.3
+  kernelspec:
+    display_name: R
+    language: R
+    name: ir
+---
+
+# Figure 1. Sex-biased gene expression and alternative splicing. 
+
+- (a) Pre-messenger RNA splicing occurs cotranscriptionally and is influenced by RNA binding proteins and epigenetic factors such as histone modifications that interact with the transcriptional machinery or other proteins to influence splicing and transcription.17 
+- (b) Flowchart depicting the analysis of GTEx RNA-seq data. Analysis of GTEx gene expression and AS profiles identified significantly sex-biased genes and AS events. Data were used as input for a hierarchical Bayesian model to characterize the influence of RBPs and gene expression on sex-biased AS events. 
+- **(c) Heatplot representing similarity in the fold-changes between male and female samples, with the values in the heatmap being the correlation between the vectors of fold changes of the tissues.**
+
+- (d) The five categories of AS events that were investigated in this work <br>(**`SE`**: skipped exon/exon inclusion; **`A3SS/A5SS`**: alternative 3’/5’ splice site; **`MEX`**: mutually exclusive exons; **`RI`**: retained intron). 
+
+- **(e) Number of sex-biased AS events per tissue type.**
+
+
+A `heatplot` representing similarity in the fold-changes between male and female samples, with the values in the heatmap being the correlation between the vectors of fold changes of the tissues. </b>
+
+
+## **NOTE**:
+
+We assume that you have cloned the analysis repository and have `cd` into the parent directory. Before starting with the analysis make sure you have first completed the dependencies set up by following the instructions described in the **`dependencies/README.md`** document. All paths defined in this Notebook are relative to the parent directory (repository). Please close this Notebook and start again by following the above guidelines if you have not completed the aforementioned steps.
+
+
+## Loading dependencies
+
+```{r}
+library(downloader)
+library(readr)
+library(edgeR)
+library(biomaRt)
+library(DBI) # v >= 1.1.0 required for biomaRt
+library(devtools)
+library(yarn)
+library(statmod)
+library(piggyback)
+library(snakecase)
+library(stringr)
+library(pheatmap)
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(viridis)
+library(scales)
+
+Sys.setenv(TAR = "/bin/tar") # for gzfile
+```
+
+## Figure 1c  Heatplot representing similarity in the fold-changes between male and female samples
+The values in the heatmap being the correlation between the vectors of fold changes of the tissues.
+
+
+# Retrieving the GTEx archive
+
+We used the R package [{yarn}](https://bioconductor.org/packages/release/bioc/html/yarn.html) to retrieve the GTEx Biobank data. In order to downloaded the latest GTEx version 8.0 for RNA-seq and genotype data (phs000424.v8.v2), released 2019-08-26, we created a fork of the package's GitHub repository and created a new version of the function **`yarn::downloadGTEx()`**, namely **`yarn::downloadGTExV8()`** to download this release. 
+
+We used the function to perform quality control, gene filtering and normalization pre-processing on the GTEx RNA-seq data, as described in (Paulson et al, 2017). This pipeline tested for sample sex-misidentification, merged related sub-tissues and performed tissue-aware normalization using the **`{yarn::qsmooth}`**  function (Hicks et al, 2017).
+
+We have archived the output of the **`yarn::downloadGTExV8()`** function, which is an `ExpressionSet` object in the repo `lifebitai/lifebitCloudOSDREgtex` for replicability and decreasing the runtime of this analysis. Below we retrieve this `gtex.rds` object from the GitHub releases using the **`{ropensci/piggyback}`** package, but we have also added the relevant command to retrieve the data from GTEx and generate the `ExpressionSet` object using  **`yarn::downloadGTExV8()`**. For the current analysis we are utilising a compute resource with 8 vCPUs and 60 GB of memory available.
+
+
+
+```{r}
+# Load with readRDS() if gtex.rds available in data/
+if ("gtex.rds" %in% list.files("../data/")) {
+    message("Loading GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
+    obj <- readRDS(file = "../data/gtex.rds")
+    message("Done!\n")
+    message("Generating sha256sum for gtex.rds ..\n")    
+    message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+    message("Done!\n")
+}
+
+# Download from archive if not available in ../data
+if (!("gtex.rds" %in% list.files("../data/"))) {
+    message("Downloading GTEx v8 from GitHub Releases archive into the ../data/ directory ..\n")
+    piggyback::pb_download(file = "gtex.rds", 
+                                repo = "lifebit-ai/lifebitCloudOSDREgtex", 
+                                tag  = "fig1c_archive", 
+                                dest = "../data/")
+    message("Generating sha256sum for gtex.rds ..")    
+    message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+    message("Done!\n")    
+    message("Loading GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")    
+    obj <- readRDS(file = "../data/gtex.rds" )
+    message("Done!\n")
+}
+
+# Download with yarn if you wish, this requires several minutes to complete
+if (!("gtex.rds" %in% list.files("../data/"))) {
+    message("Downloading GTEx v8 with 'yarn::downloadGTExV8()'")
+    obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+    message("Done!")
+
+}
+```
+
+```{r}
+# Confirm that it is an expression set.
+# and check the dimensions of the objects, and the phenotype information of the objects
+class(obj) 
+dim(phenoData(obj))
+dim(obj)
+```
+
+### NOTE: 
+
+We observe above that our phenotype data have 2 more observations than our expression data,  let's inspect what are these samples:
+
+```{r}
+sample_names=as.vector(as.character(colnames(exprs(obj))))
+length(sample_names)
+
+pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
+length(pheno_sample_names)
+
+if (length(pheno_sample_names) > length(sample_names)) {
+    superset <- pheno_sample_names
+    subset   <- sample_names    
+} 
+
+if (length(pheno_sample_names) < length(sample_names)) {
+    superset <- sample_names
+    subset   <- pheno_sample_names   
+} 
+
+non_overlaps <- setdiff( superset, subset)
+
+message("The non-overlapping IDs between pheno and count data are:\n\n", 
+        paste(non_overlaps, collapse = "\n") )
+```
+
+Let's keep only the overlapping IDs:
+
+```{r}
+logical_match_names=pheno_sample_names %in% sample_names
+length(logical_match_names)
+table(logical_match_names)
+pData(obj) <- (pData(obj)[logical_match_names==TRUE,])
+dim(pData(obj))
+dim(obj)
+```
+
+#  Now we want to replace all *dashes* with **dots "."**
+
+```{r}
+pData(obj)$SAMPID[1]
+pData(obj)$SAMPID <- gsub('-','\\.',pData(obj)$SAMPID)
+pData(obj)$SAMPID[1]
+```
+
+```{r}
+colnames(pData(obj))
+```
+
+```{r}
+head(exprs(obj))
+```
+
+#  Differential Expression using `{edgeR}`
+
+```{r}
+transcript_counts_matrix <- exprs(obj)
+```
+
+```{r}
+dim(transcript_counts_matrix)
+```
+
+To use the **`edgeR::DGEList()`** function, we need to transpose our `transcript_counts_matrix` so that the length of group is equal to the number of columns in our counts (`transcript_counts_matrix`). You will get an error from the   **`edgeR::DGEList()`** function (counts = x, group = group) if the length of group is not equal to the number of columns in counts.
+
+```{r}
+group <- factor(pData(obj)$SEX)
+```
+
+```{r}
+table(group)
+```
+
+### NOTE: 
+
+This step takes several minutes to complete. If you have **not** applied other filtering options or you are coming back to your analysis and want to continue from this step, feel free to use the cached version using the following command:
+
+```
+# Load with readRDS() if `../data/DGENormFactorsy.rds` available in data/
+if ("DGENormFactorsy.rds" %in% list.files("../data/")) {
+    message("Loading  `../data/DGENormFactorsy.rds` object with `readRDS()` from ../data/ \n")    
+    y <- readRDS("../data/DGENormFactorsy.rds")
+    message("Done!")    
+}
+```
+
+By default, these objects will be regenarated the making sure the changes from above are applied to these objects as well.
+
+```{r}
+# Download if not available in ../data
+if (!("DGENormFactorsy.rds" %in% list.files("../data/"))) {
+    message("Creating `DGEList` object from counts matrix with 'edgeR::DGEList()' ..")
+    y <- edgeR::DGEList(counts = transcript_counts_matrix, 
+                        group  = group)
+    message("Done!\n")    
+
+    message("Calculating normalization factors on `DGEList` object to scale the raw library sizes with 'edgeR::DGEList()' ..")    
+    y <- edgeR::calcNormFactors(y)
+    message("Done!\n")    
+    message("Saving normalization factors object in '../data/DGENormFactorsy.rds' ..")        
+    saveRDS(y, file = "../data/DGENormFactorsy.rds")
+    message("Done!\n")    
+    message("Generating sha256sum for DGENormFactorsy.rds ..\n")    
+    message(system("sha256sum ../data/DGENormFactorsy.rds", intern = TRUE))
+    message("Done!\n")
+}
+
+attributes(y)
+```
+
+```{r}
+dim(y$counts)
+```
+
+```{r}
+# For Guy -- does this do what you are expecting -- I am confused because what you get when you
+#        ask for the min (table(groups)) is the smaller sized group -- which in this case is 
+#        female -- it will help the reader to know what you are doing here with the statement.
+#        one can read what it is doing but not understand your objective.groups <- pData(obj)$SEX
+# keep.events <- rep(TRUE, nrow(y))
+# for (group in c(1,2)) {
+#    keep.events <- keep.events & 
+#                   rowSums(cpm(y[,groups %in% group]) > 1) >= 0.25*min(table(groups))
+# }
+
+#  From Anne - I believe the objective in this step is to keep only those genes that are in the
+#    that are above the threshold of expression for the lower quartile of all sex specific genes.
+#    groups = (1,2) -- lots of confusion in logic between groups and group and male and female
+#    I recommend we use male and female.
+#    two errors then in the above loop - 
+#     1. min(table(groups)) will always return the
+#        length of the number of samples that are female 
+#        (which is 5978 for this v8 GTEx)
+#     2. sum(table(group)) will return the number of samples that are either male or female
+#        depending upon whether you are in the loop for male or female consideration.
+
+#    If my assumption is true - I recommend replacing it with the following.
+
+#  this should be replaced 
+
+```
+
+```{r}
+keep.events <- rep(TRUE, nrow(y))
+nrow(y)
+table(pData(obj)$SEX)
+table(group)
+#
+# first keep all the events for the male subsets meeting our threshold criteria
+#
+keep.events  <- keep.events & rowSums(edgeR::cpm(y$counts[,group == 1]) > 1) >= 0.25*length(group==1)
+#
+# now keep all the male subsets or the female subsets meeting our criteria
+#
+keep.events2 <- keep.events | rowSums(edgeR::cpm(y$counts[,group == 2]) > 1) >= 0.25*length(group==2)
+table(keep.events)
+table(keep.events2)
+```
+
+```{r}
+# Load with readRDS() if `../data/reduced_y.rds` available in data/
+if  ( ('reduced_y.rds' %in% list.files("../data/")) && ('reduced_obj' %in% list.files("../data/"))) {
+    message("Loading  `reduced_y.rds` and  `reduced_obj` objects with `readRDS()` from ../data/ \n")    
+    reduced_obj <- readRDS(file = "../data/reduced_obj.rds")
+    reduced_y   <- readRDS(file = "../data/reduced_y.rds")
+    message("Done!")    
+}
+
+
+# Create if not available in ../data
+if  ( !(('reduced_y.rds' %in% list.files("../data/")) && ('reduced_obj' %in% list.files("../data/")))) {
+
+    message("Creating `reduced_y` keeping only rows that match `keep.events2` list ..")
+    reduced_y<- y[keep.events2,]
+    message("Done!\n")    
+    
+    message("Creating `reduced_obj` keeping only rows that match `keep.events2` list ..")    
+    reduced_obj <- obj[keep.events2==TRUE,]
+    message("Done!\n")    
+    
+    message("Saving `reduced_y.rds`, `reduced_obj.rds` in '../data/' ..")        
+    saveRDS(reduced_y, file = "../data/reduced_y.rds")
+    saveRDS(reduced_obj, file = "../data/reduced_obj.rds")
+    message("Done!\n")     
+}
+
+dim(reduced_obj)
+```
+
+# Separate the analysis by male and by female
+
+```{r}
+reduced_male   <- pData(reduced_obj)$SEX==1
+reduced_female <- pData(reduced_obj)$SEX==2
+```
+
+```{r}
+reduced_obj_male   <- reduced_obj[,reduced_male==TRUE]
+reduced_obj_female <- reduced_obj[,reduced_female==TRUE]
+```
+
+```{r}
+dim(reduced_obj_male)
+dim(reduced_obj_female)
+```
+
+```{r}
+# changing from SMTS to SMTSD - more granularity -- but we could produce both figures
+tissue_groups_male <- factor(pData(reduced_obj_male)$SMTSD)
+tissue_groups_female <- factor(pData(reduced_obj_female)$SMTSD)
+```
+
+```{r}
+# good sanity check, the male set does not have any vaginas or uterus
+table (tissue_groups_male)
+```
+
+```{r}
+# and the females have no prostate or testis
+table(tissue_groups_female)
+```
+
+Reproducing previous results using the `yarn` expression object, loop through the tissues and for those tissues that are shared between the two sexes perform a differential gene analysis on a per tissue basis.
+
+
+```{r}
+tissue_groups <- factor(pData(reduced_obj)$SMTSD)
+```
+
+```{r}
+tissue_male_female <- tissue_groups_male %in% tissue_groups_female
+table(tissue_male_female)
+```
+
+```{r}
+tissue_shared_male_female <- factor(tissue_groups_male[tissue_male_female])
+table(tissue_shared_male_female)
+```
+
+```{r}
+# SEX is coded 1 == Male
+#              2 == Female
+sex = factor(pData(reduced_obj)$SEX)
+```
+
+Let's now define a function named `fit_tissue()`that accepts two arguments, the `tissue` and an `object` and create the **model matrix** based  that tissue's sex. We will perform a linear fit after calculating normal factors (based on the library size) and calculate the dispersion using `{voom}` (mean variance model of dispersion). We are saving the resulting matrixes as files.
+
+
+```{r}
+fit_tissue <- function (tissue, obj) {
+    tissue_true    <- pData(obj)$SMTSD == tissue
+    tissue_obj     <- obj[,tissue_true ==TRUE]
+    tissue_sex     <- factor(pData(tissue_obj)$SEX)
+    tissue_design  <- model.matrix(~tissue_sex)
+    y_tissue       <- DGEList(counts=exprs(tissue_obj), group=tissue_sex)
+    y_tissue       <- calcNormFactors(y_tissue)
+    y_tissue_voom  <- voom(y_tissue, tissue_design)
+    fit_tissue     <- lmFit(y_tissue_voom, tissue_design)
+    fit_tissue     <- eBayes(fit_tissue, robust=TRUE)
+    results_tissue <- topTable (fit_tissue, coef='tissue_sex2', number=nrow(y_tissue))
+    filename = paste(paste("../data",gsub(" ","",tissue), sep="/"),"DGE.csv", sep="_")    
+    write.table(results_tissue, filename, sep=',', quote=FALSE)
+    return (results_tissue)
+}
+```
+
+```{r}
+# debugging with using the 'Thyroid' tissue
+#thyroid_logFC <- fit_tissue('Thyroid',reduced_obj)
+#thyroid_logFC
+# 
+all_logFC <- lapply(X=levels(tissue_shared_male_female), FUN=fit_tissue, obj=reduced_obj)
+```
+
+```{r}
+filenames <- list.files("../data", pattern="*_DGE.csv", all.files=FALSE, full.names=TRUE)
+(filenames)
+```
+
+```{r}
+# preserve the ordered rownames for later assignment to matrix
+fullfilename <-filenames[1]
+logFC_mat    <- read.csv(fullfilename)
+logFC_mat    <- logFC_mat[order(rownames(logFC_mat)),]
+logFC_mat_rownames <- as.character(rownames(logFC_mat)) 
+```
+
+```{r}
+# Make a matrix for each of the tissues
+# from what files are saved
+
+make_tissue_matrix_ready <- function (file, obj) {
+    filename        <- paste('../data',file,sep="/")
+    logFC_mat       <- read.csv(filename)
+    logFC_mat       <- logFC_mat[order(rownames(logFC_mat)),]
+    logFC           <- as.matrix(as.numeric(logFC_mat$logFC),nrow=dim(obj)[2],ncol=1)
+    rownames(logFC) <- rownames(logFC_mat)
+    return(logFC)
+}
+```
+
+```{r}
+matrix_list <- lapply(X=filenames, FUN=make_tissue_matrix_ready, obj=reduced_obj)
+```
+
+```{r}
+length(matrix_list)
+logFC_mat = as.matrix(lapply(X   = matrix_list, 
+                             FUN = cbind),
+                      nrow = dim(reduced_obj)[2], 
+                      ncol = length(matrix_list))
+length(logFC_mat)
+```
+
+```{r}
+get_tissue_name <- function (tissue_name) {
+            tissue <- str_replace(tissue_name,'_DGE.txt','')
+            return(tissue)
+}
+```
+
+```{r}
+tissue_list <- lapply(X=levels(tissue_shared_male_female), FUN=get_tissue_name)
+length(tissue_list)
+head(tissue_list)
+```
+
+```{r}
+logFC_mat = as.matrix(as.numeric(unlist(matrix_list[1]),nrow=dim(reduced_obj)[2], ncol=1))
+
+for (i in (2:length(matrix_list))) {
+    n = as.matrix(as.numeric(unlist(matrix_list[i]),nrow=dim(reduced_obj)[2], ncol=1))
+    logFC_mat = cbind(logFC_mat, n)
+}
+
+dim(logFC_mat)
+rownames(logFC_mat) = logFC_mat_rownames
+colnames(logFC_mat) = tissue_list
+head(logFC_mat)
+```
+
+```{r}
+logFC_mat_NQ <- normalizeQuantiles(logFC_mat)
+```
+
+```{r}
+head(logFC_mat_NQ)
+```
+
+```{r}
+dist_mat <- as.matrix(cor(logFC_mat_NQ))
+```
+
+```{r}
+head(dist_mat)
+```
+
+```{r}
+rownames(dist_mat) <- colnames(logFC_mat)
+colnames(dist_mat) <- colnames(logFC_mat)
+
+message("Saving dist_mat object")
+saveRDS(object = dist_mat, file = "../data/dist_mat.rds")
+message("Done!")
+```
+
+```{r}
+library(pheatmap)
+pheatmap(as.matrix(dist_mat),   fontsize = 6)
+hm.parameters <- list(dist_mat, fontsize = 6)
+do.call("pheatmap", c(hm.parameters,  filename="../pdf/Figure1c.pdf"))
+```
+
+## Figure 1e - Number of sex-biased AS events per tissue type.
+
+```{r}
+totals <- read.table("../dimorphAS/figures/figure1/Totals_by_tissue_annotated.txt", sep = "\t", quote = NULL, header = T)
+totals_s <- totals %>% arrange(Total)
+totals_s$Label <- factor(totals_s$Label, levels = totals_s$Label)
+
+
+## Function to get a reverse log10 scale on the x axis
+reverselog_trans <- function(base = exp(1)) {
+  trans <- function(x) -log(x, base)
+  inv <- function(x) base^(-x)
+  trans_new(paste0("reverselog-", format(base)), trans, inv, 
+            log_breaks(base = base), 
+            domain = c(1e-100, Inf))
+}
+
+
+
+g<-ggplot(totals_s, aes(y = Label, x = Total, size = Total)) +
+  geom_point(color = "red") +
+  theme_bw() +
+  scale_x_continuous(trans=reverselog_trans(), breaks=c(1,10,100,1000,5000,10000)) +#breaks=c(10000, 5000,1000,100,10,1)) +
+  scale_y_discrete(position = "right") +
+  theme(axis.text.x = element_text(size=8, angle = 0, hjust = 0.0, vjust = 0.5),
+        axis.text.y = element_text(size=8),
+        axis.title.x = element_text(face="plain", colour="black", 
+                                    size=10),
+        axis.title.y = element_blank(),
+        legend.title=element_blank(),
+        legend.text = element_text(face="plain", colour="black", 
+                                   size=8)) +
+  xlab(paste("Number of sex-biased splicing events")) +
+  ylab("Tissue") + 
+  guides(size=FALSE)
+
+g
+ggsave("figure1e.pdf",g, height = 4.5, width = 4)
+```
+
+## Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+
+### 1. Checksums with the sha256 algorithm
+
+```{r}
+figure_id   = "figure1"
+
+message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
+system(paste0("cd ../data && find . -type f -exec sha256sum {} \\;  >  ../metadata/", figure_id, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+data.table::fread(paste0("../metadata/", figure_id, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
+```
+
+### 2. Libraries metadata
+
+```{r}
+dev_session_info   <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
+message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
+saveRDS(dev_session_info, file = paste0("../metadata/", figure_id, "_devtools_session_info.rds"))
+message("Done!\n")
+
+message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
+saveRDS(utils_session_info, file = paste0("../metadata/", figure_id ,"_utils_info.rds"))
+message("Done!\n")
+
+dev_session_info$platform
+dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
