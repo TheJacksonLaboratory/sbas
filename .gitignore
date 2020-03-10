@@ -10,3 +10,4 @@ data/*
 manifest.json
 **/*.gz
 **/*.rds
+analysisDV/significant_events/*
