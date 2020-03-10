@@ -74,7 +74,7 @@ We have archived the output of the **`yarn::downloadGTExV8()`** function, which 
 # Load with readRDS() if gtex.rds available in data/
 if ("gtex.rds" %in% list.files("../data/")) {
     message("Loading GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
-    obj <- readRDS(file = "../data/gtex.rds" )
+    obj <- readRDS(file = "../data/gtex.rds")
     message("Done!\n")
     message("Generating sha256sum for gtex.rds ..\n")    
     message(system("sha256sum ../data/gtex.rds", intern = TRUE))
@@ -538,78 +538,29 @@ For replicability and reproducibility purposes, we also print the following meta
 ### 1. Checksums with the sha256 algorithm
 
 ```{r}
+figure_id   = "figure1"
+
 message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
-system("cd ../data/ && sha256sum * > ../metadata/sha256sums.txt", intern = TRUE)
+system(paste0("cd ../data && find . -type f -exec sha256sum {} \\;  >  ../metadata/", figure_id, "_sha256sums.txt"), intern = TRUE)
 message("Done!\n")
 
-data.table::fread("../metadata/sha256sums.txt", header = FALSE, col.names = c("sha256sum", "file"))
+data.table::fread(paste0("../metadata/", figure_id, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
 ```
 
 ### 2. Libraries metadata
 
 ```{r}
-session_info <- devtools::session_info()
+dev_session_info   <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
 message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
-saveRDS(session_info, file = "../metadata/devtools_session_info.rds")
+saveRDS(dev_session_info, file = paste0("../metadata/", figure_id, "_devtools_session_info.rds"))
 message("Done!\n")
 
 message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
-saveRDS(session_info, file = "../metadata/utils_info.rds")
+saveRDS(utils_session_info, file = paste0("../metadata/", figure_id ,"_utils_info.rds"))
 message("Done!\n")
 
-session_info$platform
-
-session_info$packages[session_info$packages$attached==TRUE, ]
-```
-
-## Archive artefacts in GitHub releases using **`{ropensci/piggyback}`**
-
-
-### Create a tarball of all the light .csv file
-
-```{r}
-message("Creating tarball of .csv files and removing files ..\n")
-system("cd ../data/ && tar -czvf csv.tar.gz *csv && rm *csv", intern = TRUE)
-message("Done!\n")
-
-
-```
-
-## Create a new release in the repository of choice (or ignore if this cannot be completed)
-
-```{r}
-# Define a function to attempt archive creation via try or ignore and move on
-
-create_piggyback_archive <- function(repo, tag){
-        message(paste0("Trying to create a new tag in GitHub releases named ", tag_new, " ..\n"))
-        piggyback::pb_new_release(repo = repo_archive, tag  = tag_new)
-        message(paste0("Done..!\n"))
-    }
-
-```
-
-```{r}
-library(magrittr)
-
-tag_new      <- paste("figure1c", system("git config user.name", intern = TRUE), snakecase::to_snake_case(as.character(format(Sys.time(), "%H"))), sep = "_")
-repo_archive <- "lifebit-ai/lifebitCloudOSDREgtex"
-
-
-run_pb <- try(create_piggyback_archive(repo = repo_archive, tag = tag_new), silent = FALSE) 
-
-if (class(run_pb) != "try-error") {
-    message(paste0("Uploading the following files to the GitHub Release with tag '", 
-                   tag_new,
-                   "' (", 
-                   repo_archive, 
-                   "): \n\n", 
-                   paste0(paste("- ",list.files("../data/"), collapse = "\n"))), "\n")
-    piggyback::pb_track() %>% piggyback::pb_upload(repo = repo_archive, tag = tag_new)
-    message("Done! \n'")
-    message(paste0("Paste the following link in your browser to look at the attached files to the GitHub Release (tag:", tag_new, ") \n\n", 
-                   "https://github.com/", 
-                   repo_archive, 
-                   "/releases/tag/",
-                   tag_new, "\n"))
-}
+dev_session_info$platform
+dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
 ```
