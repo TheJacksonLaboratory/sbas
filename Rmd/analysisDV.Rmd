@@ -1,0 +1,204 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.0
+  kernelspec:
+    display_name: R
+    language: R
+    name: ir
+---
+
+# Analysis pre-processing by Diogo Veiga
+
+
+These scripts take the output of in some cases the differential analysis and other cases the output of the rMATS processing, to create the input files for each of the figures for the paper, "The Impact of Sex on Alternative Splicing"
+
+
+## **NOTE**:
+
+We assume that you have cloned the analysis repository and have `cd` into the parent directory. Before starting with the analysis make sure you have first completed the dependencies set up by following the instructions described in the **`dependencies/README.md`** document. All paths defined in this Notebook are relative to the parent directory (repository). Please close this Notebook and start again by following the above guidelines if you have not completed the aforementioned steps.
+
+
+## Loading dependencies
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+Sys.setenv(TAR = "/bin/tar") # for gzfile
+```
+
+## Download the files
+for testing, in a new launcher window, open a terminal.
+
+cd sbas/data
+mkdir significant_events
+wget wget https://github.com/adeslatt/sbas_test/releases/download/GTExV6SignificantASTissueEvents.v1/significant_events.tar
+tar xvf significant_events.tar
+
+## after getting the significant_events files -- get the gencode specific files.
+
+wget https://github.com/adeslatt/sbas_test/releases/download/rmats_final.gencode.v30/fromGTF.SE.txt
+wget https://github.com/adeslatt/sbas_test/releases/download/rmats_final.gencode.v30/fromGTF.RI.txt
+wget https://github.com/adeslatt/sbas_test/releases/download/rmats_final.gencode.v30/fromGTF.A3SS.txt
+wget https://github.com/adeslatt/sbas_test/releases/download/rmats_final.gencode.v30/fromGTF.A5SS.txt
+wget https://github.com/adeslatt/sbas_test/releases/download/rmats_final.gencode.v30/fromGTF.MXE.txt
+
+
+```{r}
+setwd('jupyter')
+```
+
+Some text for describing what is going to be executed and what it will produce
+
+```{r}
+# verify current working directory, likely it is sbas/jupyter - lets move up a directory.
+getwd()
+#setwd('../')
+getwd()
+```
+
+```{r}
+#Parse files to create a data frame with counts
+
+files <- list.files(path = "data/significant_events/", pattern = "*.txt")
+as_types <- c("a3ss", "a5ss", "mxe", "ri", "se")
+head (files)
+as_types
+```
+
+```{r}
+files_aux <- gsub(pattern = ".txt", replacement = "", x = files)
+files_aux <- gsub(pattern = "a3ss$|a5ss$|mxe$|ri$|se$", replacement = "", files_aux)
+head(files_aux)
+```
+
+```{r}
+a3ss_annot <- read.table(file = "data/fromGTF.A3SS.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
+a5ss_annot <- read.table(file = "data/fromGTF.A5SS.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
+mxe_annot  <- read.table(file = "data/fromGTF.MXE.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
+ri_annot   <- read.table(file = "data/fromGTF.RI.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
+se_annot   <- read.table(file = "data/fromGTF.SE.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
+
+head(se_annot)
+head(a3ss_annot)
+head(a5ss_annot)
+head(ri_annot)
+head(mxe_annot)
+```
+
+```{r}
+gene_as <- data.frame()
+
+for (i in 1:length(files)) {
+
+  lines <- readLines(paste0("data/significant_events/", files[i]))
+
+  if(length(lines) > 1){ #has significant events
+    events <- read.table(paste0("data/significant_events/", files[i]), sep = "\t", skip = 1)
+
+    if(grepl("a3ss.txt$", files[i])){
+      idx <- match(events$V1, a3ss_annot$ID)
+      res <- data.frame(Tissue = files_aux[i], ASE = "A3SS",
+                        GeneSymbol = a3ss_annot$geneSymbol[idx],
+                        chr = a3ss_annot$chr[idx])
+    }
+    if(grepl("a5ss.txt$", files[i])){
+      idx <- match(events$V1, a5ss_annot$ID)
+      res <- data.frame(Tissue = files_aux[i], ASE = "A5SS",
+                        GeneSymbol = a5ss_annot$geneSymbol[idx],
+                        chr = a5ss_annot$chr[idx])
+    }
+    if(grepl("mxe.txt$", files[i])){
+      idx <- match(events$V1, mxe_annot$ID)
+      res <- data.frame(Tissue = files_aux[i], ASE = "MXE",
+                        GeneSymbol = mxe_annot$geneSymbol[idx],
+                        chr = mxe_annot$chr[idx])
+    }
+    if(grepl("se.txt$", files[i])){
+      idx <- match(events$V1, se_annot$ID)
+      res <- data.frame(Tissue = files_aux[i], ASE = "SE",
+                        GeneSymbol = se_annot$geneSymbol[idx],
+                        chr = se_annot$chr[idx])
+    }
+    if(grepl("ri.txt$", files[i])){
+      idx <- match(events$V1, ri_annot$ID)
+      res <- data.frame(Tissue = files_aux[i], ASE = "RI",
+                        GeneSymbol = ri_annot$geneSymbol[idx],
+                        chr = ri_annot$chr[idx])
+    }
+
+    gene_as <- rbind(gene_as, res)
+
+  } #if has sig. events
+
+} #for all files
+
+head(gene_as)
+head(res)
+```
+
+```{r}
+# Count most frequent spliced genes
+res <- gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+res$GeneSymbol <- factor(res$GeneSymbol, levels = res$GeneSymbol)
+length(res$GeneSymbol)
+head(res)
+```
+
+```{r}
+test <- gene_as%>% group_by(GeneSymbol)
+head(test)
+```
+
+## Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+
+## Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+
+### 1. Checksums with the sha256 algorithm
+
+```{r}
+figure_id   = "<the-figure-i-am-working-on>"
+
+message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
+system(paste0("cd ../data/ && sha256sum * > ../metadata/", figure_id, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+data.table::fread(paste0("../metadata/", figure_id, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
+```
+
+### 2. Libraries metadata
+
+```{r}
+figure_id   = "<the-figure-i-am-working-on>"
+
+dev_session_info   <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
+message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
+saveRDS(dev_session_info, file = paste0("../metadata/", figure_id, "_devtools_session_info.rds"))
+message("Done!\n")
+
+message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
+saveRDS(utils_session_info, file = paste0("../metadata/", figure_id ,"_utils_info.rds"))
+message("Done!\n")
+
+dev_session_info$platform
+dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
