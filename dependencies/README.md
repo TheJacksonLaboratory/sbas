@@ -5,19 +5,21 @@ After your Notebook Session has initilased in CloudOS, open a terminal type the 
 
 Postpone opening an `.ipynb` file until you have completed all teh following steps, to make sure your Notebook environment is the updated one, after the installations have been successfully completed.
 
-
-```bash
-git clone https://github.com/TheJacksonLaboratory/sbas.git
-```
+# Set your Git credentials and preferences
 
 Follow the instructions to configure the git config, your GitHub associated email and name.
 
-# `cd` into the `sbas` directory
+```
+# Set user name and email
+git config --global user.name 
+git config --global user.email 
+
+# Set your prefered editor
+git config --global core.editor nano 
+```
 
 ```bash
-
-cd sbas
-
+git clone https://github.com/TheJacksonLaboratory/sbas.git
 ```
 
 # Initialise your environment
@@ -35,6 +37,7 @@ You might be prompted to do so by `conda` as well.
 
 
 # Update the `base` conda environment
+
 
 ```bash
 
