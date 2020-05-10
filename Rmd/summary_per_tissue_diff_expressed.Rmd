@@ -470,7 +470,7 @@ head( signif_per_tissue[ signif_per_tissue[[paste0("initial_", GENE_ID)]] %in% m
 
 
 message(round(perc_only_male, 2), " % of differentially expressed genes higher in males only found to be significantly differentin males")
-message(round(perc_only_female,2), " % of differentially expressed genes higher in females only found to be significantly different in males")
+message(round(perc_only_female,2), " % of differentially expressed genes higher in females only found to be significantly different in females")
 ```
 
 ## Significantly higher only in males
@@ -518,4 +518,41 @@ signif_per_tissue %>%
 
 ```{r}
 signif_per_chrom_per_sex
+```
+
+## Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+```{r}
+notebook_id   = "summary_per_tissue_diff_expressed"
+
+message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
+system(paste0("cd ../data/ && sha256sum **/*csv > ../metadata/", notebook_id, "_sha256sums.txt"), intern = TRUE)
+system(paste0("cd ../data/ && sha256sum *csv >> ../metadata/", notebook_id, "_sha256sums.txt"), intern = TRUE)
+
+message("Done!\n")
+
+data.table::fread(paste0("../metadata/", notebook_id, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
+```
+
+### 2. Libraries metadata
+
+```{r}
+dev_session_info   <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
+message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
+saveRDS(dev_session_info, file = paste0("../metadata/", notebook_id, "_devtools_session_info.rds"))
+message("Done!\n")
+
+message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
+saveRDS(utils_session_info, file = paste0("../metadata/", notebook_id ,"_utils_info.rds"))
+message("Done!\n")
+
+dev_session_info$platform
+dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
 ```
