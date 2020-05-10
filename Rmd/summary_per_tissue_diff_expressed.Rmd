@@ -1,0 +1,521 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.1
+  kernelspec:
+    display_name: R
+    language: R
+    name: ir
+---
+
+# Supplementary: Counts of differentially expressed genes per examined tissue
+
+This notebook aggregates the results from the differential gene expression (**see** [figure1.ipynb](figure1.ipynb)), and more specifically the `limma::topTable()` output dataframes across all tissues in the GTEX cohort and generates summary statistics for the number of genes found to be statistically up or downregulated between male and female subjects.
+
+
+ ---
+ 
+ **Running this notebook**:
+ 
+A few steps are needed before you can run this document on your own. The GitHub repository (https://github.com/TheJacksonLaboratory/sbas) of the project contains detailed instructions for setting up the environment in the **`dependencies/README.md`** document. Before starting with the analysis, make sure you have first completed the dependencies set up by following the instructions described there. If you have not done this already, you will need to close and restart this notebook before running it.
+
+All paths defined in this Notebook are relative to the parent directory (repository). 
+
+ ---
+
+
+
+# Loading dependencies
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(reshape)
+library(ggplot2)
+```
+
+<!-- #region -->
+## To get the last column fields of the GTF file to annotate the gene ids
+
+The `limma::topTable()` dataframes encode the feature information (genes) as rownames of the dataframe. The values are Ensembl Gene IDs. To map the Gene ids to Gene symbold we will use a the fields in the last column of the relevant GTF file. 
+
+Note: If you are using GENCODE to retrieve the GTF file, use the relevant field name for the gene ID:
+
+| Source | Gene Identifier Name |
+|---:|:---|
+| GENCODE|`Geneid`|
+| Ensembl|`gene_id`|
+
+
+- Here are some quick links to retrieve the GTF file, either from Ensembl or GENCODE:
+
+```bash
+wget ftp://ftp.ensembl.org/pub/release-100/gtf/homo_sapiens/Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz -P ../data
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz -P ../data
+```
+
+- To parse the GTF file and retrieve the fields associated with the Gene IDs, Gene Symbols etc you could use the following bash snippet, depending on the source of your GTF (Ensembl, GENCODE) as these two files slightly differ.
+
+```bash
+# found here: https://www.biostars.org/p/140471/
+cd sbas/data
+
+zcat gencode.v30.annotation.gtf.gz | awk 'BEGIN{FS="\t"}{split($9,a,";"); if($3~"gene") print a[1]"\t"a[3]"\t"$1":"$4"-"$5"\t"a[2]"\t"$7}' |sed 's/gene_id "//' | sed 's/gene_id "//' | sed 's/gene_type "//'| sed 's/gene_name "//' | sed 's/"//g' | awk 'BEGIN{FS="\t"}{split($3,a,"[:-]"); print $1"\t"$2"\t"a[1]"\t"a[2]"\t"a[3]"\t"$4"\t"$5"\t"a[3]-a[2];}' | sed "1i\Geneid\tGeneSymbol\tChromosome\tStart\tEnd\tClass\tStrand\tLength" > gencode.v30.annotation.gtf.gz.txt
+
+zcat Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz | awk 'BEGIN{FS="\t"}{split($9,a,";"); if($3~"gene") print a[1]"\t"a[3]"\t"$1":"$4"-"$5"\t"a[5]"\t"$7}' | sed 's/gene_id "//' | sed 's/gene_id "//' | sed 's/gene_biotype "//'| sed 's/gene_name "//' | sed 's/gene_biotype "//' | sed 's/"//g' | sed 's/ //g' | sed '1igene_id\tGeneSymbol\tChromosome\tClass\tStrand' > Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz.txt 
+```
+<!-- #endregion -->
+
+## Preview the GTF tables with the gene attributes
+
+To make sure the snippets above have worked as expected, take a look in the tables with `head()`:
+
+```{r}
+ensembl_path <- "Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz.txt"
+gencode_path <- "gencode.v34.chr_patch_hapl_scaff.annotation.gtf.gz.txt"
+gtf_ensembl <- read.table(paste0("../data/", ensembl_path), header = TRUE)
+gtf_gencode <- read.table(paste0("../data/", gencode_path), header = TRUE)
+
+head(gtf_ensembl,2)
+head(gtf_gencode,2)
+```
+
+# Create a list of named dataframes with the Differential Gene Expression `limma::topTable()`s
+
+We will iterate over the list of named dataframes to collect summary statistics. More specifically, retrieve the count of:
+- upregulated
+- downregulated
+- non significant
+
+genes for the contrast males-females per tissue.
+
+```{r}
+dge_tables_filepaths <- list.files("../data/dge", pattern = "*DGE.csv", full.names = TRUE)
+dge_tables_filenames <- list.files("../data/dge", pattern = "*DGE.csv", full.names = FALSE)
+```
+
+```{r}
+all_topTables <- lapply(dge_tables_filepaths,read.csv)
+names(all_topTables) <- gsub("_DGE.csv","", dge_tables_filenames, fixed = TRUE)
+```
+
+The list named `all_topTables` is the object that holds all the topTable dataframes from each tissue comparison:
+
+```{r}
+length(all_topTables)
+```
+
+```{r}
+summary(all_topTables)
+```
+
+# Trim gene versions from gene names to match Gene Identifiers from GTF (GENCODE, Ensembl)
+Remove characters after `.` in the Gene Identifier column, since as long as the gene version information is present we will not be able to perform a join, to annotate the toptable dataframes with the GTF gene attrubutes.
+
+```{r}
+#GTF_SOURCE <- "ensembl"      # c("gencode", "ensembl")
+#GENE_ID    <- "gene_id"      # c("Geneid" , "gene_id")
+
+GTF_SOURCE <- "gencode"      # c("gencode", "ensembl")
+GENE_ID    <- "Geneid"      # c("Geneid" , "gene_id")
+
+if (GTF_SOURCE == "gencode") { GTF <- gtf_gencode}
+if (GTF_SOURCE == "ensembl") { GTF <- gtf_ensembl}
+
+GTF[[GENE_ID]]       <- gsub("\\..*","", GTF[[GENE_ID]])
+```
+
+# Example with one topTable before iterating over all tissues
+
+```{r}
+# Example topTable and name
+topTable <- all_topTables[[1]]
+name     <- names( all_topTables)[1]
+topTable[[GENE_ID]]  <- gsub("\\..*","", rownames(topTable))
+name
+head(topTable,2)
+head(GTF, 2)
+```
+
+## Defining the thresholds for the double criterion filtering:
+
+Criteria:
+- Adjusted p-value < `p_value_cuttoff`
+- Absolut FoldChange > `absFold_change_threshold`
+
+<!-- #region -->
+----
+
+***NOTE***
+
+Defining higher in males or females based on the limma design matrix
+As we have used 1 for encoding the females and 2 for the males, our *reference level* for the contrast in the expression between males and females is 1, the females.
+
+
+From the `limma` documentation:
+>The level which is chosen for the *reference level* is the level which is contrasted against. By default, this is simply the first level alphabetically. We can specify that we want group 2 to be the reference level by either using the relevel function [..]
+
+By convention, we could say that genes with positive log fold change, are higher in males, whereas the opposite holds true for the ones that are observed to have negative log folde change. 
+
+---
+<!-- #endregion -->
+
+```{r}
+adj.P.Val_threshold  <- 0.5
+absFoldChange_cutoff <- 1.5
+```
+
+Replacing potential `NA` values in the `P.Value`, `adj.P.Val` to keep the columns numeric and avoid coersion.
+
+```{r}
+# replacing NA p-values with p-value = 1
+topTable$P.Value[is.na(topTable$P.Value)]     <- 1; 
+topTable$adj.P.Val[is.na(topTable$adj.P.Val)] <- 1;
+```
+
+```{r}
+# Add helper variable dummy `FoldChange` variable. Use 2 as base of log, because this is the default from limma
+# The following statement calculates a dummy fold change (how many times higher or lower)
+# The minus symbol is a convention symbol only! to express eg. a fold change of 0.25 as -4, 4 times lower
+topTable$FoldChange_dummy    <-   ifelse(topTable$logFC > 0, 2 ^ topTable$logFC, -1 / (2 ^ topTable$logFC))                    
+
+# Add helper variable `abs_logFC`.
+topTable$abs_logFC <- abs(topTable$logFC)
+
+# Add helper variable `abundance` for up, down, non_signif
+topTable$abundance                                                  <- "non_signif"
+topTable$abundance[(topTable$logFC >   log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "higher"
+topTable$abundance[(topTable$logFC <  -log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "lower"
+```
+
+```{r}
+head(topTable)
+```
+
+# Define a vector with the columns to keep in the annotated from GTF `topTable` object
+
+```{r}
+toKeep <- c("Geneid","logFC","FoldChange_dummy", "adj.P.Val", "abundance")
+```
+
+```{r}
+head(topTable[ , colnames(topTable) %in% toKeep ],2)
+```
+
+```{r}
+name
+dim(topTable)
+dim(topTable [topTable$abundance != "non_signif",  ])
+dim(topTable [ (topTable$abundance != "non_signif" )  & (topTable$adj.P.Val <= adj.P.Val_threshold ) ,  ])
+```
+
+```{r}
+expression_abundance <- t(table(topTable$abundance))
+expression_abundance
+```
+
+```{r}
+expression_abundance <- t(table(topTable$abundance))
+signif <- as.data.frame.matrix(expression_abundance)
+```
+
+```{r}
+signif
+```
+
+To avoid errors in the cases that we might have none lower or none higher, and the matrix might be missing columns we will create a template data.frame and also add the column that might be missing if lower or higher genes is equal to 0.
+
+```{r}
+signif_template <- structure(list(higher = integer(0), 
+                                   lower = integer(0), 
+                                   non_signif = integer(0)), 
+                              row.names = integer(0), class = "data.frame")
+signif_template
+```
+
+In the for-loop we will check if both columns `lower`, `higher` are present, if not add the column and zero count to create the expected sshape of the dataframe:
+
+```R
+signif <- as.data.frame.matrix(expression_abundance)
+if(! ("higher" %in% colnames(signif))) { 
+    
+    signif$higher <- 0
+}
+if(! ("lower" %in% colnames(signif))) { 
+
+    signif$lower <- 0
+}
+```
+
+
+Now we can add some more summary statistics eg percentage of genes lower, higher or non-significantly different, 
+
+```{r}
+signif$tissue <- name
+signif$sum    <- signif$non_signif + signif$higher + signif$lower
+toKeepInOrder <- c("tissue", "non_signif", "lower", "higher", "% lower", "% higher", "% non-signif")
+signif$`% higher`     <-  round(signif$higher / signif$sum  * 100, 2)
+signif$`% lower`      <-  round(signif$lower / signif$sum  * 100, 2)
+signif$`% non-signif` <-  round(signif$non_signif / signif$sum  * 100, 2)
+signif <- signif[, toKeepInOrder]
+signif
+```
+
+# Summary table of differentially expressed genes between male and female acrosss tissues
+
+Above we demonstrate for one example limma `topTable`. Let's now iterate over all tissue and create an aggregated table of counts of differentially expressed or non-significantly altered between the two sexes.
+
+```{r}
+summary_signif <-structure(list(tissue = character(0), 
+                            non_signif = integer(0), 
+                            lower = integer(0),
+                            higher = integer(0),
+                            `% lower` = numeric(0), 
+                            `% higher` = numeric(0), 
+                            `% non-signif` = numeric(0)), 
+                       row.names = integer(0), 
+                       class = "data.frame")
+
+signif_template <- structure(list(higher = integer(0), 
+                                   lower = integer(0), 
+                                   non_signif = integer(0)), 
+                              row.names = integer(0), class = "data.frame")
+
+signif_per_tissue <- structure(list(logFC = numeric(0), AveExpr = numeric(0), t = numeric(0), 
+                        P.Value = numeric(0), adj.P.Val = numeric(0), B = numeric(0), 
+                        initial_gene_id = character(0), gene_id = character(0), abs_logFC = numeric(0), 
+                        FoldChange_dummy = numeric(0), abundance = character(0), 
+                        GeneSymbol = character(0), Chromosome = character(0), Class = character(0), 
+                        Strand = character(0), tissue = character(0)), row.names = integer(0), class = "data.frame")
+
+
+for (i in seq_along(all_topTables)){
+    topTable <- all_topTables[[i]]
+    name     <- names(all_topTables)[i] 
+    initial_gene_id <- paste0("initial_", GENE_ID)
+    topTable[[initial_gene_id]] <- rownames(topTable)
+    topTable[[GENE_ID]]  <- gsub("\\..*","", rownames(topTable))
+    # replacing NA p-values with p-value = 1
+    topTable$P.Value[is.na(topTable$P.Value)]     <- 1; 
+    topTable$adj.P.Val[is.na(topTable$adj.P.Val)] <- 1;
+    topTable$abs_logFC <- abs(topTable$logFC)
+    # Add helper variable dummy `FoldChange` variable. Use 2 as base of log, because this is the default from limma
+    # The following statement calculates a dummy fold change (how many times higher or lower)
+    # The minus symbol is a convention symbol only! to express eg. a fold change of 0.25 as -4, 4 times lower
+    topTable$FoldChange_dummy    <-   ifelse(topTable$logFC > 0, 2 ^ topTable$logFC, -1 / (2 ^ topTable$logFC))                    
+
+    # Add helper variable `abs_logFC`.
+    topTable$abs_logFC <- abs(topTable$logFC)
+
+    # Add helper variable `abundance` for up, down, non_signif
+    topTable$abundance                                                  <- "non_signif"
+    topTable$abundance[(topTable$logFC >   log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "higher"
+    topTable$abundance[(topTable$logFC <  -log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "lower"
+    before_gtf_merge <- dim(topTable)[1]
+    topTable <- dplyr::left_join(topTable, GTF, by = GENE_ID)
+    topTable_signif <- topTable[ topTable$abundance != "non_signif", ]
+    topTable_signif$tissue <- name
+    signif_per_tissue <- rbind(signif_per_tissue, topTable_signif )
+    data.table::fwrite(file = paste0("../data/signif_", snakecase::to_snake_case(name), ".csv"), topTable_signif)
+    after_gtf_merge <- dim(topTable)[1]
+    message( name, ", N features before GTF merge: ",before_gtf_merge, ", after: ", after_gtf_merge)
+    expression_abundance <- t(table(topTable$abundance))
+    signif <- as.data.frame.matrix(expression_abundance)
+    if(! ("higher" %in% colnames(signif))) {
+        signif$higher <- 0
+    }
+    if(! ("lower" %in% colnames(signif))) {
+        signif$lower <- 0
+    }
+    signif$tissue <- name
+    signif$sum    <-   signif$non_signif + signif$higher + signif$lower
+    toKeepInOrder <- c("tissue", "non_signif", "lower", "higher", "% lower", "% higher", "% non-signif")
+    signif$`% higher`     <-  round(signif$higher / signif$sum  * 100, 2)
+    signif$`% lower`      <-  round(signif$lower / signif$sum  * 100, 2)
+    signif$`% non-signif` <-  round(signif$non_signif / signif$sum  * 100, 2)
+    signif <- signif[, toKeepInOrder]
+    summary_signif <- rbind(summary_signif, signif)   
+}
+
+summary_signif <- summary_signif[order(summary_signif$`% non-signif`), ]
+head(summary_signif , 2)
+head(signif_per_tissue, 2)
+```
+
+<!-- #region -->
+# Defining higher in males or females based on the limma design matrix
+As we have used 1 for encoding the males and 2 for the females, our *reference level* for the contrast in the expression between males and females is 1, the males.
+
+
+From the `limma` documentation:
+>The level which is chosen for the *reference level* is the level which is contrasted against. By default, this is simply the first level alphabetically. We can specify that we want group 2 to be the reference level by either using the relevel function [..]
+
+By convention, we could say that genes with positive log fold change, are higher in females, whereas the opposite holds true for the ones that are observed to have negative log folde change. 
+<!-- #endregion -->
+
+```{r}
+summary_signif$`higher in males`   <- summary_signif$lower
+summary_signif$`higher in females` <- summary_signif$higher
+head(summary_signif[summary_signif$tissue == "Adipose-Subcutaneous", ])
+```
+
+# Preparing the summary table for plotting
+
+We will need to aggregate the number of genes in one column in order to be able to plot, and also convert the `Tissue` column to a factor. We will use the `reshape` R package to *melt* the dataframe from a wide to a long version, as described above:
+
+```{r}
+toPlot <- summary_signif[, c( "tissue", "higher in males", "higher in females")]
+toPlot <- reshape::melt(toPlot, id=c("tissue"))
+toPlot$tissue <- as.factor(toPlot$tissue)
+colnames(toPlot) <- c("Tissue", "Sex Bias", "Number of Genes")
+head(toPlot[toPlot$Tissue == "Adipose-Subcutaneous", ])
+```
+
+```{r}
+options(repr.plot.width=15.5, repr.plot.height=20)
+
+ggplot(toPlot, aes(x = Tissue, y = `Number of Genes`, fill = `Sex Bias`)) + 
+  geom_bar(stat="identity", position = "dodge") + 
+  scale_fill_manual (values = c( "higher in males" = "#4A637B" , "higher in females" = "#f35f71")) + 
+  
+  theme(text              = element_text(color = "#4A637B", face = "bold", family = 'Helvetica')
+        ,plot.caption     = element_text(size =  12, color = "#8d99ae", face = "plain", hjust= 1.05) 
+        ,plot.title       = element_text(size =  18, color = "#2b2d42", face = "bold", hjust= 0.5)
+        ,axis.text.y      = element_text(angle =  0, size = 10, color = "#8d99ae", face = "bold", hjust=1.1)
+        ,axis.text.x      = element_text(angle = 70, size = 12, color = "#8d99ae", face = "bold", hjust=1.1)
+        ,axis.title.x     = element_blank()
+        ,axis.ticks.x     = element_blank()
+        ,axis.ticks.y     = element_blank()
+        ,plot.margin      = unit(c(1,1,1,1),"cm")
+        ,panel.background = element_blank()
+        ,legend.position  = "right") +
+  
+
+  geom_text(aes(y = `Number of Genes` + 15, 
+                label = `Number of Genes`),
+                size = 3,
+                color     = "#4A637B",
+                position  =  position_dodge(width = 1),
+                family    = 'Helvetica') +
+  
+  labs(title   = "Number of genes with higher expression in each sex per tissue\n",
+       caption = "\nsource: 'The impact of sex on alternative splicing'\n doi: https://doi.org/10.1101/490904",
+       y   = "\nNumber of Differentially Expressed Genes")  + coord_flip()
+
+
+```
+
+<!-- #region -->
+# Mutually exclusive sex biased genes (higher expression in one or the other sex only)
+
+
+The dataframe `signif_per_tissue` contains all the information for the genes that were significantly higher in either of the two sexes. WLet's examine how many mutually exclusive genes were found across all examined tissues. Ensembl encodes as `Chromosome` the chromosomal position, so we will create the required variables to retrieve only the chromosome information for producing summary statistics.
+<!-- #endregion -->
+
+```{r}
+dput(colnames(signif_per_tissue))
+```
+
+```{r}
+signif_per_tissue$Chromosomal_Position <- signif_per_tissue$Chromosome
+signif_per_tissue$Chromosome <- gsub("\\:.*","", signif_per_tissue$Chromosome)
+signif_per_tissue$higher_in  <- 0
+signif_per_tissue$higher_in[(signif_per_tissue$abundance == "lower" )] <- "males"
+signif_per_tissue$higher_in[(signif_per_tissue$abundance == "higher" )] <- "females"
+toKeepInOrder <- c( paste0("initial_", GENE_ID), "GeneSymbol", "logFC",  "adj.P.Val", "abundance", "higher_in",  "tissue", "Chromosome", 
+GENE_ID, "abs_logFC", "FoldChange_dummy", 
+"Class", "Strand","Chromosomal_Position", 
+ "AveExpr", "t", "P.Value", "adj.P.Val", "B")
+signif_per_tissue <- signif_per_tissue[, toKeepInOrder]
+head(signif_per_tissue, 4)
+```
+
+# Examine mutually exclusive genes upregulated in each sex
+
+```{r}
+female_biased <- unique(signif_per_tissue[[paste0("initial_", GENE_ID)]] [ signif_per_tissue$higher_in == "females" ] )
+male_biased   <- unique(signif_per_tissue[[paste0("initial_", GENE_ID)]] [ signif_per_tissue$higher_in == "males"  ] )
+
+length(male_biased)
+length(female_biased)
+```
+
+```{r}
+## Present in both
+
+length((intersect(male_biased, female_biased)))
+length((intersect(female_biased, male_biased)))
+
+intersect <- (intersect(male_biased, female_biased))
+
+```
+
+```{r}
+## Only in males
+length(male_biased[! (male_biased %in% intersect)])
+
+## Only females
+length(female_biased[! (female_biased %in% intersect)])
+```
+
+```{r}
+perc_only_male <-  length(male_biased[! (male_biased %in% intersect)]) / length(male_biased) * 100
+perc_only_female <-  length(female_biased[! (female_biased %in% intersect)]) / length(female_biased) * 100
+
+head( signif_per_tissue[ signif_per_tissue[[paste0("initial_", GENE_ID)]] %in% male_biased[! (male_biased %in% intersect)],  ] , 4 )
+
+
+message(round(perc_only_male, 2), " % of differentially expressed genes higher in males only found to be significantly differentin males")
+message(round(perc_only_female,2), " % of differentially expressed genes higher in females only found to be significantly different in males")
+```
+
+## Significantly higher only in males
+
+```{r}
+dim(signif_per_tissue[ signif_per_tissue[[paste0("initial_", GENE_ID)]] %in% male_biased[! (male_biased %in% intersect)],  ])
+
+only_male_genes <- signif_per_tissue[ signif_per_tissue[[paste0("initial_", GENE_ID)]] %in% (male_biased[! (male_biased %in% intersect)]) ,  ]
+
+head(only_male_genes[ order(only_male_genes[[paste0("initial_", GENE_ID)]] ), ], 5)
+```
+
+```{r}
+# See 8.1.1 enquo() and !! - Quote and unquote arguments in https://tidyeval.tidyverse.org/dplyr.html
+
+only_male_genes %>% 
+    count( !!GENE_ID, GeneSymbol, Class, sort = TRUE) %>%
+    head(20)
+```
+
+## Significantly higher only in females
+
+```{r}
+only_female_genes <- signif_per_tissue[ signif_per_tissue[[paste0("initial_", GENE_ID)]] %in% (female_biased[! (female_biased %in% intersect)]) ,  ]
+
+head(only_female_genes[ order(only_female_genes[[paste0("initial_", GENE_ID)]] ), ], 10)
+```
+
+```{r}
+only_female_genes %>% 
+    count( !!GENE_ID, GeneSymbol, Class, sort = TRUE) %>%
+    head(20)
+```
+
+# Examine number of differentially expressed genes per chromosome per sex
+
+```{r}
+signif_per_tissue$Chromosome <- as.factor(signif_per_tissue$Chromosome)
+signif_per_tissue$higher_in <- as.factor(signif_per_tissue$higher_in)
+
+signif_per_tissue %>% 
+    group_by(Chromosome,higher_in) %>%  
+    count()  -> signif_per_chrom_per_sex
+```
+
+```{r}
+signif_per_chrom_per_sex
+```
