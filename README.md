@@ -16,11 +16,11 @@ Todo
 The package versions used to run the analysis are documented in TDODO.
 
 To run the notebooks on the CloudOS Digital Research Environment, follow the instructions
-in the (Dependencies) [https://github.com/TheJacksonLaboratory/sbas/tree/master/dependencies] page to 
+in the [Dependencies](https://github.com/TheJacksonLaboratory/sbas/tree/master/dependencies) page to 
 set up the environment.
 
 ### Figure 1
-Gene expression heat plot: (here)[https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/Figure1b.ipynb]
+Gene expression heat plot: [here](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/Figure1b.ipynb).
 
 TODO -- List all of the files here
 
