@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.4.1
+      jupytext_version: 1.4.2
   kernelspec:
     display_name: R
     language: R
@@ -36,6 +36,63 @@ library(dplyr)
 library(tidyr)
 library(reshape)
 library(ggplot2)
+# Install this version: > devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
+library(piggyback)
+library(snakecase)
+```
+
+# Retrieving the results from the Differential Gene Expression using [`ropensci/piggyback`](https://github.com/ropensci/piggyback)
+
+This notebook requires as input data the limma `topTable()` objects from the Differential Gene Expression analysis (see [figure1.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/figure1.ipynb)). We have archived the results from the notebook that generates the results using the method described by the author of the R package [`ropensci/piggyback`](https://github.com/ropensci/piggyback). We use the release named `dge` (Differential Gene Expression) in the repo and can be accessed at [TheJacksonLaboratory/sbas/releases/tag/dge](https://github.com/TheJacksonLaboratory/sbas/releases/tag/dge). 
+
+For using the [`ropensci/piggyback`](https://github.com/ropensci/piggyback) with private repositories, it is required that a `GITHUB_TOKEN` is stored as a variable in the r environment one is working. To generate such a token with sensible default permissions, the R package [usethis]() has a convenient function 
+
+```R
+# intall.packages("usethis")
+usethis::browse_github_token()
+```
+
+This will redirect you to GitHub to create your own GitHub token. Once you have the token, you can use it to set up `.Renviron` by typing the following:
+
+```R
+Sys.setenv(GITHUB_TOKEN = "youractualtokenindoublequotes")
+```
+
+Then you sre ready to use the function [`piggyback::pb_download()`](https://docs.ropensci.org/piggyback/reference/pb_download.html) to retrieve the `dge.tar.gz` that contains the topTable objects written as .csv file for all 46 examined GTEX tissue cohorts.
+
+---
+
+***NOTE***
+
+Avoid using the `.token` argument to share your token directly in the function as you might forget and push your code, along with your private GITHUB_TOKEN to GitHub. If that happens by mistake, it is advised you invalidate the token that has been exposed by accessing [this link](https://github.com/settings/tokens) and clicking `Delete`.
+
+---
+
+```{r}
+#?piggyback::pb_download()
+```
+
+```{r}
+if (!file.exists("../data/dge.tar.gz ")) {
+    
+    message("Fetching dge.tar.gz from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "dge.tar.gz",
+                           dest = "../data",
+                           repo = "TheJacksonLaboratory/sbas",
+                           tag  = "dge",
+                           show_progress = TRUE)
+    message("Done!\n")
+    
+    message("Decompressing archive into folder ../data/dge ..")
+    # Decompress in a folder tmp named dge
+    system("mkdir -p ../data/dge && tar xvzf ../data/dge.tar.gz -C ../data/dge/", intern = TRUE)
+    message("Done!\n")
+}
+if (file.exists("../data/dge.tar.gz ")) {
+    message("File dge.tar.gz already available in ../data/ !\n")
+    }
+
 ```
 
 <!-- #region -->
@@ -76,7 +133,7 @@ To make sure the snippets above have worked as expected, take a look in the tabl
 
 ```{r}
 ensembl_path <- "Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz.txt"
-gencode_path <- "gencode.v34.chr_patch_hapl_scaff.annotation.gtf.gz.txt"
+gencode_path <- "gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz.txt"
 gtf_ensembl <- read.table(paste0("../data/", ensembl_path), header = TRUE)
 gtf_gencode <- read.table(paste0("../data/", gencode_path), header = TRUE)
 
