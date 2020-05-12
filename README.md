@@ -5,7 +5,7 @@ This repository documents the analysis pipeline and scripts we used for the anal
 
 ## Access to GTEx data
 
-In order to reproduce the results described in the manuscript, dbGAP access to the GTEx dataset is required. For our analysis, we used GTEx Analysis V7 (dbGaP Accession phs000424.v7.p2).
+In order to reproduce the results described in the manuscript, dbGAP access to the GTEx dataset is required. For our analysis, we used GTEx Analysis V8 (dbGaP Accession phs000424.v8.p2).
 
 ## Processing of the GTEx RNA-seq FASTQ files
 
