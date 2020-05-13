@@ -109,14 +109,19 @@ As instructed by the software, we are using the raw counts as provided by rMATS.
 
 
 Be sure to set your GITHUB_TOKEN, prior to downloading files
-Sys.setenv(GITHUB_TOKEN="xxxx”)
 
+One suggestion is change it to your token and then run it then immediately change it back to this:
+
+Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 <!-- #endregion -->
 
 ```{r}
 # devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
-Sys.setenv(GITHUB_TOKEN = "712efa1f0e1f5aae3287264e7028149e49b5142d")
+Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 ```
+
+### Did you remember?
+Did you remember to delete your private github token?  Now is a good time to do so, before you save your work and checkit in inadvertantly....
 
 ```{r}
 piggyback::pb_download(
@@ -415,7 +420,7 @@ head(design)
 
 Using sample as a blocking variable, we are able to model the effects of the donor on the results, which improves the power.  This topic is discussed in biostars https://www.biostars.org/p/54565/.  And Gordon Smyth answers the question here https://mailman.stat.ethz.ch/pipermail/bioconductor/2014-February/057887.html.  The method of modeling is a random effects approach in which the intra-donor correlation is incorporated into the covariance matrix instead of the linear predictor.   And though as Gordon Smyth states both are good method and the twoway anova approach makes fewer assumptions, the random effects approach is statistically more powerful.  
 
-We have a balanced design in which all donors receive all stimuli (which is really in healthy human donors, life and all of its factors! Our measurement has so many points -- we are measuring in the skipped exon approach, 42,611 junctions!   It is not possible to encorporate those measurements into the linear predictor.  A two-way ANOVA approach is virtually as powerful as the random effects approach 
+We have a balanced design in which all donors receive all stimuli (which is really in healthy human donors, life and all of its factors!) Our measurement has so many points -- we are measuring in the skipped exon approach, 42,611 junctions!   It is not possible to encorporate those measurements into the linear predictor.  A two-way ANOVA approach is virtually as powerful as the random effects approach 
 and hence is preferable as it makes fewer assumptions.
 
 For an unbalanced design in which each donor receives only a subset of the stimula, the random effects approach is more powerful.
@@ -439,21 +444,24 @@ dup_cor$consensus.correlation
 ```
 
 ```{r}
-y_dup_voom <- voom (y, design=design, plot = TRUE, correlation = dup_cor$consensus_correlation)
+y_dup_voom <- voom (y, design=design, plot = TRUE, block = donor, correlation = dup_cor$consensus.correlation)
 ```
 
 ```{r}
-Gender <- substring(sex[1:191],1,1)
+Gender <- substring(sex[1:dim(ijc)[2]],1,1)
 
-plotMDS(y[,c(1:191)], labels=Gender, top=500, col=ifelse(Gender=="m","blue","red"), 
+plotMDS(y[,c(1:dim(ijc)[2])], labels=Gender, top=500, col=ifelse(Gender=="m","blue","red"), 
         gene.selection="common")
-plotMDS(y_voom[,c(1:191)], labels=Gender, top=500, col=ifelse(Gender=="m","blue","red"), 
+plotMDS(y_voom[,c(1:dim(ijc)[2])], labels=Gender, top=500, col=ifelse(Gender=="m","blue","red"), 
         gene.selection="common")
-plotMDS(y[,c(192:382)], labels=Gender, top=250, col=ifelse(Gender=="m","blue","red"), 
+plotMDS(y_dup_voom[,c(1:dim(ijc)[2])], labels=Gender, top=500, col=ifelse(Gender=="m","blue","red"), 
         gene.selection="common")
-plotMDS(y_voom[,c(192:382)], labels=Gender, top=250, col=ifelse(Gender=="m","blue","red"), 
+plotMDS(y[,c((dim(ijc)[2]+1)):(dim(ijc)[2]+dim(sjc)[2])], labels=Gender, top=250, col=ifelse(Gender=="m","blue","red"), 
         gene.selection="common")
-
+plotMDS(y_voom[,c((dim(ijc)[2]+1)):(dim(ijc)[2]+dim(sjc)[2])], labels=Gender, top=250, col=ifelse(Gender=="m","blue","red"), 
+        gene.selection="common")
+plotMDS(y_dup_voom[,c((dim(ijc)[2]+1):(dim(ijc)[2]+dim(sjc)[2]))], labels=Gender, top=250, col=ifelse(Gender=="m","blue","red"), 
+        gene.selection="common")
 ```
 
 ```{r}
