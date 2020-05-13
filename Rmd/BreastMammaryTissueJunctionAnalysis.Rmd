@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.4.2
+      jupytext_version: 1.4.1
   kernelspec:
     display_name: R
     language: R
@@ -63,9 +63,6 @@ Common problem is to match specifically the rows of an annotation matrix with th
 
 We assume that you have cloned the analysis repository and have `cd` into the parent directory. Before starting with the analysis make sure you have first completed the dependencies set up by following the instructions described in the **`dependencies/README.md`** document. All paths defined in this Notebook are relative to the parent directory (repository). Please close this Notebook and start again by following the above guidelines if you have not completed the aforementioned steps.
 
-## rMATS-final-merged
-the rmats-nf NextFlow was executed and the results released here:
-
 
 ## Loading dependencies
 
@@ -75,8 +72,149 @@ library(multtest)
 library(Biobase)
 library(edgeR)
 library(tibble)
-install.packages('R.utils')
 library(R.utils)
+# Install this version: > devtools::install_github("ropensci/piggyback@87f71e8"), upgrade="never")
+library(piggyback)
+library(statmod)
+```
+
+# Retrieving the results from the rMATS analysis using [`ropensci/piggyback`](https://github.com/ropensci/piggyback)
+
+This notebook requires as input data the aggregated matrices from rMATS. We have archived the results from the Nextflow pipeline that generates the results using the method described by the author of the R package [`ropensci/piggyback`](https://github.com/ropensci/piggyback). We use the release named `rMATS.3.2.5.GTEx.V8.final_matrices` which can be accessed at [adeslatt/sbas_test/releases/tag/rMATS.3.2.5.GTEx.V8.final_matrices](https://github.com/adeslatt/sbas_test/releases/tag/rMATS.3.2.5.GTEx.V8.final_matrices). 
+
+For using the [`ropensci/piggyback`](https://github.com/ropensci/piggyback) with private repositories, it is required that a `GITHUB_TOKEN` is stored as a variable in the R environment in which one is working. To generate such a token with sensible default permissions, the R package [usethis]() has a convenient function 
+
+```R
+# intall.packages("usethis")
+usethis::browse_github_token()
+```
+
+This will redirect you to GitHub to create your own GitHub token. Once you have the token, you can use it to set up `.Renviron` by typing the following:
+
+```R
+Sys.setenv(GITHUB_TOKEN = "youractualtokenindoublequotes")
+```
+
+Then you are ready to use the function [`piggyback::pb_download()`](https://docs.ropensci.org/piggyback/reference/pb_download.html) to retrieve the `dge.tar.gz` that contains the topTable objects written as .csv file for all 46 examined GTEX tissue cohorts.
+
+---
+
+***NOTE***
+
+Avoid using the `.token` argument to share your token directly in the function as you might forget and push your code, along with your private GITHUB_TOKEN to GitHub. If that happens by mistake, it is advised you invalidate the token that has been exposed by accessing [this link](https://github.com/settings/tokens) and clicking `Delete`.
+
+---
+
+
+```{r}
+# ijc
+if (file.exists("../data/rmats_final.se.jc.ijc.txt.gz")) {
+    message("File rmats_final.se.jc.ijc.txt.gz already available in ../data/ !\n")
+    }
+# sjc
+if (file.exists("../data/rmats_final.se.jc.sjc.txt.gz")) {
+    message("File rmats_final.se.jc.sjc.txt.gz already available in ../data/ !\n")
+    }
+# inc
+if (file.exists("../data/rmats_final.se.jc.inc.txt.gz")) {
+    message("File rmats_final.se.jc.inc.txt.gz already available in ../data/ !\n")
+    }
+# SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz
+if (file.exists("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz")) {
+    message("File SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz already available in ../data/ !\n")
+    }
+# pData_yarn_downloadGTExV8.csv
+if (file.exists("../data/pData_yarn_downloadGTExV8.csv")) {
+    message("File pData_yarn_downloadGTExV8.csv already available in ../data/ !\n")
+    }
+# fromGTF.tar.gz
+if (file.exists("../data/fromGTF.tar.gz")) {
+    message("File fromGTF.tar.gz already available in ../data/ !\n")
+}
+
+# ijc
+if (! (file.exists("../data/rmats_final.se.jc.ijc.txt.gz"))) {
+    system("mkdir -p ../data", intern = TRUE)
+    message("Fetching rmats_final.se.jc.ijc.txt.gz from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "rmats_final.se.jc.ijc.txt.gz",
+                           dest = "../data",
+                           repo = "adeslatt/sbas_test",
+                           tag  = "rMATS.3.2.5.GTEx.V8.final_matrices",
+                           show_progress = TRUE)
+    message("Done!\n")
+}
+
+# sjc
+if (! (file.exists("../data/rmats_final.se.jc.sjc.txt.gz"))) {
+    system("mkdir -p ../data", intern = TRUE)
+    message("Fetching rmats_final.se.jc.sjc.txt.gz from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "rmats_final.se.jc.sjc.txt.gz",
+                           dest = "../data",
+                           repo = "adeslatt/sbas_test",
+                           tag  = "rMATS.3.2.5.GTEx.V8.final_matrices",
+                           show_progress = TRUE)
+    message("Done!\n")
+}
+
+#inc
+if (! (file.exists("../data/rmats_final.se.jc.inc.txt.gz"))) {
+    system("mkdir -p ../data", intern = TRUE)
+    message("Fetching rmats_final.se.jc.inc.txt.gz from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "rmats_final.se.jc.inc.txt.gz",
+                           dest = "../data",
+                           repo = "adeslatt/sbas_test",
+                           tag  = "rMATS.3.2.5.GTEx.V8.final_matrices",
+                           show_progress = TRUE)
+    message("Done!\n")
+}
+
+# SraRunTable.noCram.noExome.noWGS.totalRNA.txt
+if (! (file.exists("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz"))) {
+    system("mkdir -p ../data", intern = TRUE)
+    message("Fetching SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz",
+                           dest = "../data",
+                           repo = "TheJacksonLaboratory/sbas",
+                           tag  = "GTExV8.v1.0",
+                           show_progress = TRUE)
+    message("Done!\n")
+}
+
+# pData_yarn_downloadGTExV8.csv
+if (! (file.exists("../data/pData_yarn_downloadGTExV8.csv"))) {
+    system("mkdir -p ../data", intern = TRUE)
+    message("Fetching pData_yarn_downloadGTExV8.csv from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "pData_yarn_downloadGTExV8.csv",
+                           dest = "../data",
+                           repo = "TheJacksonLaboratory/sbas",
+                           tag  = "GTExV8.v1.0",
+                           show_progress = TRUE)
+    message("Done!\n")
+}
+
+# fromGTF.tar.gz
+if (! (file.exists("../data/fromGTF.tar.gz"))) {
+    system("mkdir -p ../data", intern = TRUE)
+    message("Fetching fromGTF.tar.gz from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "fromGTF.tar.gz",
+                           dest = "../data",
+                           repo = "adeslatt/sbas_gtf",
+                           tag  = "rMATS.3.2.5.gencode.v30",
+                           show_progress = TRUE)
+    message("Done!\n")
+    message("Decompressing fromGTF.tar.gz into ../data")
+    system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+    message("Done!\n")
+    message("Decompressing fromGTF.*.txt.gz into ../data")
+    system("gunzip  ../data/fromGTF*.txt.gz ", intern = TRUE)
+    message("Done!\n")
+}
 ```
 
 ## Modeling
@@ -98,12 +236,17 @@ As instructed by the software, we are using the raw counts as provided by rMATS.
 ijc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.ijc.txt.gz") 
 sjc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.sjc.txt.gz") 
 inc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.inc.txt.gz")
+meta.data          <- read.csv('../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt', header=TRUE, stringsAsFactors=FALSE)
+fromGTF.SE         <- read.table("../data/fromGTF.SE.txt", header=TRUE)
+AS_site_type       <- "SE"
+```
 
-meta.data<-read.csv('../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt',header=TRUE, stringsAsFactors=FALSE)
-head(ijc.iso.counts.mem)
-head(sjc.iso.counts.mem)
-head(inc.iso.counts.mem)
-head(meta.data)
+```{r}
+head(ijc.iso.counts.mem,2)
+head(sjc.iso.counts.mem,2)
+head(inc.iso.counts.mem,2)
+head(meta.data,2)
+head(fromGTF.SE,2)
 ```
 
 ## Synchronize metadata samples with ijc, sjc and inc samples
@@ -116,7 +259,10 @@ dim(ijc.iso.counts.mem)
 dim(sjc.iso.counts.mem)
 dim(inc.iso.counts.mem)
 dim(meta.data)
+dim(fromGTF.SE)
+```
 
+```{r}
 # the sample names are in the columns of both the ijc and the sjc matrices, these matrices have the identical column order)
 keep.meta.data <- meta.data$Run %in% colnames(ijc.iso.counts.mem)
 table(keep.meta.data)
@@ -157,7 +303,18 @@ sjc.iso.counts.mem2  <- sjc.iso.counts.mem2[,c(meta.data.run.names)]
 inc.iso.counts.mem2  <- inc.iso.counts.mem2[,c(meta.data.run.names)]
 ```
 
+```{r}
+dim(ijc.iso.counts.mem2)
+dim(sjc.iso.counts.mem2)
+dim(inc.iso.counts.mem2)
+```
+
 Remove samples that match '11IL0' from the ijc, sjc and metadata files
+
+```{r}
+keep.meta.data <- (!grepl('11ILO', reduced.meta.data$biospecimen_repository_sample_id))
+length(reduced.meta.data$Sample.Name)
+```
 
 ```{r}
 keep.meta.data <- (!grepl('11ILO',reduced.meta.data$Sample.Name))
@@ -200,7 +357,6 @@ ijc      <- as.data.frame(ijc.iso.counts.mem2)
 sjc      <- as.data.frame(sjc.iso.counts.mem2)
 ijc      <- data.matrix(ijc)
 sjc      <- data.matrix(sjc)
-
 ```
 
 ## Exploring the ijc and sjc Count data 
@@ -341,35 +497,27 @@ where y is the included exon junction count expression; sex denotes the reported
 
 ```{r}
 sex       <- reduced.meta.data$sex
-
 design    <- model.matrix( ~ sex )
-
 colnames(design) <- c("intercept","sex")
-
-dim(ijc)
-table(sex)
-head(design)
 
 y_ijc <- DGEList(counts=ijc, group = sex)
 y_ijc <- calcNormFactors(y_ijc, method="upperquartile")
-
 y_ijc_voom <- voom (y_ijc, design=design)
 
 Gender <- substring(sex,1,1)
-
-plotMDS(y_ijc, labels=Gender, top=1000, col=ifelse(Gender=="m","blue","red"), 
-        gene.selection="common")
-
-plotMDS(y_ijc_voom, labels=Gender, top=1000, col=ifelse(Gender=="m","blue","red"), 
-        gene.selection="common")
 
 fit_ijc <- lmFit(y_ijc_voom, design)
 fit_ijc <- eBayes(fit_ijc)
 
 ijc_sex_results          <- topTable(fit_ijc, coef='sex', number=nrow(y_voom))
+ijc_sex_results[["ID"]]  <- as.integer(rownames(ijc_sex_results))
+ijc_sex_results[["AS_site_type"]]  <- AS_site_type
+fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
+ijc_sex_results          <- dplyr::left_join(ijc_sex_results, fromGTF.SE, by = "ID")
 ijc_sex_results_refined  <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > 1.5
 
 table(ijc_sex_results_refined)
+head(ijc_sex_results, 2)
 ```
 
 ## Differential analysis as_event:sjc 
@@ -409,6 +557,10 @@ fit_sjc <- lmFit(y_sjc_voom, design)
 fit_sjc <- eBayes(fit_sjc)
 
 sjc_sex_results          <- topTable(fit_sjc, coef='sex', number=nrow(y_voom))
+sjc_sex_results[["ID"]]  <- as.integer(rownames(ijc_sex_results))
+sjc_sex_results[["AS_site_type"]]  <- AS_site_type
+sjc_sex_results          <- dplyr::left_join(ijc_sex_results, fromGTF.SE, by = "ID")
+
 sjc_sex_results_refined  <- sjc_sex_results$adj.P.Val < 0.05 & abs(sjc_sex_results$logFC) > 1.5
 
 table(sjc_sex_results_refined)
@@ -453,7 +605,6 @@ dim(as_matrix)
 table(sex)
 table(as_event)
 head(design)
-
 ```
 
 ### Voom, limma's lmFit and eBayes
@@ -511,9 +662,19 @@ fit <- eBayes(fit, robust = TRUE)
 
 ```{r}
 sex_as_events_results         <- topTable(fit, coef="sex*as_event", number=nrow(y_no_dup_voom))
+sex_as_events_results[["ID"]] <- as.integer(rownames(ijc_sex_results))
+sex_as_events_results[["AS_site_type"]]  <- AS_site_type
+sex_as_events_results[["featurespace"]] <- "sex*as_event"
+sex_as_events_results         <- dplyr::left_join(sex_as_events_results, fromGTF.SE, by = "ID")
+
 sex_as_events_results_refined <- sex_as_events_results$adj.P.Val < 0.05 & abs(sex_as_events_results$logFC) > 1.5
 
 sex_results                   <- topTable(fit, coef="sex", number=nrow(y_no_dup_voom))
+sex_results[["ID"]]           <- as.integer(rownames(sex_results))
+sex_results[["AS_site_type"]] <- AS_site_type
+sex_results[["featurespace"]] <- "sex"
+sex_results                   <- dplyr::left_join(sex_results, fromGTF.SE, by = "ID")
+
 sex_results_refined           <- sex_results$adj.P.Val < 0.05 & abs(sex_results$logFC) > 1.5
 
 table(sex_as_events_results_refined)
@@ -527,90 +688,23 @@ rMATS analyzes the gtf file and determines the junctions, identifying 10 matrice
 
 ```{r}
 ijc_sex_results          <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
-sjc_sex_results          <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
+ijc_sex_results[["ID"]]           <- as.integer(rownames(ijc_sex_results))
+ijc_sex_results[["AS_site_type"]] <- AS_site_type
+ijc_sex_results[["featurespace"]] <- "ijc"
+ijc_sex_results                   <- dplyr::left_join(ijc_sex_results, fromGTF.SE, by = "ID")
+
+sjc_sex_results                   <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
+sjc_sex_results[["ID"]]           <- as.integer(rownames(sjc_sex_results))
+sjc_sex_results[["AS_site_type"]] <- AS_site_type
+sjc_sex_results[["featurespace"]] <- "sjc"
+sjc_sex_results                   <- dplyr::left_join(sjc_sex_results, fromGTF.SE, by = "ID")
 ```
 
 ```{r}
-head(ijc_sex_results)
-head(sjc_sex_results)
-head(sex_as_events_results)
-head(sex_results)
-```
-
-```{r}
-fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
-head(fromGTF.SE)
-genes <- factor(fromGTF.SE$geneSymbol)
-length(levels(genes))
-```
-
-```{r}
-# index to the annotations - these are the Junction IDs
-sex_as_events_rnResults <- rownames(sex_as_events_results)
-sex_rnResults           <- rownames(sex_results)
-ijc_sex_rnResults       <- rownames(ijc_sex_results)
-sjc_sex_rnResults       <- rownames(sjc_sex_results)
-head(sex_as_events_rnResults)
-head(ijc_sex_rnResults)
-head(sjc_sex_rnResults)
-head(sex_rnResults)
-head(fromGTF.SE[sex_as_events_rnResults,])
-```
-
-```{r}
-# use the junctionIDs to get the annotations
-sex_as_events_resultsAnnotations      <- fromGTF.SE[sex_as_events_rnResults,]
-sex_resultsAnnotations                <- fromGTF.SE[sex_rnResults,]
-ijc_sex_resultsAnnotations            <- fromGTF.SE[ijc_sex_rnResults,]
-sjc_sex_resultsAnnotations            <- fromGTF.SE[sjc_sex_rnResults,]
-head(sex_as_events_resultsAnnotations)
-head(sex_resultsAnnotations)
-head(ijc_sex_resultsAnnotations)
-head(sjc_sex_resultsAnnotations)
-```
-
-```{r}
-sex_as_events_results_refinedAnnotations<- sex_as_events_resultsAnnotations[sex_as_events_results_refined==TRUE,]
-sex_results_refinedAnnotations          <- sex_resultsAnnotations          [sex_results_refined          ==TRUE,]
-ijc_sex_results_refinedAnnotations      <- ijc_sex_resultsAnnotations      [ijc_sex_results_refined      ==TRUE,]
-sjc_sex_results_refinedAnnotations      <- sjc_sex_resultsAnnotations      [sjc_sex_results_refined      ==TRUE,]
-head(sex_as_events_results_refinedAnnotations)
-head(sex_results_refinedAnnotations)
-head(ijc_sex_results_refinedAnnotations)
-head(sjc_sex_results_refinedAnnotations)
-```
-
-```{r}
-
-# geneSymbols are in the annotations
-sex_as_events_geneSymbols         <- sex_as_events_resultsAnnotations$geneSymbol
-sex_geneSymbols                   <- sex_resultsAnnotations$geneSymbol
-ijc_sex_geneSymbols               <- ijc_sex_resultsAnnotations$geneSymbol
-sjc_sex_geneSymbols               <- sjc_sex_resultsAnnotations$geneSymbol
-
-sex_as_events_refined_geneSymbols <- sex_as_events_results_refinedAnnotations$geneSymbol
-sex_refined_geneSymbols           <- sex_results_refinedAnnotations$geneSymbol
-ijc_sex_refined_geneSymbols       <- ijc_sex_results_refinedAnnotations$geneSymbol
-sjc_sex_refined_geneSymbols       <- sjc_sex_results_refinedAnnotations$geneSymbol
-
-# adjust the rownames to be the geneSymbols rather than junction IDs
-sex_as_events_results_rn   <- paste(sex_as_events_geneSymbols, sex_as_events_rnResults, sep="-")
-sex_results_rn             <- paste(sex_geneSymbols,           sex_rnResults, sep="-")
-ijc_sex_results_rn         <- paste(ijc_sex_geneSymbols,       ijc_sex_rnResults, sep="-")
-sjc_sex_results_rn         <- paste(sjc_sex_geneSymbols,       sjc_sex_rnResults, sep="-")
-
-head(sex_as_events_results_rn)
-head(sex_results_rn)
-head(ijc_sex_results_rn)
-head(sjc_sex_results_rn)
-
-```
-
-```{r}
-rownames(sex_as_events_results) <- sex_as_events_results_rn
-rownames(sex_results)           <- sex_results_rn
-rownames(ijc_sex_results)       <- ijc_sex_results_rn
-rownames(sjc_sex_results)       <- sjc_sex_results_rn
+head(ijc_sex_results,2)
+head(sjc_sex_results,2)
+head(sex_as_events_results, 2)
+head(sex_results, 2)
 ```
 
 ```{r}
@@ -618,45 +712,13 @@ sex_as_events_filename         = paste(paste('../data/BreastMammaryTissue',colla
 sex_filename                   = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_DGE_sex.csv',sep='')
 ijc_sex_filename               = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_DGE_ijc_sex.csv',sep='')
 sjc_sex_filename               = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_DGE_sjc_sex.csv',sep='')
-
-sex_as_events_refined_filename = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_DGE_sex_as_events_refined.csv',sep='')
-sex_refined_filename           = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_DGE_sex_refined.csv',sep='')
-ijc_sex_refined_filename       = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_DGE_ijc_sex_refined.csv',sep='')
-sjc_sex_refined_filename       = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_DGE_sjc_sex_refined.csv',sep='')
-
-sex_as_events_genesFilename    = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_sex_as_events_universe.txt',sep='')
-sex_genesFilename              = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_sex_universe.txt',sep='')
-ijc_sex_genesFilename          = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_ijc_sex_universe.txt',sep='')
-sjc_sex_genesFilename          = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_sjc_sex_universe.txt',sep='')
-
-sex_as_events_refined_genesFilename = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_sex_as_events_gene_set.txt',sep='')
-sex_refined_genesFilename           = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_sex_gene_set.txt',sep='')
-ijc_sex_refined_genesFilename       = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_ijc_sex_gene_set.txt',sep='')
-sjc_sex_refined_genesFilename       = paste(paste('../data/BreastMammaryTissue',collapse='.'),'_sjc_sex_gene_set.txt',sep='')
-
 ```
 
 ```{r}
-write.table(sex_as_events_results, file = sex_as_events_filename, row.names = T, col.names = T, quote = F, sep = ",")
-write.table(sex_results,           file = sex_filename          , row.names = T, col.names = T, quote = F, sep = ",")
-write.table(ijc_sex_results,       file = ijc_sex_filename      , row.names = T, col.names = T, quote = F, sep = ",")
-write.table(sjc_sex_results,       file = sjc_sex_filename      , row.names = T, col.names = T, quote = F, sep = ",")
-
-write.table(sex_as_events_results[sex_as_events_results_refined,], file = sex_as_events_refined_filename, row.names = T, col.names = T, quote = F, sep = ",")
-write.table(sex_results          [sex_results_refined          ,], file = sex_refined_filename          , row.names = T, col.names = T, quote = F, sep = ",")
-write.table(ijc_sex_results      [ijc_sex_results_refined      ,], file = ijc_sex_refined_filename      , row.names = T, col.names = T, quote = F, sep = ",")
-write.table(sjc_sex_results      [sjc_sex_results_refined      ,], file = sjc_sex_refined_filename      , row.names = T, col.names = T, quote = F, sep = ",")
-
-write.table(sex_as_events_geneSymbols, file = sex_as_events_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
-write.table(sex_geneSymbols,           file = sex_genesFilename          , row.names = F, col.names = F, quote = F, sep = ",")
-write.table(ijc_sex_geneSymbols,       file = ijc_sex_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
-write.table(sjc_sex_geneSymbols,       file = sjc_sex_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
-
-write.table(sex_as_events_refined_geneSymbols,file = sex_as_events_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
-write.table(sex_refined_geneSymbols,          file = sex_refined_genesFilename          , row.names = F, col.names = F, quote = F, sep = ",")
-write.table(ijc_sex_refined_geneSymbols,      file = ijc_sex_refined_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
-write.table(sjc_sex_refined_geneSymbols,      file = sjc_sex_refined_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
-
+data.table::fwrite(sex_as_events_results, file = sex_as_events_filename, sep = ",")
+data.table::fwrite(sex_results,           file = sex_filename          , sep = ",")
+data.table::fwrite(ijc_sex_results,       file = ijc_sex_filename      , sep = ",")
+data.table::fwrite(sjc_sex_results,       file = sjc_sex_filename      , sep = ",")
 ```
 
 ## Metadata
