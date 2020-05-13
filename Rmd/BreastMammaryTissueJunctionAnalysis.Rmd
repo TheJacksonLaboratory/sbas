@@ -115,7 +115,7 @@ Sys.setenv(GITHUB_TOKEN="xxxx”)
 
 ```{r}
 # devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
-#Sys.setenv(GITHUB_TOKEN = "youractualtokenindoublequotes")
+Sys.setenv(GITHUB_TOKEN = "712efa1f0e1f5aae3287264e7028149e49b5142d")
 ```
 
 ```{r}
@@ -380,7 +380,7 @@ Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transf
            y = B0 + B1 sex + B2 as_event + B3 sex*as_event + epsilon (error)
            
 
-where y is the alternative splicing event expression; sex denotes the reported sex of the subject, as_event represents the specific alternative splicing event - either included exon junction counts or skipped exon junction counts and their interaction terms.
+where y is the alternative splicing event expression; sex denotes the reported sex of the subject, as_event represents the specific alternative splicing event - either included exon junction counts or skipped exon junction counts and their interaction terms.   Donor is added to our model as a blocking variable used in both the calculation of duplicate correlation as well as in the linear fit.
 
 ```{r}
 ijc_names    <- as.character(colnames(ijc))
@@ -398,8 +398,8 @@ sex       <- factor(sex, levels=c('male','female'))
 as_event  <- c(rep("ijc",dim(ijc)[2]), rep("sjc", dim(sjc)[2]))
 as_event  <- factor(as_event, levels=c("ijc", "sjc"))
 
-# we will model as random effects, represented as a block
-sample    <- rep(sample_names, 2)
+# we will add donor as a blocking parameter
+donor    <- rep(sample_names, 2)
 
 design    <- model.matrix( ~ sex + as_event + sex*as_event )
 
@@ -413,10 +413,20 @@ head(design)
 
 ### Voom, limma's lmFit and eBayes
 
-with the duplicate correlation due to the two different counts combined into a single matrix - we should add the duplicate correlcation consensus correlation to the modeling
+Using sample as a blocking variable, we are able to model the effects of the donor on the results, which improves the power.  This topic is discussed in biostars https://www.biostars.org/p/54565/.  And Gordon Smyth answers the question here https://mailman.stat.ethz.ch/pipermail/bioconductor/2014-February/057887.html.  The method of modeling is a random effects approach in which the intra-donor correlation is incorporated into the covariance matrix instead of the linear predictor.   And though as Gordon Smyth states both are good method and the twoway anova approach makes fewer assumptions, the random effects approach is statistically more powerful.  
+
+We have a balanced design in which all donors receive all stimuli (which is really in healthy human donors, life and all of its factors! Our measurement has so many points -- we are measuring in the skipped exon approach, 42,611 junctions!   It is not possible to encorporate those measurements into the linear predictor.  A two-way ANOVA approach is virtually as powerful as the random effects approach 
+and hence is preferable as it makes fewer assumptions.
+
+For an unbalanced design in which each donor receives only a subset of the stimula, the random effects approach is more powerful.
+
+Random effects approach is equivalent to The first method is twoway anova, a generalization of a paired analysis.
+
 
 ```{r}
-length(sample)
+# we will model as random effects, represented as a block
+donor    <- rep(sample_names, 2)
+length(donor)
 ```
 
 ```{r}
@@ -424,7 +434,7 @@ y <- DGEList(counts=as_matrix, group = sex)
 y <- calcNormFactors(y, method="upperquartile")
 y_voom <- voom (y, design=design)
 
-dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=sample, weights=y$samples$norm.factors)
+dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
 dup_cor$consensus.correlation
 ```
 
@@ -447,7 +457,7 @@ plotMDS(y_voom[,c(192:382)], labels=Gender, top=250, col=ifelse(Gender=="m","blu
 ```
 
 ```{r}
-fit <- lmFit(y_voom, design=design, block=sample, correlation = dup_cor$consensus.correlation)
+fit <- lmFit(y_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
 fit <- eBayes(fit, robust=TRUE)
 ```
 

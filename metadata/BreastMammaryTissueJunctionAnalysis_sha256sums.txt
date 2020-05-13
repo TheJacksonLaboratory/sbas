@@ -19,7 +19,6 @@ fbebdeab24ea9671ae7d2c14178be4d11ba645443a4d9d27c4f0af4220248c23  ./BreastMammar
 5cfa91f71a21538245f3b5c198fc45f8652c899bbce2fd5ad9bd52a8a08566b6  ./fromGTF.MXE.txt
 d7639443651c3b508772ee89728f8ab41d62414672c41e68a78947be14e07cd6  ./rmats_final.se.jc.sjc.txt.gz
 d0da249aa15318508d6ba936b98c48176c42b97e1951419d560823aed183e3a0  ./BreastMammaryTissue_sex_as_events_gene_set.txt
-6142ec3ad2739882d288d998463840e1a29147a76537e82abe641a2c8dde3fd9  ./SraRunTable.noCram.noExome.noWGS.totalRNA.txt
 bfd9fa65689a7d157b09b5efd472f235b627f85a73b9f0493c881882acce773d  ./fromGTF.tar.gz
 849658f50abd888f8708a1ffd65ff523a14d1d5eab194583bed1caebd5cac92a  ./rmats_final.se.jc.ijc.txt.gz
 22cb3faa337ae24b7b423a985fd2056047400eccb83b716eff2e33cce9159e53  ./fromGTF.SE.txt
