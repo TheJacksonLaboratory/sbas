@@ -457,7 +457,7 @@ plotMDS(y_voom[,c(192:382)], labels=Gender, top=250, col=ifelse(Gender=="m","blu
 ```
 
 ```{r}
-fit <- lmFit(y_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
+fit <- lmFit(y_dup_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
 fit <- eBayes(fit, robust=TRUE)
 ```
 
