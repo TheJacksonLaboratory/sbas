@@ -260,13 +260,11 @@ length(levels(tissue_list_m_f))
 
 ### Keeping only chromosomes shared male female
 
-The Y chromosome spans more than 59 million base pairs of DNA and represents almost 2 percent of the total DNA in cells. Each person normally has one pair of sex chromosomes in each cell. The Y chromosome is present in males, who have one X and one Y chromosome, while females have two X chromosomes.   Since our analysis is on the comparative differences, we must eliminate chrY from our analyses.
+The Y chromosome spans more than 59 million base pairs of DNA and represents almost 2 percent of the total DNA in cells. Each person normally has one pair of sex chromosomes in each cell. The Y chromosome is present in males, who have one X and one Y chromosome, while females have two X chromosomes. Since our analysis is on the comparative differences, we must eliminate chrY from our analyses.
 
 To do so, we grab the annotation from the GTF file and remove those junctions that correspond to the genes on this chromosome
 
 ```{r}
-
-
 if (! (file.exists("../data/fromGTF.tar.gz"))) {
         system("mkdir -p ../data", intern = TRUE)
         message("Fetching fromGTF.tar.gz from GitHub ..")
@@ -302,8 +300,7 @@ sjc_m_f_no_chrY <- sjc_m_f   [keepAllJunctionsButChrY,]
 
 dim(ijc_m_f_no_chrY)
 dim(sjc_m_f_no_chrY)
-dim(fromGTFnoChrY)
-
+dim(fromGTF_no_chrY)
 ```
 
 ## Exploratory and Differential analysis as_event:ijc, sjc 
@@ -456,10 +453,10 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     y_voom <- voom (y, design=design, plot = TRUE)
 
    # for testing not using
-#    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
-#    dup_cor$consensus.correlation 
+    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
+    dup_cor$consensus.correlation 
     
-#    y_dup_voom <- voom (y, design=design, plot = TRUE, block = donor, correlation = dup_cor$consensus.correlation)
+    y_dup_voom <- voom (y, design=design, plot = TRUE, block = donor, correlation = dup_cor$consensus.correlation)
     
     # print the combined exploratory plot
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-y-ijc-MDSplot-100.pdf")
@@ -473,10 +470,10 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
             gene.selection="common")
     dev.off()
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-ijc-MDSplot-100.pdf")
-#    pdf (filename)
-#        plotMDS(y_dup_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-#            gene.selection="common")
-#    dev.off()
+    pdf (filename)
+        plotMDS(y_dup_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+            gene.selection="common")
+    dev.off()
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-y-sjc-MDSplot-100.pdf")
     pdf (filename)
         plotMDS(y[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
@@ -487,14 +484,14 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
         plotMDS(y_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
             gene.selection="common")
     dev.off()
-#    filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-sjc-MDSplot-100.pdf")
-#    pdf (filename)
-#        plotMDS(y_dup_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-#            gene.selection="common")
-#    dev.off()
+    filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-sjc-MDSplot-100.pdf")
+    pdf (filename)
+        plotMDS(y_dup_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+            gene.selection="common")
+    dev.off()
 
-#    fit <- lmFit(y_dup_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
-    fit <- lmFit(y_voom, design=design)
+    fit <- lmFit(y_dup_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
+#    fit <- lmFit(y_voom, design=design)
     fit <- eBayes(fit, robust=TRUE)    
     
     sex_as_events_results         <- topTable(fit, coef="sex*as_event", number=nrow(y_voom))
@@ -622,26 +619,6 @@ print_exploratory_plots (tissue_of_interest,
                          sjc_m_f_no_chrY, 
                          metadata_m_f )
 
-```
-
-```{r}
-ijc_m_f_modified         = ijc_m_f[          ,keep==TRUE]
-sjc_m_f_modified         = sjc_m_f         [          ,keep==TRUE]
-metadata_m_f_modified    = metadata_m_f    [keep==TRUE,          ]
-tissue_list_m_f_modified = tissue_list_m_f [keep==TRUE]
-
-dim(ijc_m_f_modified)
-dim(sjc_m_f_modified)
-dim(metadata_m_f_modified)
-length(tissue_list_m_f_modified)
-tissue_list_m_f_modified = factor(tissue_list_m_f_modified)
-
-lapply(X                  = levels(tissue_list_m_f_modified), 
-       FUN                = print_exploratory_plots,
-       tissue_list        = tissue_list_m_f_modified,
-       ijc                = ijc_m_f_modified, 
-       sjc                = sjc_m_f_modified, 
-       metadata           = metadata_m_f_modified)
 ```
 
 .
