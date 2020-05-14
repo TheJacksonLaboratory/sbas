@@ -218,6 +218,13 @@ For exon skipping events (SE), we have 42,611 non-zero junction IDs the (first d
 
 We have two counts that are in many ways two sides of the same coin.  Both our the observational output and we wish to see how robust each are in their ability to separate out the samples to provide for us differentially expressed isoform events as measured by their counts.   Each junction is in a manner a specific marker to specific isoform events that may or may not be shared between the genders.   If there is significant results, then this is indicative of the separation achieved by isoform specific differentiation.   In our model we will use these in combination, it is important to see if they will yield the results we are looking for.
 
+
+## Preparing the data further
+
+### Keeping only tissues shared male female
+
+We need to remove the tissues that are not shared by males and females, we do this by finding the intersection of the tissue lists.
+
 ```{r}
 tissue_list <- factor(reduced.meta.data$body_site)
 length(tissue_list)
@@ -248,15 +255,18 @@ dim(metadata_m_f)
 length(tissue_list_m_f)
 tissue_list_m_f <- factor(tissue_list_m_f)
 levels(tissue_list_m_f)
+length(levels(tissue_list_m_f))
 ```
 
-## Removing ChrY from analysis
+### Keeping only chromosomes shared male female
 
 The Y chromosome spans more than 59 million base pairs of DNA and represents almost 2 percent of the total DNA in cells. Each person normally has one pair of sex chromosomes in each cell. The Y chromosome is present in males, who have one X and one Y chromosome, while females have two X chromosomes.   Since our analysis is on the comparative differences, we must eliminate chrY from our analyses.
 
 To do so, we grab the annotation from the GTF file and remove those junctions that correspond to the genes on this chromosome
 
 ```{r}
+
+
 if (! (file.exists("../data/fromGTF.tar.gz"))) {
         system("mkdir -p ../data", intern = TRUE)
         message("Fetching fromGTF.tar.gz from GitHub ..")
@@ -280,10 +290,12 @@ genes <- factor(fromGTF.SE$geneSymbol)
 length(levels(genes))    
 
 table(fromGTF.SE$chr)
-table(fromGTF.SE$geneSymbol[fromGTF.SE$chr=="chrY",])
 
-keepAllJunctionsButChrY <- fromGTF.SE$chr != "chrY"
+keepAllJunctionsButChrY <- (fromGTF.SE$chr != "chrY")
 table(keepAllJunctionsButChrY)
+sum(table(keepAllJunctionsButChrY))
+fromGTFnoChrY <- fromGTF.SE[keepAllJunctionsButChrY,]
+dim(fromGTFnoChrY)
 ```
 
 ## Exploratory and Differential analysis as_event:ijc, sjc 
@@ -319,6 +331,7 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 ```{r}
 print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, ijc, sjc, metadata ) {
 
+    fromGTF           <- fromGTF
     tissue_true       <- tissue_list == tissue_of_interest
 
     table(tissue_true)
@@ -562,7 +575,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 ```{r}
 levels(tissue_list_m_f)
 actual_tissue_list_m_f = levels(tissue_list_m_f)
-tissue_of_interest = actual_tissue_list_m_f[45]
+tissue_of_interest = actual_tissue_list_m_f[2]
 tissue_of_interest
 length(actual_tissue_list_m_f)
 length(tissue_list_m_f)
@@ -570,7 +583,9 @@ length(tissue_list_m_f)
 dim(ijc_m_f)
 dim(sjc_m_f)
 dim(metadata_m_f)
-print_exploratory_plots (tissue_of_interest, fromGTF.SE, tissue_list_m_f, ijc_m_f, sjc_m_f, metadata_m_f ) 
+dim(fromGTFnoChrY)
+
+print_exploratory_plots (tissue_of_interest, fromGTFnoChrY, tissue_list_m_f, ijc_m_f, sjc_m_f, metadata_m_f )
 
 ```
 
