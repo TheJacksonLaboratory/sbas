@@ -359,33 +359,67 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     sjc.df            <- as.data.frame(sjc_tissue)    
     ijc.dm            <- data.matrix(ijc.df)
     sjc.dm            <- data.matrix(sjc.df)    
-    
+ 
     sex       <- factor(metadata_tissue$sex,levels=c('male','female')) 
     design    <- model.matrix ( ~ sex)
     colnames(design) = c("intercept","sex")
     head(design)
 
     y_ijc <- DGEList(counts=ijc.dm, group = sex)
-    y_sjc <- DGEList(counts=sjc.dm, group = sex)
-
-    y_ijc <- calcNormFactors(y_ijc, method="upperquartile")
-    y_sjc <- calcNormFactors(y_sjc, method="upperquartile")
-    
+    y_ijc <- calcNormFactors(y_ijc, method="RLE")
     y_ijc_voom <- voom (y_ijc, design=design, plot=TRUE)
-    y_sjc_voom <- voom (y_sjc, design=design, plot=TRUE)
 
     fit_ijc <- lmFit(y_ijc_voom, design)
-    fit_sjc <- lmFit(y_sjc_voom, design)
-
     fit_ijc <- eBayes(fit_ijc)
+
+    ijc_sex_results                    <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
+    ijc_sex_results_refined            <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > 1.5
+    ijc_sex_rnResults                  <- rownames(ijc_sex_results)
+    ijc_sex_resultsAnnotations         <- fromGTF[ijc_sex_rnResults,]
+
+    ijc_sex_results_refinedAnnotations <- ijc_sex_resultsAnnotations[ijc_sex_results_refined      ==TRUE,]
+    dim (ijc_sex_results_refinedAnnotations)
+    head(ijc_sex_results_refinedAnnotations)
+
+    # geneSymbols are in the annotations 
+    ijc_sex_geneSymbols               <- ijc_sex_resultsAnnotations$geneSymbol
+    ijc_sex_refined_geneSymbols       <- ijc_sex_results_refinedAnnotations$geneSymbol
+    length(ijc_sex_refined_geneSymbols)
+
+    # adjust the rownames to be the geneSymbols rather than junction IDs
+    ijc_sex_results_rn         <- paste(ijc_sex_geneSymbols,       ijc_sex_rnResults, sep="-")
+    head(ijc_sex_results_rn)
+    rownames(ijc_sex_results)       <- ijc_sex_results_rn
+
+    length(ijc_sex_refined_geneSymbols)
+    y_sjc <- DGEList(counts=ijc.dm, group = sex)
+    y_sjc <- calcNormFactors(y_ijc, method="RLE")
+    y_sjc_voom <- voom (y_ijc, design=design, plot=TRUE)
+
+    fit_sjc <- lmFit(y_sjc_voom, design)
     fit_sjc <- eBayes(fit_sjc)
-    ijc_sex_results          <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
-    sjc_sex_results          <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
 
-    ijc_sex_results_refined  <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > 1.5
-    sjc_sex_results_refined  <- sjc_sex_results$adj.P.Val < 0.05 & abs(sjc_sex_results$logFC) > 1.5
+    sjc_sex_results                    <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
+    sjc_sex_results_refined            <- sjc_sex_results$adj.P.Val < 0.05 & abs(sjc_sex_results$logFC) > 1.5
+    sjc_sex_rnResults                  <- rownames(sjc_sex_results)
+    sjc_sex_resultsAnnotations         <- fromGTF[sjc_sex_rnResults,]
 
-    # print these exploratory plots for ijc and sjc alone
+    sjc_sex_results_refinedAnnotations <- sjc_sex_resultsAnnotations[sjc_sex_results_refined      ==TRUE,]
+    dim (sjc_sex_results_refinedAnnotations)
+    head(sjc_sex_results_refinedAnnotations)
+
+    # geneSymbols are in the annotations 
+    sjc_sex_geneSymbols               <- sjc_sex_resultsAnnotations$geneSymbol
+    sjc_sex_refined_geneSymbols       <- sjc_sex_results_refinedAnnotations$geneSymbol
+    length(sjc_sex_refined_geneSymbols)
+
+    # adjust the rownames to be the geneSymbols rather than junction IDs
+    sjc_sex_results_rn         <- paste(sjc_sex_geneSymbols,       sjc_sex_rnResults, sep="-")
+    head(sjc_sex_results_rn)
+    rownames(sjc_sex_results)       <- sjc_sex_results_rn
+
+    length(sjc_sex_results_refined) 
+   # print these exploratory plots for ijc and sjc alone
     Gender <- substring(sex,1,1)
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-ijc-MDSplot-100.pdf")
     pdf (filename)
@@ -397,23 +431,62 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
         plotMDS(y_ijc_voom, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
     dev.off()
+
+    fit_ijc <- lmFit(y_ijc_voom, design)
+    fit_ijc <- eBayes(fit_ijc)
+    ijc_sex_results          <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
+    ijc_sex_results_refined  <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > 1.5
+    ijc_sex_rnResults       <- rownames(ijc_sex_results)
+
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-sjc-MDSplot-100.pdf")
     pdf (filename)
-        plotMDS(y_sjc, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+           plotMDS(y_sjc, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
     dev.off()
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-sjc-voom-MDSplot-100.pdf")
     pdf (filename)    
-        plotMDS(y_sjc_voom, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+          plotMDS(y_sjc_voom, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
     dev.off()
-    
-    ijc_names    <- as.character(colnames(ijc.dm))
-    sjc_names    <- as.character(colnames(sjc.dm))
-    sample_names <- as.character(colnames(ijc.dm))
+        
+    fit_sjc <- lmFit(y_sjc_voom, design)
+    fit_sjc <- eBayes(fit_sjc)
+        
+    sjc_sex_results            <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
+    sjc_sex_results_refined        <- sjc_sex_results$adj.P.Val < 0.05 & abs(sjc_sex_results$logFC) > 1.5
+    sjc_sex_rnResults                  <- rownames(sjc_sex_results)
+    sjc_sex_resultsAnnotations         <- fromGTF[sjc_sex_rnResults,]
+    sjc_sex_results_refinedAnnotations <- sjc_sex_resultsAnnotations[sjc_sex_results_refined ==TRUE,]
 
-    ijc_names <- paste0(ijc_names,"-ijc")
+    head(sjc_sex_resultsAnnotations)
+    head(sjc_sex_results_refinedAnnotations)
+
+    # geneSymbols are in the annotations 
+    sjc_sex_geneSymbols               <- sjc_sex_resultsAnnotations$geneSymbol
+    sjc_sex_refined_geneSymbols       <- sjc_sex_results_refinedAnnotations$geneSymbol
+
+    # adjust the rownames to be the geneSymbols rather than junction IDs
+    sjc_sex_results_rn         <- paste(sjc_sex_geneSymbols,       sjc_sex_rnResults, sep="-")
+    head(sjc_sex_results_rn)    
+    rownames(sjc_sex_results)       <- sjc_sex_results_rn
+    sjc_sex_filename               = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sjc_sex.csv',sep='')
+    sjc_sex_refined_filename       = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sjc_sex_refined.csv',sep='')
+    sjc_sex_genesFilename          = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sjc_sex_universe.txt',sep='')
+    sjc_sex_refined_genesFilename       = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sjc_sex_gene_set.txt',sep='')
+
+    write.table(sjc_sex_results,            file = sjc_sex_filename      , row.names = T, col.names = T, quote = F, sep = ",")
+    write.table(sjc_sex_results [sjc_sex_results_refined      ,], file = sjc_sex_refined_filename      , row.names = T, col.names = T, quote = F, sep = ",")
+    write.table(sjc_sex_geneSymbols,        file = sjc_sex_genesFilename        , row.names = F, col.names = F, quote = F, sep = ",")
+    write.table(sjc_sex_refined_geneSymbols,file = sjc_sex_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
+
+    
+    sample_names <- as.character(colnames(ijc.dm))
+    
+    ijc_names <- as.character(colnames(ijc.dm))
+    sjc_names <- as.character(colnames(sjc.dm))
     sjc_names <- paste0(sjc_names,"-sjc")
+    ijc_names <- paste0(ijc_names,"-ijc")
+
     colnames(ijc.dm) <- ijc_names
     colnames(sjc.dm) <- sjc_names
 
@@ -437,10 +510,10 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     head(design)
 
     y <- DGEList(counts=as_matrix, group = sex)
-    y <- calcNormFactors(y, method="upperquartile")
+    y <- calcNormFactors(y, method="RLE")
     y_voom <- voom (y, design=design, plot = TRUE)
 
-   # for testing comment this out for speed
+    # for testing comment this out for speed
     dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
     dup_cor$consensus.correlation 
     
@@ -493,11 +566,8 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 
     sex_as_events_rnResults <- rownames(sex_as_events_results)
     sex_rnResults           <- rownames(sex_results)
-    ijc_sex_rnResults       <- rownames(ijc_sex_results)
-    sjc_sex_rnResults       <- rownames(sjc_sex_results)
     head(sex_as_events_rnResults)
     head(ijc_sex_rnResults)
-    head(sjc_sex_rnResults)
     head(sex_rnResults)
     head(fromGTF[sex_as_events_rnResults,])
 
@@ -505,85 +575,68 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     sex_as_events_resultsAnnotations      <- fromGTF[sex_as_events_rnResults,]
     sex_resultsAnnotations                <- fromGTF[sex_rnResults,]
     ijc_sex_resultsAnnotations            <- fromGTF[ijc_sex_rnResults,]
-    sjc_sex_resultsAnnotations            <- fromGTF[sjc_sex_rnResults,]
     head(sex_as_events_resultsAnnotations)
     head(sex_resultsAnnotations)
     head(ijc_sex_resultsAnnotations)
-    head(sjc_sex_resultsAnnotations)
     
     sex_as_events_results_refinedAnnotations<- sex_as_events_resultsAnnotations[sex_as_events_results_refined==TRUE,]
     sex_results_refinedAnnotations          <- sex_resultsAnnotations          [sex_results_refined          ==TRUE,]
     ijc_sex_results_refinedAnnotations      <- ijc_sex_resultsAnnotations      [ijc_sex_results_refined      ==TRUE,]
-    sjc_sex_results_refinedAnnotations      <- sjc_sex_resultsAnnotations      [sjc_sex_results_refined      ==TRUE,]
     head(sex_as_events_results_refinedAnnotations)
     head(sex_results_refinedAnnotations)
     head(ijc_sex_results_refinedAnnotations)
-    head(sjc_sex_results_refinedAnnotations)
 
     # geneSymbols are in the annotations 
     sex_as_events_geneSymbols         <- sex_as_events_resultsAnnotations$geneSymbol
     sex_geneSymbols                   <- sex_resultsAnnotations$geneSymbol
     ijc_sex_geneSymbols               <- ijc_sex_resultsAnnotations$geneSymbol
-    sjc_sex_geneSymbols               <- sjc_sex_resultsAnnotations$geneSymbol
 
     sex_as_events_refined_geneSymbols <- sex_as_events_results_refinedAnnotations$geneSymbol
     sex_refined_geneSymbols           <- sex_results_refinedAnnotations$geneSymbol
     ijc_sex_refined_geneSymbols       <- ijc_sex_results_refinedAnnotations$geneSymbol
-    sjc_sex_refined_geneSymbols       <- sjc_sex_results_refinedAnnotations$geneSymbol
 
     # adjust the rownames to be the geneSymbols rather than junction IDs
     sex_as_events_results_rn   <- paste(sex_as_events_geneSymbols, sex_as_events_rnResults, sep="-")
     sex_results_rn             <- paste(sex_geneSymbols,           sex_rnResults, sep="-")
     ijc_sex_results_rn         <- paste(ijc_sex_geneSymbols,       ijc_sex_rnResults, sep="-")
-    sjc_sex_results_rn         <- paste(sjc_sex_geneSymbols,       sjc_sex_rnResults, sep="-")
     head(sex_as_events_results_rn)
     head(sex_results_rn)
     head(ijc_sex_results_rn)
-    head(sjc_sex_results_rn)    
     rownames(sex_as_events_results) <- sex_as_events_results_rn
     rownames(sex_results)           <- sex_results_rn
     rownames(ijc_sex_results)       <- ijc_sex_results_rn
-    rownames(sjc_sex_results)       <- sjc_sex_results_rn
     
     sex_as_events_filename         = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex_as_events.csv')
     sex_filename                   = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex.csv',sep='')
     ijc_sex_filename               = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_ijc_sex.csv',sep='')
-    sjc_sex_filename               = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sjc_sex.csv',sep='')
 
     sex_as_events_refined_filename = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex_as_events_refined.csv',sep='')
     sex_refined_filename           = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex_refined.csv',sep='')
     ijc_sex_refined_filename       = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_ijc_sex_refined.csv',sep='')
-    sjc_sex_refined_filename       = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_DGE_sjc_sex_refined.csv',sep='')
 
     sex_as_events_genesFilename    = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sex_as_events_universe.txt',sep='')
     sex_genesFilename              = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sex_universe.txt',sep='')
     ijc_sex_genesFilename          = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_ijc_sex_universe.txt',sep='')
-    sjc_sex_genesFilename          = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sjc_sex_universe.txt',sep='')
 
     sex_as_events_refined_genesFilename = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sex_as_events_gene_set.txt',sep='')
     sex_refined_genesFilename           = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sex_gene_set.txt',sep='')
     ijc_sex_refined_genesFilename       = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_ijc_sex_gene_set.txt',sep='')
-    sjc_sex_refined_genesFilename       = paste0(paste0('../data/',snakecase::to_snake_case(tissue_of_interest)),'_sjc_sex_gene_set.txt',sep='')
 
     write.table(sex_as_events_results, file = sex_as_events_filename, row.names = T, col.names = T, quote = F, sep = ",")
     write.table(sex_results,           file = sex_filename          , row.names = T, col.names = T, quote = F, sep = ",")
     write.table(ijc_sex_results,       file = ijc_sex_filename      , row.names = T, col.names = T, quote = F, sep = ",")
-    write.table(sjc_sex_results,       file = sjc_sex_filename      , row.names = T, col.names = T, quote = F, sep = ",")
 
     write.table(sex_as_events_results[sex_as_events_results_refined,], file = sex_as_events_refined_filename, row.names = T, col.names = T, quote = F, sep = ",")
     write.table(sex_results          [sex_results_refined          ,], file = sex_refined_filename          , row.names = T, col.names = T, quote = F, sep = ",")
     write.table(ijc_sex_results      [ijc_sex_results_refined      ,], file = ijc_sex_refined_filename      , row.names = T, col.names = T, quote = F, sep = ",")
-    write.table(sjc_sex_results      [sjc_sex_results_refined      ,], file = sjc_sex_refined_filename      , row.names = T, col.names = T, quote = F, sep = ",")
 
     write.table(sex_as_events_geneSymbols, file = sex_as_events_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
     write.table(sex_geneSymbols,           file = sex_genesFilename          , row.names = F, col.names = F, quote = F, sep = ",")
     write.table(ijc_sex_geneSymbols,       file = ijc_sex_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
-    write.table(sjc_sex_geneSymbols,       file = sjc_sex_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
 
     write.table(sex_as_events_refined_geneSymbols,file = sex_as_events_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
     write.table(sex_refined_geneSymbols,          file = sex_refined_genesFilename          , row.names = F, col.names = F, quote = F, sep = ",")
     write.table(ijc_sex_refined_geneSymbols,      file = ijc_sex_refined_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
-    write.table(sjc_sex_refined_geneSymbols,      file = sjc_sex_refined_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
 
     return(0)
 }
@@ -595,7 +648,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 cat(levels(tissue_list_m_f),sep="\n")
 
 actual_tissue_list_m_f = levels(tissue_list_m_f)
-tissue_of_interest = actual_tissue_list_m_f[21]
+tissue_of_interest = actual_tissue_list_m_f[29]
 tissue_of_interest
 length(actual_tissue_list_m_f)
 length(tissue_list_m_f)
@@ -613,12 +666,6 @@ print_exploratory_plots (tissue_of_interest,
                          metadata_m_f )
 
 ```
-
-.
-
-
-
-
 
 ## Metadata
 
