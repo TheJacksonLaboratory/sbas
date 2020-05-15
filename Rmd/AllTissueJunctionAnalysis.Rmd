@@ -12,7 +12,7 @@ jupyter:
     name: ir
 ---
 
-#AllTissueJunctionAnalysis as a Notebook 
+# AllTissueJunctionAnalysis as a Notebook 
 
 rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stored in the Sequence Read Archive with controlled access managed by dbGaP.   The data were generated under the Gene Tissue Expression.
 
@@ -301,6 +301,17 @@ sjc_m_f_no_chrY <- sjc_m_f   [keepAllJunctionsButChrY,]
 dim(ijc_m_f_no_chrY)
 dim(sjc_m_f_no_chrY)
 dim(fromGTF_no_chrY)
+
+
+ijc_m_f_no_chrY <- data.matrix(ijc_m_f_no_chrY)
+sjc_m_f_no_chrY <- data.matrix(sjc_m_f_no_chrY)
+
+rownames(ijc_m_f_no_chrY) <- rownames(fromGTF_no_chrY)
+rownames(sjc_m_f_no_chrY) <- rownames(fromGTF_no_chrY)
+
+head(ijc_m_f_no_chrY)
+head(fromGTF_no_chrY)
+head(sjc_m_f_no_chrY)
 ```
 
 ## Exploratory and Differential analysis as_event:ijc, sjc 
@@ -332,29 +343,6 @@ For an unbalanced design in which each donor receives only a subset of the stimu
 
 Random effects approach is equivalent to The first method is twoway anova, a generalization of a paired analysis.
 
-
-```{r}
-levels(tissue_list_m_f)
-actual_tissue_list_m_f = levels(tissue_list_m_f)
-length(actual_tissue_list_m_f)
-length(tissue_list_m_f)
-
-tissue_of_interest = actual_tissue_list_m_f[2]
-tissue_of_interest
-
-fromGTF     <- fromGTF_no_chrY
-ijc         <- ijc_m_f_no_chrY
-sjc         <- sjc_m_f_no_chrY
-tissue_list <- tissue_list_m_f
-metadata    <- metadata_m_f
-
-dim(fromGTF)
-dim(ijc)
-dim(sjc)
-length(tissue_list)
-dim(metadata)
-
-```
 
 ```{r}
 print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, ijc, sjc, metadata ) {
@@ -452,7 +440,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     y <- calcNormFactors(y, method="upperquartile")
     y_voom <- voom (y, design=design, plot = TRUE)
 
-   # for testing not using
+   # for testing comment this out for speed
     dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
     dup_cor$consensus.correlation 
     
@@ -490,8 +478,11 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
             gene.selection="common")
     dev.off()
 
+    # for testing comment this out for speed
     fit <- lmFit(y_dup_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
-#    fit <- lmFit(y_voom, design=design)
+    
+    # and uncomment this to have the model fit to the design matrix
+    #    fit <- lmFit(y_voom, design=design)
     fit <- eBayes(fit, robust=TRUE)    
     
     sex_as_events_results         <- topTable(fit, coef="sex*as_event", number=nrow(y_voom))
@@ -549,7 +540,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     head(sex_results_rn)
     head(ijc_sex_results_rn)
     head(sjc_sex_results_rn)    
-   rownames(sex_as_events_results) <- sex_as_events_results_rn
+    rownames(sex_as_events_results) <- sex_as_events_results_rn
     rownames(sex_results)           <- sex_results_rn
     rownames(ijc_sex_results)       <- ijc_sex_results_rn
     rownames(sjc_sex_results)       <- sjc_sex_results_rn
@@ -600,9 +591,11 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 ```
 
 ```{r}
-levels(tissue_list_m_f)
+
+cat(levels(tissue_list_m_f),sep="\n")
+
 actual_tissue_list_m_f = levels(tissue_list_m_f)
-tissue_of_interest = actual_tissue_list_m_f[3]
+tissue_of_interest = actual_tissue_list_m_f[21]
 tissue_of_interest
 length(actual_tissue_list_m_f)
 length(tissue_list_m_f)
