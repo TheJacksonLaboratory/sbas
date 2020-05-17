@@ -373,7 +373,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     fit_ijc <- eBayes(fit_ijc)
 
     ijc_sex_results                    <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
-    ijc_sex_results_refined            <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > 1.5
+    ijc_sex_results_refined            <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > abs(1.5
     ijc_sex_rnResults                  <- rownames(ijc_sex_results)
     ijc_sex_resultsAnnotations         <- fromGTF[ijc_sex_rnResults,]
 
@@ -559,10 +559,10 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     fit <- eBayes(fit, robust=TRUE)    
     
     sex_as_events_results         <- topTable(fit, coef="sex*as_event", number=nrow(y_voom))
-    sex_as_events_results_refined <- sex_as_events_results$adj.P.Val < 0.05 & abs(sex_as_events_results$logFC) > 1.5
+    sex_as_events_results_refined <- sex_as_events_results$adj.P.Val < 0.05 & abs(sex_as_events_results$logFC) > abs(log2(1.5))
 
     sex_results                   <- topTable(fit, coef="sex", number=nrow(y_voom))
-    sex_results_refined           <- sex_results$adj.P.Val < 0.05 & abs(sex_results$logFC) > 1.5
+    sex_results_refined           <- sex_results$adj.P.Val < 0.05 & abs(sex_results$logFC) > abs(log2(1.5))
 
     sex_as_events_rnResults <- rownames(sex_as_events_results)
     sex_rnResults           <- rownames(sex_results)
@@ -648,7 +648,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 cat(levels(tissue_list_m_f),sep="\n")
 
 actual_tissue_list_m_f = levels(tissue_list_m_f)
-tissue_of_interest = actual_tissue_list_m_f[29]
+tissue_of_interest = actual_tissue_list_m_f[30]
 tissue_of_interest
 length(actual_tissue_list_m_f)
 length(tissue_list_m_f)
