@@ -89,7 +89,7 @@ library(multtest)
 library(Biobase)
 library(edgeR)
 library(tibble)
-install.packages('R.utils')
+#install.packages('R.utils')
 library(R.utils)
 ```
 
@@ -361,7 +361,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     sjc.dm            <- data.matrix(sjc.df)    
  
     sex       <- factor(metadata_tissue$sex,levels=c('male','female')) 
-    design    <- model.matrix ( ~ sex)
+    design    <- model.matrix ( ~ sex )
     colnames(design) = c("intercept","sex")
     head(design)
 
@@ -373,7 +373,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     fit_ijc <- eBayes(fit_ijc)
 
     ijc_sex_results                    <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
-    ijc_sex_results_refined            <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > abs(1.5
+    ijc_sex_results_refined            <- ijc_sex_results$adj.P.Val <= 0.05 & abs(ijc_sex_results$logFC) >= abs(log2(1.5))
     ijc_sex_rnResults                  <- rownames(ijc_sex_results)
     ijc_sex_resultsAnnotations         <- fromGTF[ijc_sex_rnResults,]
 
@@ -392,15 +392,15 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     rownames(ijc_sex_results)       <- ijc_sex_results_rn
 
     length(ijc_sex_refined_geneSymbols)
-    y_sjc <- DGEList(counts=ijc.dm, group = sex)
-    y_sjc <- calcNormFactors(y_ijc, method="RLE")
-    y_sjc_voom <- voom (y_ijc, design=design, plot=TRUE)
+    y_sjc <- DGEList(counts=sjc.dm, group = sex)
+    y_sjc <- calcNormFactors(y_sjc, method="RLE")
+    y_sjc_voom <- voom (y_sjc, design=design, plot=TRUE)
 
     fit_sjc <- lmFit(y_sjc_voom, design)
     fit_sjc <- eBayes(fit_sjc)
 
     sjc_sex_results                    <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
-    sjc_sex_results_refined            <- sjc_sex_results$adj.P.Val < 0.05 & abs(sjc_sex_results$logFC) > 1.5
+    sjc_sex_results_refined            <- sjc_sex_results$adj.P.Val <= 0.05 & abs(sjc_sex_results$logFC) >= abs(log2(1.5))
     sjc_sex_rnResults                  <- rownames(sjc_sex_results)
     sjc_sex_resultsAnnotations         <- fromGTF[sjc_sex_rnResults,]
 
@@ -435,7 +435,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     fit_ijc <- lmFit(y_ijc_voom, design)
     fit_ijc <- eBayes(fit_ijc)
     ijc_sex_results          <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
-    ijc_sex_results_refined  <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > 1.5
+    ijc_sex_results_refined  <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > abs(log2(1.5))
     ijc_sex_rnResults       <- rownames(ijc_sex_results)
 
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-sjc-MDSplot-100.pdf")
@@ -453,7 +453,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     fit_sjc <- eBayes(fit_sjc)
         
     sjc_sex_results            <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
-    sjc_sex_results_refined        <- sjc_sex_results$adj.P.Val < 0.05 & abs(sjc_sex_results$logFC) > 1.5
+    sjc_sex_results_refined        <- sjc_sex_results$adj.P.Val <= 0.05 & abs(sjc_sex_results$logFC) >= abs(log2(1.5))
     sjc_sex_rnResults                  <- rownames(sjc_sex_results)
     sjc_sex_resultsAnnotations         <- fromGTF[sjc_sex_rnResults,]
     sjc_sex_results_refinedAnnotations <- sjc_sex_resultsAnnotations[sjc_sex_results_refined ==TRUE,]
@@ -498,7 +498,10 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 
     length(as_event)
     # we will add donor as a blocking parameter
-    donor    <- rep(sample_names, 2)
+    # rather than sample name -- we should use donor for real
+    donor     <- factor(sample_names)
+    
+    donor    <- rep(sample, 2)
 
     design    <- model.matrix( ~ sex + as_event + sex*as_event )
 
@@ -514,7 +517,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     y_voom <- voom (y, design=design, plot = TRUE)
 
     # for testing comment this out for speed
-    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
+    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor2, weights=y$samples$norm.factors)
     dup_cor$consensus.correlation 
     
     y_dup_voom <- voom (y, design=design, plot = TRUE, block = donor, correlation = dup_cor$consensus.correlation)
@@ -562,7 +565,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     sex_as_events_results_refined <- sex_as_events_results$adj.P.Val < 0.05 & abs(sex_as_events_results$logFC) > abs(log2(1.5))
 
     sex_results                   <- topTable(fit, coef="sex", number=nrow(y_voom))
-    sex_results_refined           <- sex_results$adj.P.Val < 0.05 & abs(sex_results$logFC) > abs(log2(1.5))
+    sex_results_refined           <- sex_results$adj.P.Val <= 0.05 & abs(sex_results$logFC) >= abs(log2(1.5))
 
     sex_as_events_rnResults <- rownames(sex_as_events_results)
     sex_rnResults           <- rownames(sex_results)
@@ -648,7 +651,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 cat(levels(tissue_list_m_f),sep="\n")
 
 actual_tissue_list_m_f = levels(tissue_list_m_f)
-tissue_of_interest = actual_tissue_list_m_f[30]
+tissue_of_interest = actual_tissue_list_m_f[21]
 tissue_of_interest
 length(actual_tissue_list_m_f)
 length(tissue_list_m_f)
