@@ -1,6 +1,6 @@
 name	female	male	include	display.name
-Adipose-Subcutaneous	218	445	1	Adipose.sc
-Adipose-Visceral(Omentum)	170	371	1	Adipose.v
+Adipose-Subcutaneous	218	445	1	Adipose (sc)
+Adipose-Visceral(Omentum)	170	371	1	Adipose (v)
 AdrenalGland	101	157	1	Adrenal gland
 Artery-Aorta	153	279	1	Aorta
 Artery-Coronary	94	146	1	Coronary artery
