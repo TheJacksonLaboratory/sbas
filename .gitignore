@@ -7,5 +7,6 @@ data/*
 .Rhistory
 .Rdata
 .DS_Store
+pdf/*
 manifest.json
 **/*.gz
