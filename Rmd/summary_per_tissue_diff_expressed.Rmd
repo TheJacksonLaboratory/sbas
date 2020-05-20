@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.4.2
+      jupytext_version: 1.3.3
   kernelspec:
     display_name: R
     language: R
@@ -45,7 +45,7 @@ library(snakecase)
 
 This notebook requires as input data the limma `topTable()` objects from the Differential Gene Expression analysis (see [figure1.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/figure1.ipynb)). We have archived the results from the notebook that generates the results using the method described by the author of the R package [`ropensci/piggyback`](https://github.com/ropensci/piggyback). We use the release named `dge` (Differential Gene Expression) in the repo and can be accessed at [TheJacksonLaboratory/sbas/releases/tag/dge](https://github.com/TheJacksonLaboratory/sbas/releases/tag/dge). 
 
-For using the [`ropensci/piggyback`](https://github.com/ropensci/piggyback) with private repositories, it is required that a `GITHUB_TOKEN` is stored as a variable in the r environment one is working. To generate such a token with sensible default permissions, the R package [usethis]() has a convenient function 
+For using the [`ropensci/piggyback`](https://github.com/ropensci/piggyback) with private repositories, it is required that a `GITHUB_TOKEN` is stored as a variable in the R environment in which one is working. To generate such a token with sensible default permissions, the R package [usethis]() has a convenient function 
 
 ```R
 # intall.packages("usethis")
@@ -95,8 +95,46 @@ if (file.exists("../data/dge.tar.gz ")) {
 
 ```
 
-<!-- #region -->
 ## To get the last column fields of the GTF file to annotate the gene ids
+- The following code cells download the Ensembl or Gencode GTF file (for now we are using Ensembl). Alternatively, you can get the files from the command line as follows.
+
+```bash
+wget ftp://ftp.ensembl.org/pub/release-100/gtf/homo_sapiens/Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz -P ../data
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz -P ../data
+```
+
+```{r}
+# Download from archive if not available in ../data
+if (!("Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz" %in% list.files("../data/"))) {
+    message("Downloading Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz from Ensembl into the ../data/ directory ..\n")
+    gtf_url = 'ftp://ftp.ensembl.org/pub/release-100/gtf/homo_sapiens/Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz'
+    destination = '../data/Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz'
+    download.file(gtf_url, destination, "wget", quiet = FALSE, mode = "w",
+              cacheOK = TRUE,
+              extra = getOption("download.file.extra"))
+    message("Done!\n")
+} else {
+    message("GTF file previously downloaded")
+}
+```
+
+```{r}
+# ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz
+if (!("gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz" %in% list.files("../data/"))) {
+    message("Downloading gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz from Gencode into the ../data/ directory ..\n")
+    gencode_url = 'ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz'
+    destination = '../data/gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz'
+    download.file(gencode_url, destination, "wget", quiet = FALSE, mode = "w",
+            cacheOK = TRUE,
+            extra = getOption("download.file.extra"))
+    message("Done!\n")
+} else {
+    message("Genecode file previously downloaded")
+}
+```
+
+<!-- #region -->
+## Mapping the Ensembl geneids to gene symbols
 
 The `limma::topTable()` dataframes encode the feature information (genes) as rownames of the dataframe. The values are Ensembl Gene IDs. To map the Gene ids to Gene symbold we will use a the fields in the last column of the relevant GTF file. 
 
@@ -108,12 +146,7 @@ Note: If you are using GENCODE to retrieve the GTF file, use the relevant field 
 | Ensembl|`gene_id`|
 
 
-- Here are some quick links to retrieve the GTF file, either from Ensembl or GENCODE:
 
-```bash
-wget ftp://ftp.ensembl.org/pub/release-100/gtf/homo_sapiens/Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz -P ../data
-wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz -P ../data
-```
 
 - To parse the GTF file and retrieve the fields associated with the Gene IDs, Gene Symbols etc you could use the following bash snippet, depending on the source of your GTF (Ensembl, GENCODE) as these two files slightly differ.
 
@@ -127,13 +160,27 @@ zcat Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz | awk 'BEGIN{FS="\t"}{s
 ```
 <!-- #endregion -->
 
+```{r}
+# The following awesome AWK command retrieves the fields we want from the Ensembl GTF file
+zcat_command = 'zcat Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz | awk \'BEGIN{FS="\t"}{split($9,a,";"); if($3~"gene") print a[1]"\t"a[3]"\t"$1":"$4"-"$5"\t"a[5]"\t"$7}\' | sed \'s/gene_id "//\' | sed \'s/gene_id "//\' | sed \'s/gene_biotype "//\'| sed \'s/gene_name "//\' | sed \'s/gene_biotype "//\' | sed \'s/"//g\' | sed \'s/ //g\' | sed \'1igene_id\tGeneSymbol\tChromosome\tClass\tStrand\' > Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz.txt '
+command = paste('cd ../data/; ', zcat_command, sep=' ')
+system(command)
+```
+
+```{r}
+# Now do the same for gencode
+zcat_command = 'zcat gencode.v30.annotation.gtf.gz | awk \'BEGIN{FS="\t"}{split($9,a,";"); if($3~"gene") print a[1]"\t"a[3]"\t"$1":"$4"-"$5"\t"a[2]"\t"$7}\' |sed \'s/gene_id "//\' | sed \'s/gene_id "//\' | sed \'s/gene_type "//\'| sed \'s/gene_name "//\' | sed \'s/"//g\' | awk \'BEGIN{FS="\t"}{split($3,a,"[:-]"); print $1"\t"$2"\t"a[1]"\t"a[2]"\t"a[3]"\t"$4"\t"$5"\t"a[3]-a[2];}\' | sed "1i\tGeneid\tGeneSymbol\tChromosome\tStart\tEnd\tClass\tStrand\tLength" > gencode.v30.annotation.gtf.gz.txt'
+command = paste('cd ../data/; ', zcat_command, sep=' ')
+system(command)
+```
+
 ## Preview the GTF tables with the gene attributes
 
 To make sure the snippets above have worked as expected, take a look in the tables with `head()`:
 
 ```{r}
 ensembl_path <- "Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz.txt"
-gencode_path <- "gencode.v30.chr_patch_hapl_scaff.annotation.gtf.gz.txt"
+gencode_path <- "gencode.v30.annotation.gtf.gz.txt"
 gtf_ensembl <- read.table(paste0("../data/", ensembl_path), header = TRUE)
 gtf_gencode <- read.table(paste0("../data/", gencode_path), header = TRUE)
 
@@ -174,11 +221,11 @@ summary(all_topTables)
 Remove characters after `.` in the Gene Identifier column, since as long as the gene version information is present we will not be able to perform a join, to annotate the toptable dataframes with the GTF gene attrubutes.
 
 ```{r}
-#GTF_SOURCE <- "ensembl"      # c("gencode", "ensembl")
-#GENE_ID    <- "gene_id"      # c("Geneid" , "gene_id")
+GTF_SOURCE <- "ensembl"      # c("gencode", "ensembl")
+GENE_ID    <- "gene_id"      # c("Geneid" , "gene_id")
 
-GTF_SOURCE <- "gencode"      # c("gencode", "ensembl")
-GENE_ID    <- "Geneid"      # c("Geneid" , "gene_id")
+#GTF_SOURCE <- "gencode"      # c("gencode", "ensembl")
+#GENE_ID    <- "Geneid"      # c("Geneid" , "gene_id")
 
 if (GTF_SOURCE == "gencode") { GTF <- gtf_gencode}
 if (GTF_SOURCE == "ensembl") { GTF <- gtf_ensembl}
@@ -202,21 +249,21 @@ head(GTF, 2)
 
 Criteria:
 - Adjusted p-value < `p_value_cuttoff`
-- Absolut FoldChange > `absFold_change_threshold`
+- Absolute FoldChange > `absFold_change_threshold`
 
 <!-- #region -->
 ----
 
 ***NOTE***
 
-Defining higher in males or females based on the limma design matrix
+Defining higher in males or females based on the limma design matrix.
 As we have used 1 for encoding the females and 2 for the males, our *reference level* for the contrast in the expression between males and females is 1, the females.
 
 
 From the `limma` documentation:
 >The level which is chosen for the *reference level* is the level which is contrasted against. By default, this is simply the first level alphabetically. We can specify that we want group 2 to be the reference level by either using the relevel function [..]
 
-By convention, we could say that genes with positive log fold change, are higher in males, whereas the opposite holds true for the ones that are observed to have negative log folde change. 
+By convention, we could say that genes with positive log fold change, are higher in males, whereas the opposite holds true for the ones that are observed to have negative log fold change. 
 
 ---
 <!-- #endregion -->
@@ -245,8 +292,8 @@ topTable$abs_logFC <- abs(topTable$logFC)
 
 # Add helper variable `abundance` for up, down, non_signif
 topTable$abundance                                                  <- "non_signif"
-topTable$abundance[(topTable$logFC >   log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "higher"
-topTable$abundance[(topTable$logFC <  -log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "lower"
+topTable$abundance[(topTable$logFC >=   log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "higher"
+topTable$abundance[(topTable$logFC <=  -log2(absFoldChange_cutoff)) & (topTable$adj.P.Val <= adj.P.Val_threshold )]   <- "lower"
 ```
 
 ```{r}
@@ -294,7 +341,7 @@ signif_template <- structure(list(higher = integer(0),
 signif_template
 ```
 
-In the for-loop we will check if both columns `lower`, `higher` are present, if not add the column and zero count to create the expected sshape of the dataframe:
+In the for-loop we will check if both columns `lower`, `higher` are present, if not add the column and zero count to create the expected shape of the dataframe:
 
 ```R
 signif <- as.data.frame.matrix(expression_abundance)
@@ -433,7 +480,8 @@ head(toPlot[toPlot$Tissue == "Adipose-Subcutaneous", ])
 ```
 
 ```{r}
-options(repr.plot.width=15.5, repr.plot.height=20)
+
+#options(repr.plot.width=15.5, repr.plot.height=20)
 
 ggplot(toPlot, aes(x = Tissue, y = `Number of Genes`, fill = `Sex Bias`)) + 
   geom_bar(stat="identity", position = "dodge") + 
@@ -612,4 +660,166 @@ message("Done!\n")
 
 dev_session_info$platform
 dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
+
+# Calculating the sex-biased splicing index
+The normalized sex-biased splicing index is defined as the number of statistically significant splicing events per 1000 exons in the chromosome.
+
+```{r}
+dim(signif_per_chrom_per_sex)
+```
+
+Sorry, I cannot do this in R. Here is Python (ugly script but works)
+
+import csv
+import gzip
+import re
+from collections import defaultdict
+
+fname = 'Homo_sapiens.GRCh38.100.chr_patch_hapl_scaff.gtf.gz'
+
+chrom2exons = defaultdict(set)
+
+with gzip.open(fname, 'rt') as f:
+    cr = csv.reader(f, delimiter='\t', quotechar='"')
+    for row in cr:
+        #print(row)
+        if row[0].startswith('#'):
+            continue
+        chrom = row[0]
+        annots = row[8]
+        fields = annots.split(";")
+        exon = re.compile(r'exon_id "(ENSE\d+)"')
+        for f in fields:
+            itm = f.strip()
+            match = exon.match(itm)
+            if match:
+                exonid = match.group(1)
+                chrom2exons[chrom].add(exonid)
+
+g = open('chrom2exons.txt', 'wt')
+for k, v in chrom2exons.items():
+    print("chr{}: n={}".format(k, len(v)))
+    g.write("{}\t{}\n".format(k, len(v)))
+g.close()
+
+1	69381
+2	55599
+3	46452
+4	29749
+5	34789
+6	33817
+7	35973
+X	22471
+8	28489
+9	26460
+11	43212
+10	26514
+12	42925
+13	13193
+14	25994
+15	28720
+16	36285
+17	45142
+18	13360
+20	16704
+19	44166
+Y	2908
+22	16411
+21	8830
+MT	37
+
+```{r}
+signif_per_chrom_per_sex
+```
+
+```{r}
+only_female_genes %>% 
+    count( !!GENE_ID, GeneSymbol, Class, sort = TRUE) %>%
+    head(20)
+```
+
+```{r}
+signif_per_tissue %>% 
+     group_by(Chromosome) %>%  
+    count()  -> signif_per_chrom
+```
+
+```{r}
+signif_per_chrom
+```
+
+```{r}
+chrom2exon_filename = '../assets/canon_chrom2exons.txt'
+if (! file.exists(chrom2exon_filename)) {
+    message("Could not find canon_chrom2exons.txt file")
+}
+c2e_df = read.csv(chrom2exon_filename, sep='\t', header=FALSE)
+colnames(c2e_df) <- c("Chromosome","exons")
+head(c2e_df) # 25 chromosomes including MT
+```
+
+```{r}
+df2 <- merge(signif_per_chrom, c2e_df, by="Chromosome")
+head(df2)
+```
+
+```{r}
+# calculate splicinig index
+library(tidyverse)
+```
+
+```{r}
+df2 %>% 
+  mutate(Index = 1000 * n/exons) -> df3
+```
+
+```{r}
+df4 <- df3[-25,] # remove the Y chromosome
+df4 <- df4[-23,] # remove the MT chromosome
+```
+
+```{r}
+rm(res_sorted)
+res_sorted <- df4[order(df4$Index, decreasing=TRUE),]
+res_sorted
+
+```
+
+```{r}
+res_sorted$Chromosome <- factor(res_sorted$Chromosome, levels = res_sorted$Chromosome)
+res_sorted
+```
+
+```{r}
+# set the colors
+npgBlue<- rgb(60/256,84/256,136/256,1)
+npgRed <- rgb(220/256,0,0,0.5)
+npgGreen <- rgb(0,160/256,135/256,1)
+npgBrown <- rgb(126/256,97/256,72/256,1)
+```
+
+```{r}
+# make the plot 
+figure2b <- ggplot(res_sorted, aes(x = Chromosome, y = Index, size = n)) +
+  geom_point(color=npgBlue) +
+  theme_bw() +
+  theme(axis.text.x = element_text(size=14, angle = 270, hjust = 0.0, vjust = 0.5),
+	axis.text.y = element_text(size=16),
+	axis.title.x = element_blank(),
+	axis.title.y = element_text(face="plain", colour="black",
+                                    size=18),
+	legend.title=element_blank(),
+	legend.text = element_text(face="plain", colour="black",
+                                   size=14)) +
+  scale_fill_viridis_c() +
+  ylab(paste("Sex-biased splicing index ")) +
+  xlab("Chromosomes") +
+  guides(size = guide_legend(title = "Number of ASE"))
+figure2b
+
+```
+
+```{r}
+
 ```
