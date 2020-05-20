@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.4.1
+      jupytext_version: 1.3.3
   kernelspec:
     display_name: R
     language: R
@@ -75,9 +75,13 @@ library(piggyback)
 library(multtest)
 library(Biobase)
 library(edgeR)
-library(tibble)
+library(tidyverse)
 library(R.utils)
 library(statmod)
+```
+
+```{r}
+
 ```
 
 <!-- #region -->
@@ -237,12 +241,18 @@ We have two counts that are in many ways two sides of the same coin.  Both our t
 Exon included junction counts -- duplicate correlation is actually 2 (there are 2 exons for each included exon) the results provide robust separation up until around 550.
 
 ```{r}
+donor <- factor(substr(reduced.meta.data$'Sample Name', 1,9))
+length(levels(donor))
+```
+
+```{r}
 sex       <- factor(reduced.meta.data$sex,levels=c('male','female'))
 
-design    <- model.matrix ( ~ sex)
+design    <- model.matrix ( ~ sex + donor)
 y <- DGEList(counts=ijc, group = sex)
 y <- calcNormFactors(y, method="upperquartile")
 y_voom <- voom (y, design=design)
+
 Gender <- substring(sex,1,1)
 plotMDS(y, labels=Gender, top=500, col=ifelse(Gender=="m","blue","red"), 
         gene.selection="common")
@@ -412,8 +422,13 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 
 ```{r}
 # we will model as random effects, represented as a block
-donor    <- rep(sample_names, 2)
-length(donor)
+donor2    <- rep(donor, 2)
+length(levels(donor2))
+
+```
+
+```{r}
+
 ```
 
 ```{r}
