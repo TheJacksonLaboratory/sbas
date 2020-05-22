@@ -680,12 +680,14 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     as_matrix <- cbind(ijc.dm,sjc.dm)
     sex       <- c(rep(metadata_tissue$sex,2))
     sex       <- factor(sex, levels=c('male','female'))
+    age       <- metadata_tissue$AGE
+    cod       <- metadata_tissue$DTHHRDY
     as_event  <- c(rep("ijc",dim(ijc.dm)[2]), rep("sjc", dim(sjc.dm)[2]))
     as_event  <- factor(as_event, levels=c("ijc", "sjc"))
 
     length(as_event)
 
-    design    <- model.matrix( ~ sex + as_event + sex*as_event )
+    design    <- model.matrix( ~ sex + age +  cod + as_event + sex*as_event )
 
     colnames(design) <- c("intercept","sex","as_event","sex*as_event")
 
@@ -699,10 +701,10 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     y_voom <- voom (y, design=design, plot = TRUE)
 
     # for testing comment this out for speed
-    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
-    dup_cor$consensus.correlation 
+#    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
+#    dup_cor$consensus.correlation 
     
-    y_dup_voom <- voom (y, design=design, plot = TRUE, block = donor, correlation = dup_cor$consensus.correlation)
+#    y_dup_voom <- voom (y, design=design, plot = TRUE, block = donor, correlation = dup_cor$consensus.correlation)
     
     # print the combined exploratory plot
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-y-ijc-MDSplot-100.pdf")
