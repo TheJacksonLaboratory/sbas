@@ -117,92 +117,245 @@ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 
 ```{r}
 # devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
-Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
+
+#parameters for running the notebook as NextFlow
+tissue_index <- 17
 ```
 
 ### Did you remember?
 Did you remember to delete your private github token?  Now is a good time to do so, before you save your work and checkit in inadvertantly....
 
 ```{r}
-piggyback::pb_download(
-    repo = "TheJacksonLaboratory/sbas", 
-    file = "SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz",
-    tag  = "GTExV8.v1.0", 
-    dest = "../data/")
+if (!("SraRunTable.txt.gz" %in% list.files("../data/"))) {
+    piggyback::pb_download(
+        show_progress = TRUE,
+        repo = "TheJacksonLaboratory/sbas", 
+        file = "SraRunTable.txt.gz",
+        tag  = "GTExV8.v1.0", 
+        dest = "../data/")
+    
+    message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")   
+    metadata <- data.table::fread("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz")
+    message("done!")
+} else {
+    message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")   
+    metadata <- data.table::fread("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz")
+    message("done!\n")
+}
 
-piggyback::pb_download(
-    repo = "adeslatt/sbas_test", 
-    file = "rmats_final.se.jc.ijc.txt.gz",
-    tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-    dest = "../data/")
+if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files("../data/"))) {    
+    piggyback::pb_download(
+        show_progress = TRUE,
+        repo = "adeslatt/sbas_test", 
+        file = "rmats_final.se.jc.ijc.txt.gz",
+        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
+        dest = "../data/")
+    message("Loading ijc counts from rmats_final.se.jc.ijc.txt.gz ../data/gtex.rds ..\n")   
+    ijc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.ijc.txt.gz")
+    message("done!\n")
+} else {
+    message("Loading ijc counts from rmats_final.se.jc.ijc.txt.gz ../data/gtex.rds ..\n")   
+    ijc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.ijc.txt.gz")
+    message("done!\n")    
+}
 
-piggyback::pb_download(
-    repo = "adeslatt/sbas_test", 
-    file = "rmats_final.se.jc.sjc.txt.gz",
-    tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-    dest = "../data/")
+if (!("rmats_final.se.jc.sjc.txt.gz" %in% list.files("../data/"))) {
+    message("Downloading rmats_final.se.jc.sjc.txt.gz")
+    piggyback::pb_download(
+        show_progress = TRUE,
+        repo = "adeslatt/sbas_test", 
+        file = "rmats_final.se.jc.sjc.txt.gz",
+        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
+        dest = "../data/")
+    message("Loading sjc counts from rmats_final.se.jc.sjc.txt.gz ../data/gtex.rds ..\n")   
+    sjc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.sjc.txt.gz")
+    message("done!\n")    
 
-ijc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.ijc.txt.gz") 
-sjc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.sjc.txt.gz") 
-meta.data          <- data.table::fread("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz")
+} else {
+    message("Loading sjc counts from rmats_final.se.jc.sjc.txt.gz ../data/gtex.rds ..\n")   
+    sjc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.sjc.txt.gz")
+    message("done!\n")        
+}
 
-head(ijc.iso.counts.mem)
-head(sjc.iso.counts.mem)
-head(meta.data)
+if (!("gtex.rds" %in% list.files("../data/"))) {
+    message("Downloading and loading obj with GTEx v8 with 'yarn::downloadGTExV8()'\n")
+    obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+    message("Done!\n")
 
-#dimensions before we make the changes.
-dim(ijc.iso.counts.mem)
-dim(sjc.iso.counts.mem)
-dim(meta.data)
+} else {
+# Load with readRDS() if gtex.rds available in data/
+    message("Loading obj GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
+    obj <- readRDS(file = "../data/gtex.rds")
+    message("Done!\n")
+    message("Generating sha256sum for gtex.rds ..\n")    
+    message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+    message("Done!\n")
+} 
+if (! (file.exists("../data/fromGTF.tar.gz"))) {
+    system("mkdir -p ../data", intern = TRUE)
+    message("Fetching fromGTF.tar.gz from GitHub ..")
+    # Download archive from GitHub release with tag "dge"
+    piggyback::pb_download(file = "fromGTF.tar.gz",
+                           dest = "../data",
+                           repo = "adeslatt/sbas_gtf",
+                           tag  = "rMATS.3.2.5.gencode.v30",
+                           show_progress = TRUE)
+    message("Done!\n")
+    message("Decompressing fromGTF.tar.gz into ../data")
+    system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+    message("Done!\n")
+    message("Decompressing fromGTF.*.txt.gz into ../data")
+    system("gunzip  ../data/fromGTF*.txt.gz ", intern = TRUE)
+    message("Done!\n")
+    message("Reading fromGTF.SE.txt into fromGTF.SE")    
+    fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
+    message("Done!\n")
+} else {
+        message("Reading fromGTF.SE.txt into fromGTF.SE")    
+        fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
+        message("Done!\n")
+    
+}
 ```
 
-## Synchronize metadata samples with ijc sjc samples
+### keep only those values for which we have phenotype data 
+Samples were resequenced, which is shown since we have the previous step saw no reduction in information - but we are using the yarn function to correct for errors in the GTEx data set.
 
-Keep only the runs that are in the ijc count list (assuming ijc and sjc are the same).  As well, name the rows with the junction id column and then make the matrix just about the counts.
+To deal with this, we make the metadata unique per sample, rather than unique per run -- there are a little over 100 runs that are more than one sequencing run for a sample.
+
+There are in fact 69 samples which have more than 1 run, 67 samples that have 3 sequencing runs and 2 samples that have 2 sequencing runs.
+
+### Now we need to reduce the metadata to the unique samples
+We will use the first occurance of the sample, got the idea from here https://stackoverflow.com/questions/19944334/extract-rows-for-the-first-occurrence-of-a-variable-in-a-data-frame
 
 ```{r}
-# the sample names are in the columns of both the ijc and the sjc matrices, these matrices have the identical column order)
-keep.meta.data <- meta.data$Run %in% colnames(ijc.iso.counts.mem)
-table(keep.meta.data)
-reduced.meta.data <- meta.data[keep.meta.data==TRUE,]
+metadata$SAMPID   <- gsub('-','\\.',metadata$'Sample Name')
+pData(obj)$SAMPID <- gsub('-','\\.',pData(obj)$SAMPID)
 
+length(unique(pData(obj)$SAMPID))
+length(unique(metadata$SAMPID))
+length(metadata$SAMPID)
+
+# the runs are unique in the metadata file
+length(unique(metadata$Run))
+length(metadata$Run)
+
+# 69 samples which have more than 1 run, 
+# 2 samples that have 2 sequencing runs and 
+# 67 samples that have 3 sequencing runs.
+# as the following three commands illustrate
+# we use t (which is the number of runs per sample) as the index
+# to reduce the table
+unique_index <- unique(metadata$SAMPID)
+t <- table(metadata$SAMPID)
+table((t[t>1]))
+names_gt_1 <- names(table(t[t>1]))
+length(unique_index)
+
+metadata_first <- metadata[match(unique(metadata$SAMPID), metadata$SAMPID),]
+dim(metadata_first)
+
+# now that we have this reduced we can merge these together
+metadata_pData <- dplyr::left_join(metadata_first, pData(obj), by = "SAMPID")
+dim(metadata_pData)
+```
+
+### Name the rows by the SE Junction ID
+
+Name the rows with the junction id column and then make the matrix just about the counts.
+Adjust the matrix, preparing them to be pure count matrices
+
+```{r}
 # preserve junction id as rowname
 rownames(ijc.iso.counts.mem) <- ijc.iso.counts.mem$ID
 rownames(sjc.iso.counts.mem) <- sjc.iso.counts.mem$ID
 
 # and remove the id to have a data matrix
-ijc.iso.counts.mem  <- ijc.iso.counts.mem[,-1]
-sjc.iso.counts.mem  <- sjc.iso.counts.mem[,-1]
+ijc.iso.counts.mem2  <- ijc.iso.counts.mem[,-1]
+sjc.iso.counts.mem2  <- sjc.iso.counts.mem[,-1]
+
+dim(ijc.iso.counts.mem2)
+dim(sjc.iso.counts.mem2)
 ```
 
-## Order ijc and sjc columns in the same order as the metadata Run order
+### Line up the run names in the metadata with the count matrices
+We need to do two things, one refer to only those runs that we have appropriate metadata for and two make sure the order of both are in sync.  First, we make sure that both the metadata runs and the ijc, sjc counts are the same
+
+```{r}
+ijc_run_names <- as.vector(as.character(colnames(ijc.iso.counts.mem2)))
+run_names     <- as.vector(as.character(metadata_pData$Run))
+
+non_overlaps <- setdiff( ijc_run_names, run_names)
+
+message("The non-overlaping IDs between pheno and count data are:\n\n", 
+        paste(length(non_overlaps), collapse = "\n") )
+
+ijc_in_metadata =run_names %in% ijc_run_names
+
+length(ijc_in_metadata)
+table(ijc_in_metadata)
+
+reduced_metadata_pData <- metadata_pData[ijc_in_metadata==TRUE,]
+
+ijc_run_names      <- as.vector(as.character(colnames(ijc.iso.counts.mem2)))
+reduced_run_names  <- as.vector(as.character(reduced_metadata_pData$Run))
+
+non_overlaps <- setdiff( ijc_run_names, reduced_run_names)
+
+message("The non-overlapping IDs between ijc, sjc count matrix and the reduced_metadata are:\n\n", 
+        paste(length(non_overlaps), collapse = "\n") )
+
+runs_in_ijc  <- ijc_run_names %in% reduced_run_names 
+table(runs_in_ijc)
+length(runs_in_ijc)
+
+ijc.iso.counts.mem3 <- data.matrix(ijc.iso.counts.mem2)
+sjc.iso.counts.mem3 <- data.matrix(sjc.iso.counts.mem2)
+dim(ijc.iso.counts.mem3)
+dim(sjc.iso.counts.mem3)
+
+ijc.iso.counts.mem3 <- ijc.iso.counts.mem3[,runs_in_ijc==TRUE]
+sjc.iso.counts.mem3 <- sjc.iso.counts.mem3[,runs_in_ijc==TRUE]
+
+dim(ijc.iso.counts.mem3)
+dim(sjc.iso.counts.mem3)
+dim(reduced_metadata_pData)
+```
+
+###  Order ijc and sjc columns in the same order as the metadata Run order
 
 Using tibble library, we can rearrange the columns as the column name.  
 
 ```{r}
-meta.data.run.names  <- as.character(reduced.meta.data$Run)
-ijc.iso.counts.mem2  <- as_tibble(ijc.iso.counts.mem)
-sjc.iso.counts.mem2  <- as_tibble(sjc.iso.counts.mem)
+metadata_runnames    <- as.character(reduced_metadata_pData$Run)
+metadata_SAMPID      <- as.character(reduced_metadata_pData$SAMPID)
 
-ijc.iso.counts.mem2  <- ijc.iso.counts.mem2[,c(meta.data.run.names)]
-sjc.iso.counts.mem2  <- sjc.iso.counts.mem2[,c(meta.data.run.names)]
+ijc.iso.counts.mem4  <- as_tibble(ijc.iso.counts.mem3)
+sjc.iso.counts.mem4  <- as_tibble(sjc.iso.counts.mem3)
 
-dim(ijc.iso.counts.mem2)
-dim(sjc.iso.counts.mem2)
-dim(reduced.meta.data)
+ijc.iso.counts.mem4  <- ijc.iso.counts.mem4[,c(metadata_runnames)]
+sjc.iso.counts.mem4  <- sjc.iso.counts.mem4[,c(metadata_runnames)]
+
+dim(ijc.iso.counts.mem4)
+dim(sjc.iso.counts.mem4)
+dim(reduced_metadata_pData)
+write.csv(reduced_metadata_pData,"../data/reduced_metadata_pData.csv")
 ```
+
+### Removing 11IL0...
 
 Remove samples that match '11IL0' from the ijc, sjc and metadata files using the logical grep, grepl
 
 ```{r}
-keep.meta.data <- (!grepl('11ILO',reduced.meta.data$"Sample Name"))
-table(keep.meta.data)
-ijc.iso.counts.mem2 <-ijc.iso.counts.mem2 [                    ,keep.meta.data==TRUE]
-sjc.iso.counts.mem2 <-sjc.iso.counts.mem2 [                    ,keep.meta.data==TRUE]
+keep_metadata <- (!grepl('11ILO',reduced_metadata_pData$SAMPID))
+table(keep_metadata)
+ijc.iso.counts.mem4 <-ijc.iso.counts.mem4      [                    ,keep_metadata==TRUE]
+sjc.iso.counts.mem4 <-sjc.iso.counts.mem4      [                    ,keep_metadata==TRUE]
+reduced_metadata_pData <-reduced_metadata_pData[keep_metadata==TRUE,                    ]
 
-reduced.meta.data   <-reduced.meta.data   [keep.meta.data==TRUE,                    ]
-dim(ijc.iso.counts.mem2)
-dim(sjc.iso.counts.mem2)
+dim(reduced_metadata_pData)
+dim(ijc.iso.counts.mem4)
+dim(sjc.iso.counts.mem4)
 ```
 
 ### and now for all tissues
@@ -218,6 +371,17 @@ For exon skipping events (SE), we have 42,611 non-zero junction IDs the (first d
 
 We have two counts that are in many ways two sides of the same coin.  Both our the observational output and we wish to see how robust each are in their ability to separate out the samples to provide for us differentially expressed isoform events as measured by their counts.   Each junction is in a manner a specific marker to specific isoform events that may or may not be shared between the genders.   If there is significant results, then this is indicative of the separation achieved by isoform specific differentiation.   In our model we will use these in combination, it is important to see if they will yield the results we are looking for.
 
+### What else could we add to our linear model
+There are a couple of other items we can add to the mix, to make the data a bit more interesting
+We will use the yarn SEX phenotype 1==male, 2==female, rather than the SRA sex phenotype.
+
+```{r}
+table(reduced_metadata_pData$AGE)
+table(reduced_metadata_pData$DTHHRDY)
+table(reduced_metadata_pData$SMCENTER)
+table(reduced_metadata_pData$SEX)
+table(reduced_metadata_pData$sex)
+```
 
 ## Preparing the data further
 
@@ -226,17 +390,52 @@ We have two counts that are in many ways two sides of the same coin.  Both our t
 We need to remove the tissues that are not shared by males and females, we do this by finding the intersection of the tissue lists.
 
 ```{r}
-tissue_list <- factor(reduced.meta.data$body_site)
-length(tissue_list)
+# SEX is coded 1 == Male
+#              2 == Female
+sex = factor(reduced_metadata_pData$SEX)
+sex2 <- ifelse(sex == 1,'male','female')
+table(sex)
+table(sex2)
+tissue_reduction <- read.table(file="../assets/tissues.tsv", header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
 
-male_tissues_true   <- reduced.meta.data$sex == "male"
-female_tissues_true <- reduced.meta.data$sex == "female"
+# only include those tissues we wish to continue with
+table(tissue_reduction$include)
+tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 
-sum(table(male_tissues_true))
-sum(table(female_tissues_true))
 
-male_tissue_list   <- factor(tissue_list[male_tissues_true   == TRUE])
-female_tissue_list <- factor(tissue_list[female_tissues_true == TRUE])
+# reduced the expressionSet object to only those tissues we wish to keep
+# create a matching tissue name to go with the expressionSet phenotype object
+reduced_metadata_pData$tissue <- factor(snakecase::to_snake_case(as.character(reduced_metadata_pData$SMTSD)))
+tissue_reduction$SMTSD        <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+                                                          
+tissue_names_keep <- reduced_metadata_pData$tissue %in% tissue_reduction$SMTSD
+table(tissue_names_keep)
+length(tissue_names_keep)
+dim(reduced_metadata_pData)
+
+reduced_metadata_pData<-reduced_metadata_pData[tissue_names_keep==TRUE,                       ]
+ijc.iso.counts.mem5   <-ijc.iso.counts.mem4   [                       ,tissue_names_keep==TRUE]
+sjc.iso.counts.mem5   <-sjc.iso.counts.mem4   [                       ,tissue_names_keep==TRUE]
+dim(reduced_metadata_pData)
+dim(ijc.iso.counts.mem5)
+dim(sjc.iso.counts.mem5)
+
+#table(reduced_metadata_pData$tissue)
+```
+
+### Create sex specific tissues
+
+
+```{r}
+
+male_tissues_true   <- sex2 == "male"
+female_tissues_true <- sex2 == "female"
+
+tissue_list         <- reduced_metadata_pData$tissue
+male_tissue_list    <- factor(reduced_metadata_pData$tissue[male_tissues_true   == TRUE])
+female_tissue_list  <- factor(reduced_metadata_pData$tissue[female_tissues_true == TRUE])
 
 male_female_tissue_list <- intersect(levels(male_tissue_list),levels(female_tissue_list))
 
@@ -244,10 +443,10 @@ keep = tissue_list %in% male_female_tissue_list
 
 table(keep)
 
-ijc_m_f         = ijc.iso.counts.mem2[          ,keep==TRUE]
-sjc_m_f         = sjc.iso.counts.mem2[          ,keep==TRUE]
-metadata_m_f    = reduced.meta.data  [keep==TRUE,          ]
-tissue_list_m_f = tissue_list        [keep==TRUE]
+ijc_m_f         = ijc.iso.counts.mem5    [          ,keep==TRUE]
+sjc_m_f         = sjc.iso.counts.mem5    [          ,keep==TRUE]
+metadata_m_f    = reduced_metadata_pData [keep==TRUE,          ]
+tissue_list_m_f = tissue_list            [keep==TRUE]
 
 dim(ijc_m_f)
 dim(sjc_m_f)
@@ -256,6 +455,7 @@ length(tissue_list_m_f)
 tissue_list_m_f <- factor(tissue_list_m_f)
 levels(tissue_list_m_f)
 length(levels(tissue_list_m_f))
+length(tissue_list_m_f)
 ```
 
 ### Keeping only chromosomes shared male female
@@ -265,24 +465,6 @@ The Y chromosome spans more than 59 million base pairs of DNA and represents alm
 To do so, we grab the annotation from the GTF file and remove those junctions that correspond to the genes on this chromosome
 
 ```{r}
-if (! (file.exists("../data/fromGTF.tar.gz"))) {
-        system("mkdir -p ../data", intern = TRUE)
-        message("Fetching fromGTF.tar.gz from GitHub ..")
-        # Download archive from GitHub release with tag "dge"
-        piggyback::pb_download(file = "fromGTF.tar.gz",
-                           dest = "../data",
-                           repo = "adeslatt/sbas_gtf",
-                           tag  = "rMATS.3.2.5.gencode.v30",
-                           show_progress = TRUE)
-        message("Done!\n")
-        message("Decompressing fromGTF.tar.gz into ../data")
-        system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-        message("Done!\n")
-        message("Decompressing fromGTF.*.txt.gz into ../data")
-        system("gunzip  ../data/fromGTF*.txt.gz ", intern = TRUE)
-        message("Done!\n")
-}
-fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
 head(fromGTF.SE)
 genes <- factor(fromGTF.SE$geneSymbol)
 length(levels(genes))    
@@ -478,9 +660,14 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     write.table(sjc_sex_results [sjc_sex_results_refined      ,], file = sjc_sex_refined_filename      , row.names = T, col.names = T, quote = F, sep = ",")
     write.table(sjc_sex_geneSymbols,        file = sjc_sex_genesFilename        , row.names = F, col.names = F, quote = F, sep = ",")
     write.table(sjc_sex_refined_geneSymbols,file = sjc_sex_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
-
     
     sample_names <- as.character(colnames(ijc.dm))
+    # we will add donor as a blocking parameter
+    # rather than sample name -- we should use donor for real
+    sample     <- factor(sample_names)
+    
+    donor    <- rep(sample, 2)
+
     
     ijc_names <- as.character(colnames(ijc.dm))
     sjc_names <- as.character(colnames(sjc.dm))
@@ -497,11 +684,6 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     as_event  <- factor(as_event, levels=c("ijc", "sjc"))
 
     length(as_event)
-    # we will add donor as a blocking parameter
-    # rather than sample name -- we should use donor for real
-    donor     <- factor(sample_names)
-    
-    donor    <- rep(sample, 2)
 
     design    <- model.matrix( ~ sex + as_event + sex*as_event )
 
@@ -517,7 +699,7 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
     y_voom <- voom (y, design=design, plot = TRUE)
 
     # for testing comment this out for speed
-    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor2, weights=y$samples$norm.factors)
+    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
     dup_cor$consensus.correlation 
     
     y_dup_voom <- voom (y, design=design, plot = TRUE, block = donor, correlation = dup_cor$consensus.correlation)
@@ -643,15 +825,15 @@ print_exploratory_plots <- function (tissue_of_interest, fromGTF, tissue_list, i
 
     return(0)
 }
-
 ```
 
 ```{r}
+# tissue_index -- enables this to run as a NextFlow notebook
 
 cat(levels(tissue_list_m_f),sep="\n")
 
 actual_tissue_list_m_f = levels(tissue_list_m_f)
-tissue_of_interest = actual_tissue_list_m_f[21]
+tissue_of_interest = actual_tissue_list_m_f[tissue_index]
 tissue_of_interest
 length(actual_tissue_list_m_f)
 length(tissue_list_m_f)
