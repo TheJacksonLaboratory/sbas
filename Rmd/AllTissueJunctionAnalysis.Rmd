@@ -135,11 +135,11 @@ if (!("SraRunTable.txt.gz" %in% list.files("../data/"))) {
         dest = "../data/")
     
     message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")   
-    metadata <- data.table::fread("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz")
+    metadata <- data.table::fread("../data/SraRunTable.txt.gz")
     message("done!")
 } else {
     message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")   
-    metadata <- data.table::fread("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz")
+    metadata <- data.table::fread("../data/SraRunTable.txt.gz")
     message("done!\n")
 }
 
