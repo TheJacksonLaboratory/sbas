@@ -1,51 +1,51 @@
 name	female	male	include	display.name
-Adipose-Subcutaneous	218	445	1	Adipose (sc)
-Adipose-Visceral(Omentum)	170	371	1	Adipose (v)
-AdrenalGland	101	157	1	Adrenal gland
-Artery-Aorta	153	279	1	Aorta
-Artery-Coronary	94	146	1	Coronary artery
-Artery-Tibial	209	454	1	Tibial artery
-Bladder	7	14	0	n/a
-Brain-Amygdala	45	107	0	n/a
-Brain-Anteriorcingulatecortex(BA24)	48	128	0	n/a
-Brain-Caudate(basalganglia)	63	183	1	Caudate
-Brain-CerebellarHemisphere	58	157	1	Cerebellar hemisphere
-Brain-Cerebellum	67	174	1	Cerebellum
-Brain-Cortex	74	181	1	Cortex
-Brain-FrontalCortex(BA9)	56	153	1	Frontal cortex
-Brain-Hippocampus	54	143	1	Hippocampus
-Brain-Hypothalamus	55	147	1	Hypothalamus
-Brain-Nucleusaccumbens(basalganglia)	64	182	1	Nucleus accumbens
-Brain-Putamen(basalganglia)	49	156	1	Putamen
-Brain-Spinalcord(cervicalc-1)	57	102	1	Spinal cord
-Brain-Substantianigra	38	101	0	n/a
-Breast-MammaryTissue	168	291	1	Breast
-Cells-Culturedfibroblasts	174	330	1	Fibroblasts
-Cells-EBV-transformedlymphocytes	62	112	1	EBV-lymphocytes
-Colon-Sigmoid	133	240	1	Sigmoid colon
-Colon-Transverse	147	259	1	Transverse colon
-Esophagus-GastroesophagealJunction	124	251	1	Esophagus (gej)
-Esophagus-Mucosa	192	363	1	Esophagus (m)
-Esophagus-Muscularis	177	338	1	Esophagus (mu)
-Heart-AtrialAppendage	136	293	1	Atrial appendage
-Heart-LeftVentricle	138	294	1	Left ventricle
-Kidney-Cortex	19	66	0	n/a
-Kidney-Medulla	1	3	0	n/a
-Liver	65	161	1	Liver
-Lung	183	395	1	Lung
-MinorSalivaryGland	47	115	0	n/a
-Muscle-Skeletal	260	543	1	Skeletal muscle
-Nerve-Tibial	200	419	1	Tibial nerve
-Ovary	180	0	0	n/a
-Pancreas	121	207	1	Pancreas
-Pituitary	79	204	1	Pituitary
-Prostate	0	245	0	n/a
-Skin-NotSunExposed(Suprapubic)	193	411	1	Skin (not exposed)
-Skin-SunExposed(Lowerleg)	234	467	1	Skin (exposed)
-SmallIntestine-TerminalIleum	67	120	1	Small intestine
-Spleen	87	154	1	Spleen
-Stomach	132	227	1	Stomach
-Testis	0	361	0	n/a
-Thyroid	219	434	1	Thyroid
-Uterus	142	0	0	n/a
-WholeBlood	254	501	1	Whole blood
+adipose_subcutaneous	218	445	1	Adipose (sc)
+adipose_visceral_omentum	170	371	1	Adipose (v)
+adrenal_gland	101	157	1	Adrenal gland
+artery_aorta	153	279	1	Aorta
+artery_coronary	94	146	1	Coronary artery
+artery_tibial	209	454	1	Tibial artery
+bladder	7	14	0	n/a
+brain_amygdala	45	107	0	n/a
+brain_anterior_cingulate_cortex_ba_24	48	128	0	n/a
+brain_caudate_basal_ganglia	63	183	1	Caudate
+brain_cerebellar_hemisphere	58	157	1	Cerebellar hemisphere
+brain_cerebellum	67	174	1	Cerebellum
+brain_cortex	74	181	1	Cortex
+brain_frontal_cortex_ba_9	56	153	1	Frontal cortex
+brain_hippocampus	54	143	1	Hippocampus
+brain_hypothalamus	55	147	1	Hypothalamus
+brain_nucleus_accumbens_basal_ganglia	64	182	1	Nucleus accumbens
+brain_putamen_basal_ganglia	49	156	1	Putamen
+brain_spinal_cord_cervical_c_1	57	102	1	Spinal cord
+brain_substantia_nigra	38	101	0	n/a
+breast_mammary_tissue	168	291	1	Breast
+cells_cultured_fibroblasts	174	330	1	Fibroblasts
+cells_ebv_transformed_lymphocytes	62	112	1	EBV-lymphocytes
+colon_sigmoid	133	240	1	Sigmoid colon
+colon_transverse	147	259	1	Transverse colon
+esophagus_gastroesophageal_junction	124	251	1	Esophagus (gej)
+esophagus_mucosa	192	363	1	Esophagus (m)
+esophagus_muscularis	177	338	1	Esophagus (mu)
+heart_atrial_appendage	136	293	1	Atrial appendage
+heart_left_ventricle	138	294	1	Left ventricle
+kidney_cortex	19	66	0	n/a
+kidney_medula	1	3	0	n/a
+liver	65	161	1	Liver
+lung	183	395	1	Lung
+minor_salivary_gland	47	115	0	n/a
+muscle_skeletal	260	543	1	Skeletal muscle
+nerve_tibial	200	419	1	Tibial nerve
+ovary	180	0	0	n/a
+pancreas	121	207	1	Pancreas
+pituitary	79	204	1	Pituitary
+prostate	0	245	0	n/a
+skin_not_sun_exposed_suprapubic	193	411	1	Skin (not exposed)
+skin_sun_exposed_lower_leg	234	467	1	Skin (exposed)
+small_intestine_terminal_ileum	67	120	1	Small intestine
+spleen	87	154	1	Spleen
+stomach	132	227	1	Stomach
+testis	0	361	0	n/a
+thyroid	219	434	1	Thyroid
+uterus	142	0	0	n/a
+whole_blood	254	501	1	Whole blood
