@@ -116,9 +116,16 @@ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 <!-- #endregion -->
 
 ```{r}
+
+```
+
+```{r}
+
+```
+
+```{r tags=c("parameters")}
 # devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
 #parameters for running the notebook as NextFlow
-
 tissue_index <- 17
 ```
 
