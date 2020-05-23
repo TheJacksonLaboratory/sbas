@@ -759,7 +759,7 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 
 
 ```{r}
-print_exploratory_plots <- function (tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, metadata ) {
+print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, metadata ) {
 
     fromGTF           <- fromGTF
     tissue_true       <- tissue_list == tissue_of_interest
@@ -785,7 +785,7 @@ print_exploratory_plots <- function (tissue_of_interest, splice_type, fromGTF, t
 
     y_ijc <- DGEList(counts=ijc.dm, group = sex2)
     y_ijc <- calcNormFactors(y_ijc, method="RLE")
-    y_ijc_voom <- voom (y_ijc, design=design, plot=TRUE)
+    y_ijc_voom <- voom (y_ijc, design=design, plot=plot)
 
     fit_ijc <- lmFit(y_ijc_voom, design)
     fit_ijc <- eBayes(fit_ijc)
@@ -811,7 +811,7 @@ print_exploratory_plots <- function (tissue_of_interest, splice_type, fromGTF, t
     length(ijc_sex_refined_geneSymbols)
     y_sjc <- DGEList(counts=sjc.dm, group = sex2)
     y_sjc <- calcNormFactors(y_sjc, method="RLE")
-    y_sjc_voom <- voom (y_sjc, design=design, plot=TRUE)
+    y_sjc_voom <- voom (y_sjc, design=design, plot=plot)
 
     fit_sjc <- lmFit(y_sjc_voom, design)
     fit_sjc <- eBayes(fit_sjc)
@@ -942,7 +942,7 @@ print_exploratory_plots <- function (tissue_of_interest, splice_type, fromGTF, t
 
     y <- DGEList(counts=as_matrix, group = sex3)
     y <- calcNormFactors(y, method="RLE")
-    y_voom <- voom (y, design=design, plot = TRUE)
+    y_voom <- voom (y, design=design, plot = plot)
 
 #    commenting this out for speed - not sure of the value of its addition
 #    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
@@ -1101,6 +1101,7 @@ fromGTF             = a3ss_fromGTF_no_chrY
 metadata            = reduced_metadata_pData
 ijc                 = a3ss_jc_ijc_no_chrY
 sjc                 = a3ss_jc_sjc_no_chrY
+plot                = FALSE
 
 for (tissue_index in 1:length(tissue_list_m_f)) {
 
@@ -1111,7 +1112,8 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = a3ss_jc_ijc_no_chrY
     sjc                 = a3ss_jc_sjc_no_chrY
-    print_exploratory_plots (tissue_of_interest, 
+    print_exploratory_plots (plot,
+                         tissue_of_interest, 
                          splice_type, 
                          fromGTF, 
                          tissue_list_m_f, 
@@ -1125,7 +1127,8 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = a5ss_jc_ijc_no_chrY
     sjc                 = a5ss_jc_sjc_no_chrY
-    print_exploratory_plots (tissue_of_interest, 
+    print_exploratory_plots (plot,
+                         tissue_of_interest, 
                          splice_type, 
                          fromGTF, 
                          tissue_list_m_f, 
@@ -1139,7 +1142,8 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = mxe_jc_ijc_no_chrY
     sjc                 = mxe_jc_sjc_no_chrY
-    print_exploratory_plots (tissue_of_interest, 
+    print_exploratory_plots (plot,
+                         tissue_of_interest, 
                          splice_type, 
                          fromGTF, 
                          tissue_list_m_f, 
@@ -1153,7 +1157,8 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = ri_jc_ijc_no_chrY
     sjc                 = ri_jc_sjc_no_chrY
-    print_exploratory_plots (tissue_of_interest, 
+    print_exploratory_plots (plot,
+                         tissue_of_interest, 
                          splice_type, 
                          fromGTF, 
                          tissue_list_m_f, 
@@ -1167,7 +1172,8 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = se_jc_ijc_no_chrY
     sjc                 = se_jc_sjc_no_chrY
-    print_exploratory_plots (tissue_of_interest, 
+    print_exploratory_plots (plot,
+                         tissue_of_interest, 
                          splice_type, 
                          fromGTF, 
                          tissue_list_m_f, 
