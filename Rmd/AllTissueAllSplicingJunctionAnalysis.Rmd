@@ -1001,14 +1001,14 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
     # which leads us to counts - it goes in this direction.
     # first phenotype obj subsetting for the tissue_of_interest
 
-    message("Limiting phenotype data to tissue of interest")    
+    message("\nLimiting phenotype data to tissue of interest")    
     keep = pData(reduced_obj2)$tissue== tissue_of_interest
     table(keep)
     tissue_obj<- reduced_obj2[,keep]
-    message("tissue_obj now reduced to the tissue of interest\n",
-            paste(dim(pData(tissue_obj)), collapse="\n"))
-    message("sample value\n",
-            paste(   pData(tissue_obj)[1,], collapse="\n"))
+    message("\ntissue_obj now reduced to the tissue of interest\n",
+            paste(dim(pData(tissue_obj)), collapse=" "))
+    message("\nsample value\n",
+            paste(   pData(tissue_obj)[1,], collapse=" "))
 
     # now we get the runs via the metadata ocounts_metadata matrix via SAMPID
     # limit the phenotype info to just the samples we care about
@@ -1017,35 +1017,35 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
 
     rm(keep)
     keep = tissue_phenotype_samples %in% metadata_samples
-    message("Limit the phenotypes to those we have samples for\n", 
-        paste(table(keep), collapse = "\n") )
-    message("tissue_count_obj now has these count specific phenotypes")    
+    message("\nLimit the phenotypes to those we have samples for\n", 
+        paste(table(keep), collapse = " ") )
+    message("\ntissue_count_obj now has these count specific phenotypes")    
     tissue_count_obj        <- tissue_obj[keep,]
     pData(tissue_count_obj) <- pData(tissue_obj)[keep,]
-    message("Dimensions of tissue_count_obj \n", 
-        paste(dim(pData(tissue_count_obj)), collapse = "\n") )
-    message("Dimensions of tissue_count_obj \n", 
-        paste( dim(tissue_count_obj), collapse = "\n") )
+    message("\nDimensions of tissue_count_obj\n", 
+        paste(dim(pData(tissue_count_obj)), collapse = " ") )
+    message("\nDimensions of tissue_count_obj \n", 
+        paste( dim(tissue_count_obj), collapse = " ") )
 
     # and vice-versa, limit our samples to the ones we have phenotype for
     rm(keep)
     metadata_samples       <- as.character(ocounts_metadata$SAMPID)
     phenotype_samples      <- as.character(pData(tissue_count_obj)$SAMPID)
     keep = metadata_samples %in% phenotype_samples
-    message("Limit the counts now has these count specific phenotypes \n", 
-        paste( table(keep), collapse = "\n") )
+    message("\nLimit the counts now has these count specific phenotypes \n", 
+        paste( table(keep), collapse = " ") )
     table(keep)
 
     ijc_tissue        <- ijc     [          ,keep==TRUE]
     sjc_tissue        <- sjc     [          ,keep==TRUE]
     metadata_tissue   <- metadata[keep==TRUE,          ]
 
-    message("dimensions of the ijc_tissue \n", 
-        paste(  dim(ijc_tissue), collapse = "\n") )
-    message("dimensions of the ijc_tissue \n", 
-        paste(  dim(sjc_tissue), collapse = "\n") )
-    message("dimensions of the metadata_tissue \n", 
-        paste(  dim(metadata_tissue), collapse = "\n") )
+    message("\ndimensions of the ijc_tissue \n", 
+        paste(  dim(ijc_tissue), collapse = " ") )
+    message("\ndimensions of the ijc_tissue \n", 
+        paste(  dim(sjc_tissue), collapse = " ") )
+    message("\ndimensions of the metadata_tissue \n", 
+        paste(  dim(metadata_tissue), collapse = " ") )
    
     metadata_samples       <- as.character(metadata_tissue$SAMPID)
     phenotype_samples      <- as.character(pData(tissue_count_obj)$SAMPID)
@@ -1053,8 +1053,8 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
     length(metadata_samples)
     length(phenotype_samples)
     non_overlaps <- setdiff( metadata_samples, phenotype_samples)
-    message("The non-overlapping IDs between pheno and count data are:\n", 
-        paste(length(non_overlaps), collapse = "\n") )
+    message("\nThe non-overlapping IDs between pheno and count data are:\n", 
+        paste(length(non_overlaps), collapse = " ") )
 
     for (i in (1:length(metadata_samples))) {
         sample = metadata_tissue[i,]$SAMPID
@@ -1074,8 +1074,8 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
 
     sex      <- ifelse(sex == 1,"male","female")
     sex      <- factor(sex,levels=c("male","female"))
-    message("sex samples:\n",
-        paste0(table(sex), collapse="\n"))
+    message("\nsex samples:\n",
+        paste0(table(sex), collapse=" "))
 
     design    <- model.matrix ( ~ sex)
 
@@ -1094,16 +1094,14 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
     ijc_sex_resultsAnnotations         <- fromGTF[ijc_sex_rnResults,]
 
     ijc_sex_results_refinedAnnotations <- ijc_sex_resultsAnnotations[ijc_sex_results_refined      ==TRUE,]
-    message("dimensions of the ijc_sex_results_refined_annotations \n", 
-        paste(dim (ijc_sex_results_refinedAnnotations), collapse = "\n") )
-    message("gut check first line\n", 
-        paste( head(ijc_sex_results_refinedAnnotations,2), collapse = "\n") )
+    message("\ndimensions of the ijc_sex_results_refined_annotations \n", 
+        paste(dim (ijc_sex_results_refinedAnnotations), collapse = " ") )
 
     # geneSymbols are in the annotations 
     ijc_sex_geneSymbols               <- ijc_sex_resultsAnnotations$geneSymbol
     ijc_sex_refined_geneSymbols       <- ijc_sex_results_refinedAnnotations$geneSymbol
-    message("length ijc_sex_results_refined_geneSymbols\n", 
-        paste(length(ijc_sex_refined_geneSymbols), collapse = "\n") )
+    message("\nlength ijc_sex_results_refined_geneSymbols\n", 
+        paste(length(ijc_sex_refined_geneSymbols), collapse = " ") )
     
     # adjust the rownames to be the geneSymbols rather than junction IDs
     ijc_sex_results_rn         <- paste(ijc_sex_geneSymbols,       ijc_sex_rnResults, sep="-")
@@ -1149,9 +1147,37 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
  
     fit_ijc <- lmFit(y_ijc_voom, design)
     fit_ijc <- eBayes(fit_ijc)
-    ijc_sex_results          <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
-    ijc_sex_results_refined  <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > abs(log2(1.5))
-    ijc_sex_rnResults        <- rownames(ijc_sex_results)
+    ijc_sex_results                <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
+    ijc_sex_results_refined        <- ijc_sex_results$adj.P.Val < 0.05 & abs(ijc_sex_results$logFC) > abs(log2(1.5))
+    ijc_sex_rnResults              <- rownames(ijc_sex_results)
+    ijc_sex_resultsAnnotations     <- fromGTF[ijc_sex_rnResults,]
+    ijc_sex_results_refinedAnnotations <- ijc_sex_resultsAnnotations[ijc_sex_results_refined ==TRUE,]
+
+    # geneSymbols are in the annotations 
+    ijc_sex_geneSymbols            <- ijc_sex_resultsAnnotations$geneSymbol
+    ijc_sex_refined_geneSymbols    <- ijc_sex_results_refinedAnnotations$geneSymbol
+
+    # adjust the rownames to be the geneSymbols rather than junction IDs
+    ijc_sex_results_rn             <- paste(ijc_sex_geneSymbols, ijc_sex_rnResults, sep="-")
+    rownames(ijc_sex_results)      <- ijc_sex_results_rn
+    ijc_sex_filename               = paste0(paste0(paste0('../significant_events/', splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_ijc_sex.csv',sep='')
+    ijc_sex_refined_filename       = paste0(paste0(paste0('../significant_events/', splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_ijc_sex_refined.csv',sep='')
+    ijc_sex_genesFilename          = paste0(paste0(paste0('../significant_events/', splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_ijc_sex_universe.txt',sep='')
+    ijc_sex_refined_genesFilename  = paste0(paste0(paste0('../significant_events/', splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_ijc_sex_gene_set.txt',sep='')
+
+    write.table(ijc_sex_results, 
+                file = ijc_sex_filename        , row.names = T, col.names = T, quote = F, sep = ",")
+    write.table(ijc_sex_results [ijc_sex_results_refined      ,], 
+                file = ijc_sex_refined_filename, row.names = T, col.names = T, quote = F, sep = ",")
+    write.table(ijc_sex_geneSymbols,        
+                file = ijc_sex_genesFilename        , row.names = F, col.names = F, quote = F, sep = ",")
+    write.table(ijc_sex_refined_geneSymbols,
+                file = ijc_sex_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
+    
 
     filename <- paste0(paste0(paste0("../pdf/", splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-sjc-MDSplot-100.pdf")
@@ -1221,16 +1247,16 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
     colnames(sjc.dm) <- sjc_names
 
     as_matrix <- cbind(ijc.dm,sjc.dm)
-    message("dim as_matrix\n", 
-        paste(dim(as_matrix), collapse = "\n") )
+    message("\ndim as_matrix", 
+        paste(dim(as_matrix), collapse = " ") )
     sex2      <- c(rep(sex,2))
-    message("dim sex\n", 
-        paste(dim(sex2), collapse = "\n") )
+    message("\ndim sex\n", 
+        paste(dim(sex2), collapse = " ") )
     as_event  <- c(rep("ijc",dim(ijc.dm)[2]), rep("sjc", dim(sjc.dm)[2]))
     as_event  <- factor(as_event, levels=c("ijc", "sjc"))
 
-    message("length as_event\n", 
-        paste(length(as_event), collapse = "\n") )
+    message("\nlength as_event\n", 
+        paste(length(as_event), collapse = " ") )
 
     design    <- model.matrix( ~ sex2 + as_event + sex2*as_event)
 
