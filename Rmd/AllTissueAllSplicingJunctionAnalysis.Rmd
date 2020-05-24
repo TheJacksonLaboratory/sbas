@@ -12,7 +12,7 @@ jupyter:
     name: ir
 ---
 
-# AllTissueAllSplicingJunctionAnalysisNoDup as a Notebook 
+# AllTissueAllSplicingJunctionAnalysis as a Notebook 
 
 rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stored in the Sequence Read Archive with controlled access managed by dbGaP.   The data were generated under the Gene Tissue Expression.
 
@@ -474,16 +474,28 @@ Rearrange the metadata order to match the count data sample order
 and to reduce the sample by the same.   
 
 ```{r}
-SRR_accession_order   <- as.character(colnames(se.jc.ijc))
-metadata_SRR_names    <- as.character(metadata_pData$Run)
+# name the row names as the Run
+rownames(metadata_pData) <- as.character(metadata_pData$Run)
+head(rownames(metadata_pData))
 
-SRR_in_metadata       <- metadata_SRR_names %in% SRR_accession_order
+SRR_accession_order  <- colnames(se.jc.ijc)
+metadata_SRR_names   <- rownames(metadata_pData)
 
-metadata_pData2       <- metadata_pData
-metadata_pData2       <- metadata_pData2[SRR_in_metadata==TRUE,]
+# first limit metadata to match only those Runs we have accessions for
+SRR_in_metadata  <- metadata_SRR_names %in% SRR_accession_order
 
-dim(metadata_pData)
-dim(metadata_pData2)
+table(SRR_in_metadata)
+
+metadata_pData2    <- metadata_pData[SRR_in_metadata==TRUE,]
+
+# Now match the order of the metadata to the count data
+metadata_SRR_names <- as.character(rownames(metadata_pData2))
+idx <- match(SRR_accession_order,metadata_SRR_names)
+metadata_pData3   <- metadata_pData2[idx,]
+
+head(rownames(metadata_pData3))
+head(colnames(se.jc.ijc))
+dim(metadata_pData3)
 dim(a3ss.jc.ijc)
 dim(a3ss.jc.sjc)
 dim(a5ss.jc.ijc)
@@ -494,22 +506,19 @@ dim(ri.jc.ijc)
 dim(ri.jc.sjc)
 dim(se.jc.ijc)
 dim(se.jc.sjc)
+
+write.csv(metadata_pData3,"../data/metadata_pData3.csv")
 ```
 
 ### which metadata shall we use?
 There is a lack of correspondeence between the metadata in the Sequence Read Archive table as obtained from dbGaP SRR Run Explorer and the GTEx V8 Release.   Not sure which one to use!  
 
 ```{r}
-table(metadata_pData2$AGE)
-table(metadata_pData2$DTHHRDY)
-table(metadata_pData2$SMCENTER)
-table(metadata_pData2$SEX)
-table(metadata_pData2$sex)
-```
-
-```{r}
-write.csv(metadata_pData, "../data/metadata_pData.csv")
-write.csv(metadata_pData2,"../data/metadata_pData2.csv")
+table(metadata_pData3$AGE)
+table(metadata_pData3$DTHHRDY)
+table(metadata_pData3$SMCENTER)
+table(metadata_pData3$SEX)
+table(metadata_pData3$sex)
 ```
 
 #### Exploring the ijc and sjc Count data 
@@ -546,18 +555,18 @@ tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 
 # reduced the expressionSet object to only those tissues we wish to keep
 # create a matching tissue name to go with the expressionSet phenotype object
-metadata_pData2$tissue <- factor(snakecase::to_snake_case(as.character(metadata_pData2$SMTSD)))
+metadata_pData3$tissue <- factor(snakecase::to_snake_case(as.character(metadata_pData3$SMTSD)))
 tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
 
-length(levels(metadata_pData2$tissue))
+length(levels(metadata_pData3$tissue))
 length(levels(tissue_reduction$SMTSD))
 
-tissue_names_keep <- metadata_pData2$tissue %in% tissue_reduction$SMTSD
+tissue_names_keep <- metadata_pData3$tissue %in% tissue_reduction$SMTSD
 table(tissue_names_keep)
 length(tissue_names_keep)
-dim(metadata_pData2)
+dim(metadata_pData3)
 
-reduced_metadata_pData<-metadata_pData2[tissue_names_keep==TRUE,]
+reduced_metadata_pData<-metadata_pData3[tissue_names_keep==TRUE,]
 dim(reduced_metadata_pData)
 
 reduced_metadata_pData$tissue <- factor(reduced_metadata_pData$tissue)
@@ -759,7 +768,7 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 
 
 ```{r}
-print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, metadata ) {
+#print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, metadata ) {
 
     fromGTF           <- fromGTF
     tissue_true       <- tissue_list == tissue_of_interest
@@ -837,7 +846,7 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
 
     length(sjc_sex_results_refined) 
    # print these exploratory plots for ijc and sjc alone
-    Gender <- substring(sex,1,1)
+    Gender <- substring(sex2,1,1)
     filename <- paste0(paste0(paste0("../pdf/", splice_type),
                                      snakecase::to_snake_case(tissue_of_interest)),"-ijc-MDSplot-100.pdf")
     pdf (filename)
@@ -926,6 +935,7 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
 
     as_matrix <- cbind(ijc.dm,sjc.dm)
     sex3      <- c(rep(sex2,2))
+    head(sex2)
     as_event  <- c(rep("ijc",dim(ijc.dm)[2]), rep("sjc", dim(sjc.dm)[2]))
     as_event  <- factor(as_event, levels=c("ijc", "sjc"))
 
@@ -949,7 +959,8 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
     dup_cor$consensus.correlation 
     y_dup_voom <- voom (y, design=design, plot = plot, block = donor, correlation = dup_cor$consensus.correlation)
     
-    # print the combined exploratory plot
+    Gender <- substring(sex3,1,1)
+     # print the combined exploratory plot
     filename <- paste0(paste0(paste0("../pdf/", splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-ijc-MDSplot-100.pdf")
     pdf (filename)
@@ -1081,7 +1092,7 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
     write.table(ijc_sex_refined_geneSymbols,      file = ijc_sex_refined_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
 
     return(0)
-}
+#}
 ```
 
 ```{r}
@@ -1092,7 +1103,7 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
 splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
 
 tissue_index <- 17
-splice_index <- 1
+splice_index <- 5
 
 tissue_list_m_f     = levels(reduced_metadata_pData$tissue)
 tissue_of_interest  = tissue_list_m_f[tissue_index]
@@ -1186,6 +1197,31 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
 #                         sjc, 
 #                         metadata)
 }
+```
+
+```{r}
+#     se
+    splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
+    tissue_list_m_f     = levels(reduced_metadata_pData$tissue)
+    splice_index        = 5
+    tissue_index        = 17
+    plot                = TRUE
+    splice_type         = splice_list    [splice_index] 
+    tissue_of_interest  = tissue_list_m_f[tissue_index]
+    fromGTF             = se_fromGTF_no_chrY
+    metadata            = reduced_metadata_pData
+    ijc                 = se_jc_ijc_no_chrY
+    sjc                 = se_jc_sjc_no_chrY
+    tissue_list         = tissue_list_m_f
+    print_exploratory_plots (plot,
+                         tissue_of_interest, 
+                         splice_type, 
+                         fromGTF, 
+                         tissue_list_m_f, 
+                         ijc, 
+                         sjc, 
+                         metadata)
+
 ```
 
 ## Metadata
