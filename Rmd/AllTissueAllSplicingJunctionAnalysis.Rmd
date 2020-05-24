@@ -989,32 +989,6 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 
 
 ```{r}
-    splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
-    tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
-    tissue_list_m_f
-
-    splice_index        = 5
-    tissue_index        = 21
-    plot                = TRUE
-    splice_type         = splice_list    [splice_index] 
-    tissue_of_interest  = tissue_list_m_f[tissue_index]
-    fromGTF             = se_fromGTF_no_chrY
-    metadata            = ocounts_metadata
-    obj                 = reduced_obj2
-    ijc                 = se_jc_ijc_no_chrY
-    sjc                 = se_jc_sjc_no_chrY
-    tissue_list         = tissue_list_m_f
-
-    fromGTF           <- fromGTF
-
-
-tissue_of_interest
-splice_type
-
- 
-```
-
-```{r}
 print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, obj, metadata ) {
 
     fromGTF           <- fromGTF
@@ -1028,7 +1002,6 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
     # first phenotype obj subsetting for the tissue_of_interest
 
     message("Limiting phenotype data to tissue of interest")    
-    rm(keep)
     keep = pData(reduced_obj2)$tissue== tissue_of_interest
     table(keep)
     tissue_obj<- reduced_obj2[,keep]
@@ -1409,10 +1382,6 @@ print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, from
 ```
 
 ```{r}
-
-```
-
-```{r}
 # tissue_index -- enables this to run as a NextFlow notebook
 # devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
 #parameters for running the notebook as NextFlow
@@ -1525,14 +1494,14 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
 ```{r}
 #     se
     splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
-    tissue_list_m_f     = levels(reduced_metadata_pData$tissue)
+    tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
     splice_index        = 5
     tissue_index        = 21
     plot                = TRUE
     splice_type         = splice_list    [splice_index] 
     tissue_of_interest  = tissue_list_m_f[tissue_index]
     fromGTF             = se_fromGTF_no_chrY
-    metadata            = reduced_metadata_pData
+    metadata            = ocounts_metadata
     ijc                 = se_jc_ijc_no_chrY
     sjc                 = se_jc_sjc_no_chrY
     tissue_list         = tissue_list_m_f
