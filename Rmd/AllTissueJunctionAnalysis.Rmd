@@ -115,17 +115,10 @@ One suggestion is change it to your token and then run it then immediately chang
 Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 <!-- #endregion -->
 
-```{r}
-
-```
-
-```{r}
-
-```
-
 ```{r tags=c("parameters")}
 # devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
 #parameters for running the notebook as NextFlow
+
 tissue_index <- 17
 ```
 
@@ -223,6 +216,42 @@ if (! (file.exists("../data/fromGTF.tar.gz"))) {
         message("Done!\n")
     
 }
+```
+
+## Quality control, preprocessing of data 
+
+We observed above that our phenotype data have 2 more observations than our expression data. Let's inspect what these samples are:
+
+```{r}
+tail (pData(obj),2)
+dim(pData(obj))
+dim(exprs(obj))
+dim(obj)
+sample_names=as.vector(as.character(colnames(exprs(obj))))
+pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
+length(pheno_sample_names)
+length(sample_names)
+
+if (length(pheno_sample_names) > length(sample_names)) {
+    superset <- pheno_sample_names
+    subset   <- sample_names    
+} 
+
+if (length(pheno_sample_names) < length(sample_names)) {
+    superset <- sample_names
+    subset   <- pheno_sample_names   
+} 
+
+non_overlaps <- setdiff( superset, subset)
+
+message("The non-overlapping IDs between pheno and count data are:\n\n", 
+        paste(non_overlaps, collapse = "\n") )
+logical_match_names=superset %in% subset
+length(logical_match_names)
+table(logical_match_names)
+pData(obj) <- (pData(obj)[logical_match_names==TRUE,])
+dim(pData(obj))
+dim(obj)
 ```
 
 ### keep only those values for which we have phenotype data 

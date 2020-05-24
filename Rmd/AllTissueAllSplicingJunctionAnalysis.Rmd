@@ -353,8 +353,48 @@ if (! (file.exists("../data/fromGTF.tar.gz"))) {
     message("Done!\n")
     message("Reading fromGTF.SE.txt into fromGTF.SE")    
     fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
-    message("Done!\n")
+    message("Done!\n") 
 }
+```
+
+## Quality control, preprocessing of data 
+
+We observed above that our phenotype data have 2 more observations than our expression data. Let's inspect what these samples are:
+
+```{r}
+tail (pData(obj),2)
+dim(pData(obj))
+dim(exprs(obj))
+dim(obj)
+sample_names=as.vector(as.character(colnames(exprs(obj))))
+pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
+length(pheno_sample_names)
+length(sample_names)
+
+if (length(pheno_sample_names) > length(sample_names)) {
+    superset <- pheno_sample_names
+    subset   <- sample_names    
+} 
+
+if (length(pheno_sample_names) < length(sample_names)) {
+    superset <- sample_names
+    subset   <- pheno_sample_names   
+} 
+
+non_overlaps <- setdiff( superset, subset)
+
+message("The non-overlapping IDs between pheno and count data are:\n\n", 
+        paste(non_overlaps, collapse = "\n") )
+logical_match_names=superset %in% subset
+length(logical_match_names)
+table(logical_match_names)
+pData(obj) <- (pData(obj)[logical_match_names==TRUE,])
+
+tail (pData(obj),2)
+dim(pData(obj))
+dim(exprs(obj))
+dim(obj)
+
 ```
 
 ## Read in junction Annotation Data
@@ -447,78 +487,311 @@ dim(se.jc.sjc)
 
 ```
 
-### Join Clinical Annotations and Accession Run 
+### Synchronize Clinical Annotations and Accession Run, reducing to only tissues of interest
 
 Join the yarn metadata with the metadata we have (there are redundant samples that have been sequenced multiple times). We want to be sure that we can obtain all required Clinical Annotation information from the YARN GTEx Annotation information, as the SRA metadata is not as reliable.    This will be a one-to-many mapping, as there are multiple sequence runs per 69 samples -- expanding our data set.  There are only a handful of annotations we require: SEX, AGE, DTHHRDY (which is cause of death), SMCENTER.
 
-Note that the numbers in specific age groups expand because of the one to many relationship from sample to sequencing runs.  
+Note that the numbers in specific age groups expand because of the one to many relationship from sample to sequencing runs. 
+
+#### Using results from analysis of number of samples stored in `tissues.tsv` we keep only those that are members of this reduced tissue list.
 
 ```{r}
-#Info before dplyr::left_join
-table(pData(obj)$AGE)
-table(pData(obj)$DTHHRDY)
-table(pData(obj)$SMCENTER)
-table(pData(obj)$SEX)
-table(metadata$sex)
-dim(pData(obj))
-dim(metadata)
-metadata$SAMPID   <- gsub('-','\\.',metadata$'Sample Name')
-pData(obj)$SAMPID <- gsub('-','\\.',pData(obj)$SAMPID)
+# read in all requirements so that the stage is properly set -- 
+# if it is clear here -- it will remain clear for the rest of the time
+# tissues.tsv contains the subset of files desired for analysis.
+tissue_reduction <- read.table(file="../assets/tissues.tsv", header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
 
-metadata_pData <- dplyr::left_join(metadata, pData(obj), by = "SAMPID")
+# only include those tissues we wish to continue with
+table(tissue_reduction$include)
+tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
+
+# create a matching tissue name to go with the expressionSet phenotype object
+pData(obj)$tissue      <- factor(snakecase::to_snake_case(as.character(pData(obj)$SMTSD)))
+tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+
+dim(tissue_reduction)
+dim(obj)
+dim(pData(obj))
+
+# test to make sure we don't have nonsense
+keep = pData(obj)$tissue== "breast_mammary_tissue"
+table(keep)
+tobj = obj[,keep]
+dim(tobj)
+dim(pData(tobj))
+pData(tobj)[1,]
+# end test
+
+length(levels(pData(obj)$tissue))
+length(levels(tissue_reduction$SMTSD))
+
+keep <- pData(obj)$tissue %in% tissue_reduction$SMTSD
+table(keep)
+length(keep)
+
+dim(obj)
+dim(pData(obj))
+reduced_obj <- obj[,keep==TRUE]
+dim(reduced_obj)
+dim(pData(reduced_obj))
+
+# test to make sure we don't have nonsense
+keep = pData(reduced_obj)$tissue== "breast_mammary_tissue"
+table(keep)
+tobj = reduced_obj[,keep]
+dim(tobj)
+dim(pData(tobj))
+pData(tobj)[1,]
+# end test
 ```
 
-###  Order metadata SRR run order in the same order as the ijc and sjc columns 
-
-Rearrange the metadata order to match the count data sample order
-and to reduce the sample by the same.   
+#### Synchronize accession metadata and phenotype data
+A kind of transitive closure.   Metadata links the count data to the phenotype data.
+Begin with synchronizing accession metadata and phenotype data - which has been reduced - `reduced_obj` inputs here 
 
 ```{r}
-# name the row names as the Run
-rownames(metadata_pData) <- as.character(metadata_pData$Run)
-head(rownames(metadata_pData))
+# let's limit the phenotype object and then align the metadata file
+metadata <- data.table::fread("../data/SraRunTable.txt.gz")
+metadata$SAMPID   <- gsub('-','\\.',metadata$'Sample Name')
+pData(reduced_obj)$SAMPID <- gsub('-','\\.',pData(reduced_obj)$SAMPID)
 
-SRR_accession_order  <- colnames(se.jc.ijc)
-metadata_SRR_names   <- rownames(metadata_pData)
+dim(metadata)
+dim(reduced_obj)
+dim(pData(reduced_obj))
+rownames(pData(reduced_obj))<- pData(reduced_obj)$SAMPID
 
-# first limit metadata to match only those Runs we have accessions for
-SRR_in_metadata  <- metadata_SRR_names %in% SRR_accession_order
+# keep only those runs (as epitomized by the metadata_samples) in the phenotype set
+metadata_samples   <- as.character(metadata$SAMPID)
+phenotype_samples  <- as.character(pData(reduced_obj)$SAMPID)
 
-table(SRR_in_metadata)
+# any undefined (N/A) sample names? These results will be zero
+sum(is.na(metadata_samples))
+sum(is.na(phenotype_samples))
 
-metadata_pData2    <- metadata_pData[SRR_in_metadata==TRUE,]
+rm(keep)
+keep <- phenotype_samples %in% metadata_samples
+table(keep)
+reduced_obj2 <- reduced_obj[,keep==TRUE]
+dim(reduced_obj2)
+dim(pData(reduced_obj2))
 
-# Now match the order of the metadata to the count data
-metadata_SRR_names <- as.character(rownames(metadata_pData2))
-idx <- match(SRR_accession_order,metadata_SRR_names)
-metadata_pData3   <- metadata_pData2[idx,]
+# test to make sure we don't have nonsense
+rm(keep)
+keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
+table(keep)
+tobj = reduced_obj2[,keep]
+dim(tobj)
+dim(pData(tobj))
+pData(tobj)[1,]
+# end test
 
-head(rownames(metadata_pData3))
-head(colnames(se.jc.ijc))
-dim(metadata_pData3)
-dim(a3ss.jc.ijc)
-dim(a3ss.jc.sjc)
-dim(a5ss.jc.ijc)
-dim(a5ss.jc.sjc)
-dim(mxe.jc.ijc)
-dim(mxe.jc.sjc)
-dim(ri.jc.ijc)
-dim(ri.jc.sjc)
-dim(se.jc.ijc)
-dim(se.jc.sjc)
+# now go the other way - make sure the metadata samples are in sync with the phenotype samples
+# note that we are now with `reduced_obj2`
+metadata_samples   <- as.character(metadata$SAMPID)
+phenotype_samples  <- as.character(pData(reduced_obj2)$SAMPID)
+length(metadata_samples)
+length(phenotype_samples)
+dim(reduced_obj2)
+dim(pData(reduced_obj2))
+dim(metadata)
+rm(keep)
+keep <- metadata_samples %in% phenotype_samples
+table(keep)
 
-write.csv(metadata_pData3,"../data/metadata_pData3.csv")
+reduced_metadata <- metadata[keep==TRUE,]
+dim(reduced_metadata)
+
+# test to make sure we don't have nonsense
+rm(keep)
+keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
+table(keep)
+tobj = reduced_obj2[,keep]
+dim(tobj)
+dim(pData(tobj))
+breast_metadata_samples   <- as.character(reduced_metadata$SAMPID)
+breast_phenotype_samples  <- as.character(pData(tobj)$SAMPID)
+rm(keep)
+keep = breast_metadata_samples %in% breast_phenotype_samples
+table(keep)
+breast_samples <- reduced_metadata[keep,]
+length(breast_samples$SAMPID)
+length(pData(tobj)$SAMPID)
+breast_samples[1,]
+# end test
+
+```
+
+###  Limit obj and metadata to size of the ijc and sjc columns 
+
+Things are complicated and can easily lead to data disaster.
+We need to go forward and backwards with these data - and see how to have them arranged.  
+Things we know to be true:
+1. Run numbers are unique
+2. Samples (which are Donor and Tissue combined) have been sequenced more than once.
+
+We need to keep this clear as the metadata are used to sort out tissues, sex, and other factors - and these are based upon a Donor.  Relationships are as follows:
+
+* One Donor can have many tissues (one donor has as many as 54 tissues)
+* One Tissue may have many sequencing runs (One Tissue has been as of this writing sequenced as many as 3 times)
+
+The analyst must keep this information in mind as manipulations occur.
+
+Here we use `se.jc.ijc` as exemplar as well as model for all subsequent matrices.  Arrangements of `se.jc.ijc` will ripple to all other matrices because sample order is the same between all samples.
+
+Entering into this step we have for our phenotype object:
+1. reduced_obj2
+2. reduced_metadata
+
+```{r}
+metadata_for_counts = colnames(se.jc.ijc)%in% reduced_metadata$Run
+counts_for_metadata = reduced_metadata$Run %in% colnames(se.jc.ijc)
+table(metadata_for_counts)
+table(counts_for_metadata)
+
+counts          <- data.matrix(se.jc.ijc)
+counts_metadata <- reduced_metadata
+dim(counts)
+dim(counts_metadata)
+
+counts          <- counts         [                         ,metadata_for_counts==TRUE]
+counts_metadata <- counts_metadata[counts_for_metadata==TRUE,                         ]
+
+# now we arrange metadata and counts to be in the same order
+# Run numbers are unique, but we will replace the columns with SAMPID as metadata is by SAMPID
+i = order(colnames(counts))
+j = order(counts_metadata$Run)
+
+ose.jc.ijc       = counts[,i]
+ocounts_metadata = counts_metadata[j,]
+
+tail(colnames(ose.jc.ijc),3)
+tail(ocounts_metadata$Run,3)
+
+colnames(ose.jc.ijc) = as.character(ocounts_metadata$SAMPID)
+tail(colnames(ose.jc.ijc),3)
+tail(ocounts_metadata$SAMPID,3)
+sum(table(colnames(ose.jc.ijc))==1)
+sum(table(colnames(ose.jc.ijc))==2)
+sum(table(colnames(ose.jc.ijc))==3)
+sum(table(colnames(ose.jc.ijc))==4)
+dim(ose.jc.ijc)
+```
+
+## Now extend this organization to all count matrices
+now that the data are organized and accounted for, extend to the rest of the splicing factors and their count matrices
+
+```{r}
+oa3ss.jc.ijc  <- data.matrix(a3ss.jc.ijc)
+oa3ss.jc.sjc  <- data.matrix(a3ss.jc.sjc)
+oa3ss.jc.ijc  <- oa3ss.jc.ijc[,metadata_for_counts==TRUE]
+oa3ss.jc.sjc  <- oa3ss.jc.sjc[,metadata_for_counts==TRUE]
+
+oa5ss.jc.ijc  <- data.matrix(a5ss.jc.ijc)
+oa5ss.jc.sjc  <- data.matrix(a5ss.jc.sjc)
+oa5ss.jc.ijc  <- oa5ss.jc.ijc[,metadata_for_counts==TRUE]
+oa5ss.jc.sjc  <- oa5ss.jc.sjc[,metadata_for_counts==TRUE]
+
+omxe.jc.ijc   <- data.matrix(mxe.jc.ijc)
+omxe.jc.sjc   <- data.matrix(mxe.jc.sjc)
+omxe.jc.ijc   <- omxe.jc.ijc[,metadata_for_counts==TRUE]
+omxe.jc.sjc   <- omxe.jc.sjc[,metadata_for_counts==TRUE]
+
+ori.jc.ijc    <- data.matrix(ri.jc.ijc)
+ori.jc.sjc    <- data.matrix(ri.jc.sjc)
+ori.jc.ijc    <- ori.jc.ijc[,metadata_for_counts==TRUE]
+ori.jc.sjc    <- ori.jc.sjc[,metadata_for_counts==TRUE]
+
+ose.jc.ijc    <- data.matrix(se.jc.ijc)
+ose.jc.sjc    <- data.matrix(se.jc.sjc)
+ose.jc.ijc    <- ose.jc.ijc[,metadata_for_counts==TRUE]
+ose.jc.sjc    <- ose.jc.sjc[,metadata_for_counts==TRUE]
+
+oa3ss.jc.ijc  <- oa3ss.jc.ijc[,i]
+oa3ss.jc.sjc  <- oa3ss.jc.sjc[,i]
+
+oa5ss.jc.ijc  <- oa5ss.jc.ijc[,i]
+oa5ss.jc.sjc  <- oa5ss.jc.sjc[,i]
+
+omxe.jc.ijc   <- omxe.jc.ijc[,i]
+omxe.jc.sjc   <- omxe.jc.sjc[,i]
+
+ori.jc.ijc    <- ori.jc.ijc[,i]
+ori.jc.sjc    <- ori.jc.sjc[,i]
+
+ose.jc.ijc    <- ose.jc.ijc  [,i]
+ose.jc.sjc    <- ose.jc.sjc  [,i]
+
+
+colnames(oa3ss.jc.ijc) = as.character(ocounts_metadata$SAMPID)
+colnames(oa3ss.jc.sjc) = as.character(ocounts_metadata$SAMPID)
+
+colnames(oa5ss.jc.ijc) = as.character(ocounts_metadata$SAMPID)
+colnames(oa5ss.jc.sjc) = as.character(ocounts_metadata$SAMPID)
+
+colnames(omxe.jc.ijc) = as.character(ocounts_metadata$SAMPID)
+colnames(omxe.jc.sjc) = as.character(ocounts_metadata$SAMPID)
+
+colnames(ori.jc.ijc) = as.character(ocounts_metadata$SAMPID)
+colnames(ori.jc.sjc) = as.character(ocounts_metadata$SAMPID)
+
+colnames(ose.jc.ijc) = as.character(ocounts_metadata$SAMPID)
+colnames(ose.jc.sjc) = as.character(ocounts_metadata$SAMPID)
+
+tail(colnames(oa3ss.jc.ijc),3)
+tail(colnames(oa3ss.jc.sjc),3)
+
+tail(colnames(oa5ss.jc.ijc),3)
+tail(colnames(oa5ss.jc.sjc),3)
+
+tail(colnames(omxe.jc.ijc),3)
+tail(colnames(omxe.jc.sjc),3)
+
+tail(colnames(ori.jc.ijc),3)
+tail(colnames(ori.jc.sjc),3)
+
+tail(colnames(ose.jc.ijc),3)
+tail(colnames(ose.jc.sjc),3)
+
+```
+
+### Sanity Check
+
+Spot check one tissue and make sure there isn't nonsense
+Our current matrices are:
+1. ocounts_metadata for the connection from counts to phenotype via the Run and SAMPID
+2. pData(reduced_obj2)
+
+```{r}
+# test to make sure we don't have nonsense
+rm(keep)
+keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
+table(keep)
+tobj = reduced_obj2[,keep]
+dim(tobj)
+dim(pData(tobj))
+breast_metadata_samples   <- as.character(ocounts_metadata$SAMPID)
+breast_phenotype_samples  <- as.character(pData(tobj)$SAMPID)
+rm(keep)
+keep = breast_metadata_samples %in% breast_phenotype_samples
+table(keep)
+breast_samples <- ocounts_metadata[keep,]
+length(breast_samples$SAMPID)
+length(pData(tobj)$SAMPID)
+breast_samples[1,]
+# end test
 ```
 
 ### which metadata shall we use?
 There is a lack of correspondeence between the metadata in the Sequence Read Archive table as obtained from dbGaP SRR Run Explorer and the GTEx V8 Release.   Not sure which one to use!  
 
 ```{r}
-table(metadata_pData3$AGE)
-table(metadata_pData3$DTHHRDY)
-table(metadata_pData3$SMCENTER)
-table(metadata_pData3$SEX)
-table(metadata_pData3$sex)
+table(pData(reduced_obj2)$AGE)
+table(pData(reduced_obj2)$DTHHRDY)
+table(pData(reduced_obj2)$SMCENTER)
+table(pData(reduced_obj2)$SEX)
+table(ocounts_metadata$sex)
 ```
 
 #### Exploring the ijc and sjc Count data 
@@ -537,87 +810,35 @@ The `IJC` and `SJC` counts are in many ways two sides of the same coin.  Both ou
 
 
 
-## Preparing the data further
-
-### Keeping only tissues with sufficient number of samples for analysis
-
-Using results from analysis of number of samples stored in `tissues.tsv` we keep only those that are members of this reduced tissue list.
-
-```{r}
-tissue_reduction <- read.table(file="../assets/tissues.tsv", header=TRUE, sep="\t",
-                               skipNul=FALSE, stringsAsFactors = FALSE)
-colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
-
-# only include those tissues we wish to continue with
-table(tissue_reduction$include)
-tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
-
-
-# reduced the expressionSet object to only those tissues we wish to keep
-# create a matching tissue name to go with the expressionSet phenotype object
-metadata_pData3$tissue <- factor(snakecase::to_snake_case(as.character(metadata_pData3$SMTSD)))
-tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
-
-length(levels(metadata_pData3$tissue))
-length(levels(tissue_reduction$SMTSD))
-
-tissue_names_keep <- metadata_pData3$tissue %in% tissue_reduction$SMTSD
-table(tissue_names_keep)
-length(tissue_names_keep)
-dim(metadata_pData3)
-
-reduced_metadata_pData<-metadata_pData3[tissue_names_keep==TRUE,]
-dim(reduced_metadata_pData)
-
-reduced_metadata_pData$tissue <- factor(reduced_metadata_pData$tissue)
-levels(reduced_metadata_pData$tissue)
-length(levels(reduced_metadata_pData$tissue))
-```
-
 ### Reduce count matrices based upon the reduced tissue information - count matrix by column adjustment
 
 We wish to keep only those samples (columns) in our count data that are a member of the reduced tissue set.
 
 ```{r}
-metadata_SRR_names    <- as.character(reduced_metadata_pData$Run)
-SRR_accession_order   <- as.character(colnames(se.jc.ijc))
+metadata_names <- as.character(ocounts_metadata$SAMPID)
+count_names    <- as.character(colnames(ose.jc.ijc))
 
-SRR_in_counts         <- SRR_accession_order %in% metadata_SRR_names
+keep  <- count_names %in% metadata_names
 
-table(SRR_in_counts)
-length(SRR_in_counts)
-length(SRR_accession_order)
-length(metadata_SRR_names)
+table(keep)
+length(keep)
+length(metadata_names)
+length(count_names)
 
-a3ss.jc.ijc2 <- data.matrix(a3ss.jc.ijc)
-a3ss.jc.sjc2 <- data.matrix(a3ss.jc.sjc)
+a3ss.jc.ijc2 = oa3ss.jc.ijc[,keep==TRUE] 
+a3ss.jc.sjc2 = oa3ss.jc.sjc[,keep==TRUE] 
 
-a5ss.jc.ijc2 <- data.matrix(a5ss.jc.ijc)
-a5ss.jc.sjc2 <- data.matrix(a5ss.jc.sjc)
+a5ss.jc.ijc2 = oa5ss.jc.ijc[,keep==TRUE] 
+a5ss.jc.sjc2 = oa5ss.jc.sjc[,keep==TRUE] 
 
-mxe.jc.ijc2 <- data.matrix(mxe.jc.ijc)
-mxe.jc.sjc2 <- data.matrix(mxe.jc.sjc)
+mxe.jc.ijc2 = omxe.jc.ijc[,keep==TRUE] 
+mxe.jc.sjc2 = omxe.jc.sjc[,keep==TRUE] 
 
-ri.jc.ijc2 <- data.matrix(ri.jc.ijc)
-ri.jc.sjc2 <- data.matrix(ri.jc.sjc)
+ri.jc.ijc2 = ori.jc.ijc[,keep==TRUE] 
+ri.jc.sjc2 = ori.jc.sjc[,keep==TRUE] 
 
-se.jc.ijc2 <- data.matrix(se.jc.ijc)
-se.jc.sjc2 <- data.matrix(se.jc.sjc)
-
-a3ss.jc.ijc2 = a3ss.jc.ijc2[,SRR_in_counts==TRUE] 
-a3ss.jc.sjc2 = a3ss.jc.sjc2[,SRR_in_counts==TRUE] 
-
-a5ss.jc.ijc2 = a5ss.jc.ijc2[,SRR_in_counts==TRUE] 
-a5ss.jc.sjc2 = a5ss.jc.sjc2[,SRR_in_counts==TRUE] 
-
-mxe.jc.ijc2 = mxe.jc.ijc2[,SRR_in_counts==TRUE] 
-mxe.jc.sjc2 = mxe.jc.sjc2[,SRR_in_counts==TRUE] 
-
-ri.jc.ijc2 = ri.jc.ijc2[,SRR_in_counts==TRUE] 
-ri.jc.sjc2 = ri.jc.sjc2[,SRR_in_counts==TRUE] 
-
-se.jc.ijc2 = se.jc.ijc2[,SRR_in_counts==TRUE] 
-se.jc.sjc2 = se.jc.sjc2[,SRR_in_counts==TRUE] 
+se.jc.ijc2 = ose.jc.ijc[,keep==TRUE] 
+se.jc.sjc2 = ose.jc.sjc[,keep==TRUE] 
 
 dim(a3ss.jc.ijc2)
 dim(a3ss.jc.sjc2)
@@ -768,31 +989,123 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 
 
 ```{r}
-#print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, metadata ) {
+    splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
+    tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
+    tissue_list_m_f
+
+    splice_index        = 5
+    tissue_index        = 21
+    plot                = TRUE
+    splice_type         = splice_list    [splice_index] 
+    tissue_of_interest  = tissue_list_m_f[tissue_index]
+    fromGTF             = se_fromGTF_no_chrY
+    metadata            = ocounts_metadata
+    obj                 = reduced_obj2
+    ijc                 = se_jc_ijc_no_chrY
+    sjc                 = se_jc_sjc_no_chrY
+    tissue_list         = tissue_list_m_f
+
+    fromGTF           <- fromGTF
+
+
+tissue_of_interest
+splice_type
+
+ 
+```
+
+```{r}
+print_exploratory_plots <- function (plot, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, obj, metadata ) {
 
     fromGTF           <- fromGTF
     tissue_true       <- tissue_list == tissue_of_interest
 
-    table(tissue_true)
-    ijc_tissue        <- ijc      [                 ,tissue_true==TRUE]
-    sjc_tissue        <- sjc      [                 ,tissue_true==TRUE]
-    metadata_tissue   <- metadata [tissue_true==TRUE,                 ]
+    # test to make sure we don't have nonsense
+    # like proteins - this process moves in one direction
+    # tissue will get us the phenotype selection 
+    # from the phenotype SAMPID we get the metadata SAMPID
+    # which leads us to counts - it goes in this direction.
+    # first phenotype obj subsetting for the tissue_of_interest
 
-    ijc.df            <- as.data.frame(ijc_tissue)
-    sjc.df            <- as.data.frame(sjc_tissue)    
-    ijc.dm            <- data.matrix(ijc.df)
-    sjc.dm            <- data.matrix(sjc.df)    
- 
-    
-    sex       <- metadata_tissue$SEX
-    sex2      <- ifelse(sex == 1,"male","female")
-    sex2      <- factor(sex2,levels=c("male","female"))
-    design    <- model.matrix ( ~ sex2)
-    
+    message("Limiting phenotype data to tissue of interest")    
+    rm(keep)
+    keep = pData(reduced_obj2)$tissue== tissue_of_interest
+    table(keep)
+    tissue_obj<- reduced_obj2[,keep]
+    message("tissue_obj now reduced to the tissue of interest")    
+    dim(pData(tissue_obj))
+    pData(tissue_obj)[1,]
+
+
+    # now we get the runs via the metadata ocounts_metadata matrix via SAMPID
+    # limit the phenotype info to just the samples we care about
+    metadata_samples          <- as.character(ocounts_metadata$SAMPID)
+    tissue_phenotype_samples  <- as.character(pData(tissue_obj)$SAMPID)
+
+    message("Limit the phenotypes to those we have samples for")    
+    rm(keep)
+    keep = tissue_phenotype_samples %in% metadata_samples
+    table(keep)
+    message("tissue_count_obj now has these count specific phenotypes")    
+    tissue_count_obj        <- tissue_obj[keep,]
+    pData(tissue_count_obj) <- pData(tissue_obj)[keep,]
+    dim(pData(tissue_count_obj))
+    dim(tissue_count_obj)
+
+    # and vice-versa, limit our samples to the ones we have phenotype for
+    rm(keep)
+    message("Limit the counts now has these count specific phenotypes")    
+    metadata_samples       <- as.character(ocounts_metadata$SAMPID)
+    phenotype_samples      <- as.character(pData(tissue_count_obj)$SAMPID)
+    keep = metadata_samples %in% phenotype_samples
+    message("metadata_tissue now has these phenotype specific counts")    
+    table(keep)
+
+    ijc_tissue        <- ijc     [          ,keep==TRUE]
+    sjc_tissue        <- sjc     [          ,keep==TRUE]
+    metadata_tissue   <- metadata[keep==TRUE,          ]
+
+    message("dimensions of the ijc_tissue,sjc_tissue, metadata_tissue and pData(tissue_count_obj)")
+    dim(ijc_tissue)
+    dim(sjc_tissue)
+    dim(metadata_tissue)
+    metadata_samples       <- as.character(metadata_tissue$SAMPID)
+    phenotype_samples      <- as.character(pData(tissue_count_obj)$SAMPID)
+
+    length(metadata_samples)
+    length(phenotype_samples)
+    non_overlaps <- setdiff( metadata_samples, phenotype_samples)
+    message("The non-overlapping IDs between pheno and count data are:\n\n", 
+        paste(length(non_overlaps), collapse = "\n") )
+
+    for (i in (1:length(metadata_samples))) {
+        sample = metadata_tissue[i,]$SAMPID
+        sample_sex = pData(tissue_count_obj)$SEX[pData(tissue_count_obj)$SAMPID == sample]
+        if (i==1) {
+            sex = sample_sex
+        } else {
+            sex = c(sex,sample_sex)
+        }
+    }
+
+    message("sex samples:\n\n",
+        paste0(table(sex), collapse="\n"))
+
+
+    ijc.dm            <- data.matrix(ijc_tissue)
+    sjc.dm            <- data.matrix(sjc_tissue)    
+
+
+    sex      <- ifelse(sex == 1,"male","female")
+    sex      <- factor(sex,levels=c("male","female"))
+    message("sex samples:\n\n",
+        paste0(table(sex), collapse="\n"))
+
+    design    <- model.matrix ( ~ sex)
+
     colnames(design) <- c("intercept","sex")
-    head(design)
 
-    y_ijc <- DGEList(counts=ijc.dm, group = sex2)
+    y_ijc <- DGEList(counts=ijc.dm, group = sex)
     y_ijc <- calcNormFactors(y_ijc, method="RLE")
     y_ijc_voom <- voom (y_ijc, design=design, plot=plot)
 
@@ -818,7 +1131,7 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
     rownames(ijc_sex_results)  <- ijc_sex_results_rn
 
     length(ijc_sex_refined_geneSymbols)
-    y_sjc <- DGEList(counts=sjc.dm, group = sex2)
+    y_sjc <- DGEList(counts=sjc.dm, group = sex)
     y_sjc <- calcNormFactors(y_sjc, method="RLE")
     y_sjc_voom <- voom (y_sjc, design=design, plot=plot)
 
@@ -846,7 +1159,7 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 
     length(sjc_sex_results_refined) 
    # print these exploratory plots for ijc and sjc alone
-    Gender <- substring(sex2,1,1)
+    Gender <- substring(sex,1,1)
     filename <- paste0(paste0(paste0("../pdf/", splice_type),
                                      snakecase::to_snake_case(tissue_of_interest)),"-ijc-MDSplot-100.pdf")
     pdf (filename)
@@ -934,8 +1247,8 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
     colnames(sjc.dm) <- sjc_names
 
     as_matrix <- cbind(ijc.dm,sjc.dm)
-    sex3      <- c(rep(sex2,2))
-    head(sex2)
+    sex3      <- c(rep(sex,2))
+    head(sex)
     as_event  <- c(rep("ijc",dim(ijc.dm)[2]), rep("sjc", dim(sjc.dm)[2]))
     as_event  <- factor(as_event, levels=c("ijc", "sjc"))
 
@@ -955,9 +1268,9 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
     y_voom <- voom (y, design=design, plot = plot)
 
 #    commenting this out for speed
-    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
-    dup_cor$consensus.correlation 
-    y_dup_voom <- voom (y, design=design, plot = plot, block = donor, correlation = dup_cor$consensus.correlation)
+#    dup_cor <- duplicateCorrelation(y_voom$E, design=design, ndups=2, block=donor, weights=y$samples$norm.factors)
+#    dup_cor$consensus.correlation 
+#    y_dup_voom <- voom (y, design=design, plot = plot, block = donor, correlation = dup_cor$consensus.correlation)
     
     Gender <- substring(sex3,1,1)
      # print the combined exploratory plot
@@ -974,10 +1287,10 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
             gene.selection="common")
     dev.off()
     filename <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-ijc-MDSplot-100.pdf")
-    pdf (filename)
-        plotMDS(y_dup_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-            gene.selection="common")
-    dev.off()
+#    pdf (filename)
+#        plotMDS(y_dup_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+#            gene.selection="common")
+#    dev.off()
     filename <- paste0(paste0(paste0("../pdf/", splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-sjc-MDSplot-100.pdf")
     pdf (filename)
@@ -992,14 +1305,14 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
     dev.off()
     filename <- paste0(paste0(paste0("../pdf/", snakecase::to_snake_case(splice_type)),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-sjc-MDSplot-100.pdf")
-    pdf (filename)
-        plotMDS(y_dup_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-            gene.selection="common")
-    dev.off()
+#    pdf (filename)
+#        plotMDS(y_dup_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+#            gene.selection="common")
+#    dev.off()
                        
 # for comment this out for speed
-   fit <- lmFit(y_dup_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
-#    fit <- lmFit(y_voom, design=design)
+#   fit <- lmFit(y_dup_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
+    fit <- lmFit(y_voom, design=design)
     fit <- eBayes(fit, robust=TRUE)    
     
     sex_as_events_results         <- topTable(fit, coef="sex*as_event", number=nrow(y_voom))
@@ -1092,7 +1405,11 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
     write.table(ijc_sex_refined_geneSymbols,      file = ijc_sex_refined_genesFilename      , row.names = F, col.names = F, quote = F, sep = ",")
 
     return(0)
-#}
+}
+```
+
+```{r}
+
 ```
 
 ```{r}
@@ -1109,10 +1426,11 @@ tissue_list_m_f     = levels(reduced_metadata_pData$tissue)
 tissue_of_interest  = tissue_list_m_f[tissue_index]
 splice_type         = splice_list    [splice_index] 
 fromGTF             = a3ss_fromGTF_no_chrY
-metadata            = reduced_metadata_pData
+metadata            = ocounts_metadata
 ijc                 = a3ss_jc_ijc_no_chrY
 sjc                 = a3ss_jc_sjc_no_chrY
 plot                = FALSE
+obj                 = reduced_obj2
 
 for (tissue_index in 1:length(tissue_list_m_f)) {
 
@@ -1124,14 +1442,15 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = a3ss_jc_ijc_no_chrY
     sjc                 = a3ss_jc_sjc_no_chrY
-    print_exploratory_plots (plot,
-                         tissue_of_interest, 
-                         splice_type, 
-                         fromGTF, 
-                         tissue_list_m_f, 
-                         ijc, 
-                         sjc, 
-                         metadata)
+    print_exploratory_plots (plot, 
+                             tissue_of_interest, 
+                             splice_type, 
+                             fromGTF, 
+                             tissue_list, 
+                             ijc, 
+                             sjc, 
+                             obj, 
+                             metadata )
     # a5ss
     splice_index        = 2
     splice_type         = splice_list    [splice_index] 
@@ -1140,14 +1459,15 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = a5ss_jc_ijc_no_chrY
     sjc                 = a5ss_jc_sjc_no_chrY
-    print_exploratory_plots (plot,
-                         tissue_of_interest, 
-                         splice_type, 
-                         fromGTF, 
-                         tissue_list_m_f, 
-                         ijc, 
-                         sjc, 
-                         metadata)
+    print_exploratory_plots (plot, 
+                             tissue_of_interest, 
+                             splice_type, 
+                             fromGTF, 
+                             tissue_list, 
+                             ijc, 
+                             sjc, 
+                             obj, 
+                             metadata )
     # mxe
     splice_index        = 3
     splice_type         = splice_list    [splice_index] 
@@ -1156,14 +1476,15 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = mxe_jc_ijc_no_chrY
     sjc                 = mxe_jc_sjc_no_chrY
-    print_exploratory_plots (plot,
-                         tissue_of_interest, 
-                         splice_type, 
-                         fromGTF, 
-                         tissue_list_m_f, 
-                         ijc, 
-                         sjc, 
-                         metadata)
+    print_exploratory_plots (plot, 
+                             tissue_of_interest, 
+                             splice_type, 
+                             fromGTF, 
+                             tissue_list, 
+                             ijc, 
+                             sjc, 
+                             obj, 
+                             metadata )
     # ri
     splice_index        = 4
     splice_type         = splice_list    [splice_index] 
@@ -1172,14 +1493,15 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     metadata            = reduced_metadata_pData
     ijc                 = ri_jc_ijc_no_chrY
     sjc                 = ri_jc_sjc_no_chrY
-    print_exploratory_plots (plot,
-                         tissue_of_interest, 
-                         splice_type, 
-                         fromGTF, 
-                         tissue_list_m_f, 
-                         ijc, 
-                         sjc, 
-                         metadata)
+    print_exploratory_plots (plot, 
+                             tissue_of_interest, 
+                             splice_type, 
+                             fromGTF, 
+                             tissue_list, 
+                             ijc, 
+                             sjc, 
+                             obj, 
+                             metadata )
     # se
 #    splice_index        = 5
 #    splice_type         = splice_list    [splice_index] 
@@ -1188,14 +1510,15 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
 #    metadata            = reduced_metadata_pData
 #    ijc                 = se_jc_ijc_no_chrY
 #    sjc                 = se_jc_sjc_no_chrY
-#    print_exploratory_plots (plot,
-#                         tissue_of_interest, 
-#                         splice_type, 
-#                         fromGTF, 
-#                         tissue_list_m_f, 
-#                         ijc, 
-#                         sjc, 
-#                         metadata)
+#    print_exploratory_plots (plot, 
+#                             tissue_of_interest, 
+#                             splice_type, 
+#                             fromGTF, 
+#                             tissue_list, 
+#                             ijc, 
+#                             sjc, 
+#                             obj, 
+#                             metadata )
 }
 ```
 
@@ -1204,7 +1527,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
     tissue_list_m_f     = levels(reduced_metadata_pData$tissue)
     splice_index        = 5
-    tissue_index        = 17
+    tissue_index        = 21
     plot                = TRUE
     splice_type         = splice_list    [splice_index] 
     tissue_of_interest  = tissue_list_m_f[tissue_index]
@@ -1213,14 +1536,16 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     ijc                 = se_jc_ijc_no_chrY
     sjc                 = se_jc_sjc_no_chrY
     tissue_list         = tissue_list_m_f
-    print_exploratory_plots (plot,
-                         tissue_of_interest, 
-                         splice_type, 
-                         fromGTF, 
-                         tissue_list_m_f, 
-                         ijc, 
-                         sjc, 
-                         metadata)
+    obj                 = reduced_obj2
+    print_exploratory_plots (plot, 
+                             tissue_of_interest, 
+                             splice_type, 
+                             fromGTF, 
+                             tissue_list, 
+                             ijc, 
+                             sjc, 
+                             obj, 
+                             metadata )
 
 ```
 

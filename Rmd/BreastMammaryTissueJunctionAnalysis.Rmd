@@ -128,9 +128,13 @@ piggyback::pb_download(
     tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
     dest = "../data/")
 
+```
+
+```{r}
+
 ijc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.ijc.txt.gz") 
 sjc.iso.counts.mem <- data.table::fread("../data/rmats_final.se.jc.sjc.txt.gz") 
-meta.data          <- data.table::fread("../data/SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz")
+meta.data          <- data.table::fread("../data/SraRunTable.txt.gz")
 
 head(ijc.iso.counts.mem)
 head(sjc.iso.counts.mem)
