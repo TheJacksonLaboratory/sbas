@@ -1049,6 +1049,10 @@ Random effects approach is equivalent to The first method is twoway anova, a gen
 
 
 ```{r}
+
+```
+
+```{r}
 print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, obj, metadata ) {
 
     fromGTF           <- fromGTF
@@ -1118,6 +1122,9 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     message("\nThe non-overlapping IDs between pheno and count data are:\n", 
         paste(length(non_overlaps), collapse = " ") )
 
+    ijc.dm            <- data.matrix(ijc_tissue)
+    sjc.dm            <- data.matrix(sjc_tissue)    
+
     for (i in (1:length(metadata_samples))) {
         sample = metadata_tissue[i,]$SAMPID
         sample_sex = pData(tissue_count_obj)$SEX[pData(tissue_count_obj)$SAMPID == sample]
@@ -1127,13 +1134,8 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
             sex = c(sex,sample_sex)
         }
     }
-
     message("sex samples:\n",
         paste0(table(sex), collapse="\n"))
-
-    ijc.dm            <- data.matrix(ijc_tissue)
-    sjc.dm            <- data.matrix(sjc_tissue)    
-
     sex      <- ifelse(sex == 1,"male","female")
     sex      <- factor(sex,levels=c("male","female"))
     message("\nsex samples:\n",
@@ -1152,15 +1154,19 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     Gender <- substring(sex,1,1)
     if (dup == TRUE) {
         pdf_sub_directory = '../pdf_dup_corr/'
-        csv_sub_directory = '../significant_events_dup_corr/'
+        csv_sub_directory = '../csv_dup_corr/'
+        message("mkdir -p pdf_sub_directory")
+        system ("mkdir -p '../pdf_dup_corr/'")
+        message("mkdir -p csv_sub_directory")
+        system ("mkdir -p '../csv_dup_corr/'")
     } else {
         pdf_sub_directory = '../pdf_no_dup_corr/'
-        csv_directory = '../significant_events_no_dup_corr/'
+        csv_sub_directory = '../csv_no_dup_corr/'
+        message("mkdir -p pdf_sub_directory")
+        system ("mkdir -p '../pdf_no_dup_corr/'")
+        message("mkdir -p csv_sub_directory")
+        system ("mkdir -p '../csv_no_dup_corr/'")
     }
-    message("mkdir -p pdf_sub_directory")
-    system ("mkdir -p pdf_sub_directory")
-    message("mkdir -p csv_sub_directory")
-    system ("mkdir -p csv_sub_directory")
     
     filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                                      snakecase::to_snake_case(tissue_of_interest)),"-ijc-MDSplot-100.pdf")
@@ -1305,9 +1311,12 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
             sex = c(sex,sample_sex)
         }
     }
-
     message("sex samples:\n",
         paste0(table(sex), collapse="\n"))
+    sex      <- ifelse(sex == 1,"male","female")
+    sex      <- factor(sex,levels=c("male","female"))
+    message("\nsex samples:\n",
+        paste0(table(sex), collapse=" "))
     sex2      <- c(rep(sex,2))
     table(sex2)
     message("\nlength sex2\n", 
@@ -1340,21 +1349,22 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
         paste(length(Gender), collapse = " ") )
     message("\nplotting y for ijc portion of design <- model.matrix( ~sex + as_event + sex*as_event\n")
      # print the combined exploratory plot
-    filename <- paste0(paste0(paste0("../pdf/", splice_type),
+    filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-ijc-MDSplot-100.pdf")
     pdf (filename)
         plotMDS(y[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
             gene.selection="common")
     dev.off()
     message("\nplotting y_voom for ijc portion of design <- model.matrix( ~sex + as_event + sex*as_event\n")
-    filename <- paste0(paste0(paste0("../pdf/", splice_type),
+    filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-voom-ijc-MDSplot-100.pdf")
     pdf (filename)
         plotMDS(y_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
             gene.selection="common")
     dev.off()
     if (dup == TRUE) {
-        filename <- paste0(paste0(pdf_sub_directory, snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-ijc-MDSplot-100.pdf")
+        filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
+                           snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-ijc-MDSplot-100.pdf")
         pdf (filename)
             plotMDS(y_dup_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
@@ -1376,7 +1386,7 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
             plotMDS(y_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
         dev.off()
-        filename <- paste0(paste0(paste0(pdf_sub_directory, snakecase::to_snake_case(splice_type)),
+        filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-sjc-MDSplot-100.pdf")
         pdf (filename)
             plotMDS(y_dup_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
@@ -1386,9 +1396,9 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
         fit <- lmFit(y_dup_voom, design=design, block=donor, correlation = dup_cor$consensus.correlation)
     } else {
         fit <- lmFit(y_voom, design=design)
-        fit <- eBayes(fit, robust=TRUE)    
     }
-    
+        
+    fit <- eBayes(fit, robust=TRUE)
     
     sex_as_events_results         <- topTable(fit, coef="sex*as_event", number=nrow(y_voom))
     sex_as_events_results_refined <- sex_as_events_results$adj.P.Val <= 0.05 & abs(sex_as_events_results$logFC) >= abs(log2(1.5))
@@ -1483,15 +1493,86 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
 }
 ```
 
+#### Testing Snippet
+
+To use this snippet - set *test = `TRUE`*.
+To play with using or not using duplicate correlation, set *dup = `TRUE`* accordingly.
+
 ```{r}
-# tissue_index -- enables this to run as a NextFlow notebook
-# devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
-#parameters for running the notebook as NextFlow
+#     Testing
+# set test = TRUE to test
+# set test = FALSE to ignore
 
+test = TRUE
+dup  = TRUE
+if (test == TRUE) {
+    splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
+    tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
+    splice_index        = 5
+    tissue_index        = 21
+    plot                = TRUE
+    splice_type         = splice_list    [splice_index] 
+    tissue_of_interest  = tissue_list_m_f[tissue_index]
+    fromGTF             = se_fromGTF_no_chrY
+    metadata            = ocounts_metadata
+    ijc                 = se_jc_ijc_no_chrY
+
+    message("\nijc\n", 
+        paste(dim(ijc), collapse = "\n") )
+    message("\nhead(ijc)\n", 
+        paste(ijc[1:5,1:5], collapse = " ") )
+    sjc                 = se_jc_sjc_no_chrY
+    message("\nsjc\n", 
+        paste(dim(sjc), collapse = "\n") )
+    message("\nsjc\n", 
+        paste(sjc[1:5,1:5], collapse = " ") )
+    tissue_list         = tissue_list_m_f
+    obj                 = reduced_obj2
+    message("\nobj\n", 
+        paste(dim(obj), collapse = "\n") )
+
+    
+    print_exploratory_plots (plot,
+                             dup,
+                             tissue_of_interest, 
+                             splice_type, 
+                             fromGTF, 
+                             tissue_list, 
+                             ijc, 
+                             sjc, 
+                             obj, 
+                             metadata )
+    message("\ndone!\n") 
+    
+}
+```
+
+## Execution of All Tissues and All Splicing Variants
+
+Additional values set to enable this notebook to be executed as a nextflow workflow or to run in place with appropriate settings.
+
+**NOTE**
+1. Setting `dup=TRUE` causes lengthy execution times.
+2. Setting `plot=TRUE` can overwhelm the saving capacity within a jupyter-lab notebook - 
+   this sets to print all the voom plots.
+
+**output directories**
+
+### analysis results
+
+1. csv results will be either:
+
+   a. `../csv_no_dup` *when `dup == FALSE`*
+   b. `../csv_dup`    *when `dup == TRUE`*
+
+2. pdf results will be either:tissue_index -- enables this to run as a NextFlow notebook
+ 
+   a. `../pdf_no_dup` *when `dup == FALSE`*
+   b. `../pdf_dup`    *when `dup == TRUE`*
+
+
+```{r}
 splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
-
-tissue_index <- 17
-splice_index <- 5
 
 tissue_list_m_f     = levels(reduced_metadata_pData$tissue)
 tissue_of_interest  = tissue_list_m_f[tissue_index]
@@ -1596,60 +1677,6 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
 #                             sjc, 
 #                             obj, 
 #                             metadata )
-}
-```
-
-#### Testing Snippet
-
-To use this snippet - set *test = `TRUE`*.
-
-
-```{r}
-#     Testing
-# set test = TRUE to test
-# set test = FALSE to ignore
-
-test = TRUE
-dup  = FALSE
-if (test == TRUE) {
-    splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
-    tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
-    splice_index        = 5
-    tissue_index        = 21
-    plot                = TRUE
-    splice_type         = splice_list    [splice_index] 
-    tissue_of_interest  = tissue_list_m_f[tissue_index]
-    fromGTF             = se_fromGTF_no_chrY
-    metadata            = ocounts_metadata
-    ijc                 = se_jc_ijc_no_chrY
-
-    message("\nijc\n", 
-        paste(dim(ijc), collapse = "\n") )
-    message("\nhead(ijc)\n", 
-        paste(ijc[1:5,1:5], collapse = " ") )
-    sjc                 = se_jc_sjc_no_chrY
-    message("\nsjc\n", 
-        paste(dim(sjc), collapse = "\n") )
-    message("\nsjc\n", 
-        paste(sjc[1:5,1:5], collapse = " ") )
-    tissue_list         = tissue_list_m_f
-    obj                 = reduced_obj2
-    message("\nobj\n", 
-        paste(dim(obj), collapse = "\n") )
-
-    
-    print_exploratory_plots (plot,
-                             dup,
-                             tissue_of_interest, 
-                             splice_type, 
-                             fromGTF, 
-                             tissue_list, 
-                             ijc, 
-                             sjc, 
-                             obj, 
-                             metadata )
-    message("\ndone!\n") 
-    
 }
 ```
 
