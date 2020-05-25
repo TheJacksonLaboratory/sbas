@@ -546,7 +546,7 @@ table(tissue_reduction$include)
 tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 
 # test to make sure we don't have nonsense
-keep <- (pData(obj)$tissue== "breast_mammary_tissue")
+keep <- (pData(obj)$SMTSD== "breast_mammary_tissue")
 message("\nTEST: how many to keep of obj in breast_mammary_tissue\n",
         paste(table(keep), collapse = " "))
 tobj        = obj      [,keep]
@@ -560,17 +560,17 @@ rm(keep)
 # end test
 
 # create a matching tissue name to go with the expressionSet phenotype object
-pData(obj)$tissue      <- factor(snakecase::to_snake_case(as.character(pData(obj)$SMTSD)))
+pData(obj)$SMTSD       <- factor(snakecase::to_snake_case(as.character(pData(obj)$SMTSD)))
 tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
 
 message("\nlength tissues in phenotype data\n",
-        paste(length(levels(pData(obj)$tissue)), collapse = " "))
+        paste(length(levels(pData(obj)$SMTSD)), collapse = " "))
 message("\nlength tissues in tissue_reduction data\n",
         paste(length(tissue_reduction$SMTSD), collapse = " "))
 
-keep <- pData(obj)$tissue %in% tissue_reduction$SMTSD
+keep <- pData(obj)$SMTSD %in% tissue_reduction$SMTSD
 message("\nlength tissue in samples phenotype data\n",
-        paste(length(pData(obj)$tissue), collapse = " "))
+        paste(length(pData(obj)$SMTSD), collapse = " "))
 message("\nlength keep obj \n",
         paste(length(keep), collapse = " "))
 message("\nhow many to keep in phenotype data\n",
@@ -584,9 +584,11 @@ message("\nsize reduced_obj\n",
         paste(dim(reduced_obj)), collapse=" ")
 message("\nsize pData(reduced_obj)\n",
         paste(dim(pData(reduced_obj)), collapse=" "))
+message("\nlength tissues in phenotype data\n",
+        paste(length(levels(pData(reduced_obj)$SMTSD)), collapse = " "))
 
 # test to make sure we don't have nonsense
-keep = pData(reduced_obj)$tissue== "breast_mammary_tissue"
+keep = pData(reduced_obj)$SMTSD== "breast_mammary_tissue"
 message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
         paste(table(keep), collapse = " "))
 tobj        = reduced_obj       [          ,keep==TRUE]
@@ -642,7 +644,7 @@ message("\nsize pData(reduced_obj2)\n",
         paste(dim(pData(reduced_obj2)), collapse=" "))
 
 # test to make sure we don't have nonsense
-keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
+keep = pData(reduced_obj2)$SMTSD == "breast_mammary_tissue"
 message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
         paste(table(keep), collapse = " "))
 tobj        = reduced_obj2       [          ,keep==TRUE]
@@ -676,7 +678,7 @@ message("\ndimension of reduced_metadata\n",
 rm(keep)
 
 # test to make sure we don't have nonsense
-keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
+keep = pData(reduced_obj2)$SMTSD== "breast_mammary_tissue"
 message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
         paste(table(keep), collapse = " "))
 tobj        = reduced_obj2       [          ,keep==TRUE]
@@ -861,7 +863,7 @@ Our current matrices are:
 ```{r}
 # test to make sure we don't have nonsense
 rm(keep)
-keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
+keep = pData(reduced_obj2)$SMTSD == "breast_mammary_tissue"
 table(keep)
 tobj = reduced_obj2[,keep]
 dim(tobj)
@@ -1114,7 +1116,7 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
 
     message("\nLimiting phenotype data to tissue of interest\n",
            paste(tissue_of_interest),collapse=" ")    
-    keep = pData(obj)$tissue== tissue_of_interest
+    keep = pData(obj)$SMTSD== tissue_of_interest
     message("\nkeep\n",
            paste(table(keep)),collapse=" ")    
     tissue_obj<- obj[,keep]
@@ -1640,12 +1642,16 @@ Additional values set to enable this notebook to be executed as a nextflow workf
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
 tissue_list
 length(tissue_list)
+pdata_tissue_list <- factor(snakecase::to_snake_case(as.character(pData(reduced_obj2)$SMTSD)))
+levels(pdata_tissue_list)
+length(levels(pdata_tissue_list))
+
 ```
 
 ```{r}
 # splice_list <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 
-splice_list  <- c("a3ss_","a5ss_","mxe_","ri_")
+splice_list  <- c("a3ss_","a5ss_","mxe_","ri_", "se_")
 
 # parameters that do not change with splice_type
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
@@ -1667,12 +1673,13 @@ for (tissue_index in 1:length(tissue_list)) {
     # a3ss
     splice_type = "a3ss_"
     res = splice_list %in% splice_type
+    tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+    message ("processing ",
+             paste(tissue_of_interest), " \n")
+    
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list[tissue_index]
-        message ("processing ",
-             paste(tissue_of_interest), " \n")
         fromGTF             = a3ss_fromGTF_no_chrY
         ijc                 = a3ss_jc_ijc_no_chrY
         sjc                 = a3ss_jc_sjc_no_chrY
@@ -1693,9 +1700,6 @@ for (tissue_index in 1:length(tissue_list)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list[tissue_index]
-        message ("processing ",
-             paste(tissue_of_interest), " \n")
         fromGTF             = a5ss_fromGTF_no_chrY
         ijc                 = a5ss_jc_ijc_no_chrY
         sjc                 = a5ss_jc_sjc_no_chrY
@@ -1716,9 +1720,6 @@ for (tissue_index in 1:length(tissue_list)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list[tissue_index]
-        message ("processing ",
-             paste(tissue_of_interest), " \n")
         fromGTF             = mxe_fromGTF_no_chrY
         ijc                 = mxe_jc_ijc_no_chrY
         sjc                 = mxe_jc_sjc_no_chrY
@@ -1739,9 +1740,6 @@ for (tissue_index in 1:length(tissue_list)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list[tissue_index]
-        message ("processing ",
-             paste(tissue_of_interest), " \n")
         fromGTF             = ri_fromGTF_no_chrY
         ijc                 = ri_jc_ijc_no_chrY
         sjc                 = ri_jc_sjc_no_chrY
@@ -1762,9 +1760,6 @@ for (tissue_index in 1:length(tissue_list)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list[tissue_index]
-        message ("processing ",
-             paste(tissue_of_interest), " \n")
         fromGTF             = se_fromGTF_no_chrY
         ijc                 = se_jc_ijc_no_chrY
         sjc                 = se_jc_sjc_no_chrY
