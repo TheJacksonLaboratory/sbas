@@ -402,7 +402,8 @@ message("The non-overlapping IDs between pheno and count data are:\n",
 logical_match_names=superset %in% subset
 length(logical_match_names)
 table(logical_match_names)
-pData(obj) <- (pData(obj)[logical_match_names==TRUE,])
+obj        <- obj       [logical_match_names==TRUE,]
+pData(obj) <- pData(obj)[logical_match_names==TRUE,]
 
 tail (pData(obj),2)
 dim(pData(obj))
@@ -533,47 +534,69 @@ tissue_reduction <- read.table(file="../assets/tissues.tsv", header=TRUE, sep="\
                                skipNul=FALSE, stringsAsFactors = FALSE)
 colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
 
+message("\nsize tissue_reduction\n",
+        paste(dim(tissue_reduction), collapse=" "))
+message("\nsize obj\n",
+        paste(dim(obj)), collapse="\n")
+message("\nsize pData(obj)\n",
+        paste(dim(pData(obj)), collapse=" "))
+
 # only include those tissues we wish to continue with
 table(tissue_reduction$include)
 tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
+
+# test to make sure we don't have nonsense
+keep <- (pData(obj)$tissue== "breast_mammary_tissue")
+message("\nTEST: how many to keep of obj in breast_mammary_tissue\n",
+        paste(table(keep), collapse = " "))
+tobj        = obj      [,keep]
+pData(tobj) = pData(obj[,keep])
+message("\nTEST: size breast_mammary_tissue obj:tobj\n",
+        paste(dim(tobj), collapse=" "))
+message("\nTEST: size phenotype object pData(tobj)\n",
+        paste(dim(pData(tobj)), collapse=" "))
+pData(tobj)[1,]
+rm(keep)
+# end test
 
 # create a matching tissue name to go with the expressionSet phenotype object
 pData(obj)$tissue      <- factor(snakecase::to_snake_case(as.character(pData(obj)$SMTSD)))
 tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
 
-dim(tissue_reduction)
-dim(obj)
-dim(pData(obj))
-
-# test to make sure we don't have nonsense
-keep = pData(obj)$tissue== "breast_mammary_tissue"
-table(keep)
-tobj = obj[,keep]
-dim(tobj)
-dim(pData(tobj))
-pData(tobj)[1,]
-# end test
-
-length(levels(pData(obj)$tissue))
-length(levels(tissue_reduction$SMTSD))
+message("\nlength tissues in phenotype data\n",
+        paste(length(levels(pData(obj)$tissue)), collapse = " "))
+message("\nlength tissues in tissue_reduction data\n",
+        paste(length(tissue_reduction$SMTSD), collapse = " "))
 
 keep <- pData(obj)$tissue %in% tissue_reduction$SMTSD
-table(keep)
-length(keep)
+message("\nlength tissue in samples phenotype data\n",
+        paste(length(pData(obj)$tissue), collapse = " "))
+message("\nlength keep obj \n",
+        paste(length(keep), collapse = " "))
+message("\nhow many to keep in phenotype data\n",
+        paste(table(keep), collapse = " "))
 
-dim(obj)
-dim(pData(obj))
-reduced_obj <- obj[,keep==TRUE]
-dim(reduced_obj)
-dim(pData(reduced_obj))
+# both obj and pData(obj) need to be adjusted
+reduced_obj        <- obj       [          ,keep==TRUE]
+pData(reduced_obj) <- pData(obj)[keep==TRUE,          ]
+rm(keep)
+message("\nsize reduced_obj\n",
+        paste(dim(reduced_obj)), collapse=" ")
+message("\nsize pData(reduced_obj)\n",
+        paste(dim(pData(reduced_obj)), collapse=" "))
 
 # test to make sure we don't have nonsense
 keep = pData(reduced_obj)$tissue== "breast_mammary_tissue"
-table(keep)
-tobj = reduced_obj[,keep]
-dim(tobj)
-dim(pData(tobj))
+message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
+        paste(table(keep), collapse = " "))
+tobj        = reduced_obj       [          ,keep==TRUE]
+pData(tobj) = pData(reduced_obj)[keep==TRUE,          ]
+message("\nTEST: size breast_mammary_tissue obj:tobj\n",
+        paste(dim(tobj), collapse=" "))
+message("\nTEST: size phenotype object pData(tobj)\n",
+        paste(dim(pData(tobj)), collapse=" "))
 pData(tobj)[1,]
+rm(keep)
 # end test
 ```
 
@@ -584,12 +607,15 @@ Begin with synchronizing accession metadata and phenotype data - which has been 
 ```{r}
 # let's limit the phenotype object and then align the metadata file
 metadata <- data.table::fread("../data/SraRunTable.txt.gz")
-metadata$SAMPID   <- gsub('-','\\.',metadata$'Sample Name')
+metadata$SAMPID           <- gsub('-','\\.',metadata$'Sample Name')
 pData(reduced_obj)$SAMPID <- gsub('-','\\.',pData(reduced_obj)$SAMPID)
 
-dim(metadata)
-dim(reduced_obj)
-dim(pData(reduced_obj))
+message("\nsize accession SraRunTable \n",
+        paste(dim(metadata), collapse=" "))
+message("\nsize reduced_obj\n",
+        paste(dim(reduced_obj), collapse=" "))
+message("\nsize pData(reduced_obj)\n",
+        paste(dim(pData(reduced_obj)), collapse=" "))
 rownames(pData(reduced_obj))<- pData(reduced_obj)$SAMPID
 
 # keep only those runs (as epitomized by the metadata_samples) in the phenotype set
@@ -597,57 +623,82 @@ metadata_samples   <- as.character(metadata$SAMPID)
 phenotype_samples  <- as.character(pData(reduced_obj)$SAMPID)
 
 # any undefined (N/A) sample names? These results will be zero
-sum(is.na(metadata_samples))
-sum(is.na(phenotype_samples))
+message("\n any undefined (NA) sample names?\n",
+        paste(sum(is.na(metadata_samples)), collapse=" "))
+message("\n any undefined (NA) sample names?\n",
+        paste(sum(is.na(phenotype_samples)), collapse=" "))
 
-rm(keep)
 keep <- phenotype_samples %in% metadata_samples
-table(keep)
-reduced_obj2 <- reduced_obj[,keep==TRUE]
-dim(reduced_obj2)
-dim(pData(reduced_obj2))
+message("\nlength keep metadata samples in phenotype samples \n",
+        paste(length(keep), collapse = " "))
+message("\nhow many to keep in phenotype obj\n",
+        paste(table(keep), collapse = " "))
+
+reduced_obj2        <- reduced_obj       [          ,keep==TRUE]
+pData(reduced_obj2) <- pData(reduced_obj)[keep==TRUE,          ]
+message("\nsize reduced_obj2\n",
+        paste(dim(reduced_obj2), collapse=" "))
+message("\nsize pData(reduced_obj2)\n",
+        paste(dim(pData(reduced_obj2)), collapse=" "))
 
 # test to make sure we don't have nonsense
-rm(keep)
 keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
-table(keep)
-tobj = reduced_obj2[,keep]
-dim(tobj)
-dim(pData(tobj))
+message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
+        paste(table(keep), collapse = " "))
+tobj        = reduced_obj2       [          ,keep==TRUE]
+pData(tobj) = pData(reduced_obj2)[keep==TRUE,          ]
+message("\nTEST: size breast_mammary_tissue obj:tobj\n",
+        paste(dim(tobj), collapse=" "))
+message("\nTEST: size phenotype object pData(tobj)\n",
+        paste(dim(pData(tobj)), collapse=" "))
 pData(tobj)[1,]
+rm(keep)
 # end test
 
 # now go the other way - make sure the metadata samples are in sync with the phenotype samples
 # note that we are now with `reduced_obj2`
 metadata_samples   <- as.character(metadata$SAMPID)
 phenotype_samples  <- as.character(pData(reduced_obj2)$SAMPID)
-length(metadata_samples)
-length(phenotype_samples)
-dim(reduced_obj2)
-dim(pData(reduced_obj2))
-dim(metadata)
-rm(keep)
+message("\nlength of metadata_samples\n",
+        paste(length(metadata_samples), collapse=" "))
+message("\nlength of phenotype_samples\n",
+        paste(length(phenotype_samples), collapse=" "))
+message("\ndimension of metadata\n",
+        paste(dim(metadata), collapse=" "))
 keep <- metadata_samples %in% phenotype_samples
-table(keep)
+message("\nlength keep phenotype samples in metadata samples \n",
+        paste(length(keep), collapse = " "))
+message("\nhow many to keep in metadata samples\n")
 
 reduced_metadata <- metadata[keep==TRUE,]
-dim(reduced_metadata)
+message("\ndimension of reduced_metadata\n",
+        paste(dim(reduced_metadata), collapse=" "))
+rm(keep)
 
 # test to make sure we don't have nonsense
-rm(keep)
 keep = pData(reduced_obj2)$tissue== "breast_mammary_tissue"
-table(keep)
-tobj = reduced_obj2[,keep]
-dim(tobj)
-dim(pData(tobj))
+message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
+        paste(table(keep), collapse = " "))
+tobj        = reduced_obj2       [          ,keep==TRUE]
+pData(tobj) = pData(reduced_obj2)[keep==TRUE,          ]
+message("\nTEST: size breast_mammary_tissue obj:tobj\n",
+        paste(dim(tobj), collapse=" "))
+message("\nTEST: size phenotype object pData(tobj)\n",
+        paste(dim(pData(tobj)), collapse=" "))
+pData(tobj)[1,]
+rm(keep)
+
 breast_metadata_samples   <- as.character(reduced_metadata$SAMPID)
 breast_phenotype_samples  <- as.character(pData(tobj)$SAMPID)
-rm(keep)
 keep = breast_metadata_samples %in% breast_phenotype_samples
 table(keep)
+message("\nTEST: how many breast_mammary_tissue samples in reduced_metadata\n",
+        paste(table(keep), collapse = " "))
 breast_samples <- reduced_metadata[keep,]
-length(breast_samples$SAMPID)
-length(pData(tobj)$SAMPID)
+message("\nTEST: number reduced_metadata breast_samples\n",
+        paste(length(breast_samples$SAMPID), collapse=" "))
+message("\nTEST: number phenotype obj breast_samples\n",
+        paste(length(pData(tobj)$SAMPID), collapse=" "))
 breast_samples[1,]
 # end test
 
@@ -1047,10 +1098,6 @@ For an unbalanced design in which each donor receives only a subset of the stimu
 
 Random effects approach is equivalent to The first method is twoway anova, a generalization of a paired analysis.
 
-
-```{r}
-
-```
 
 ```{r}
 print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, obj, metadata ) {
@@ -1586,16 +1633,21 @@ Additional values set to enable this notebook to be executed as a nextflow workf
 
 
 ```{r}
-# splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
+tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
+tissue_list_m_f
+```
 
-splice_list       = c("a3ss_","a5ss_","mxe_","ri_")
+```{r}
+# splice_list <- c("a3ss_","a5ss_","mxe_","ri_","se_")
+
+splice_list  <- c("a3ss_","a5ss_","mxe_","ri_")
 
 # parameters that do not change with splice_type
-tissue_list_m_f     = levels(ocouts_metadata$tissue)
-metadata            = ocounts_metadata
-plot                = FALSE
-dup                 = FALSE
-obj                 = reduced_obj2
+tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+metadata     <- ocounts_metadata
+plot         <- FALSE
+dup          <- FALSE
+obj          <- reduced_obj2
 
 # parameters that change with each splice type (3)
 # fromGTF
