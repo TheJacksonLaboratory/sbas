@@ -99,7 +99,7 @@ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 Did you remember to delete your private github token?  Now is a good time to do so, before you save your work and checkit in inadvertantly....
 
 ```{r}
-if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files("../significant_events/"))) {    
+if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files("../data/"))) {    
     # SE
     piggyback::pb_download(
         show_progress = TRUE,
