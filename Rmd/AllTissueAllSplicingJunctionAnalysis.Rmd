@@ -1551,10 +1551,24 @@ if (test == TRUE) {
 
 Additional values set to enable this notebook to be executed as a nextflow workflow or to run in place with appropriate settings.
 
-**NOTE**
+### parameters Setting
+
 1. Setting `dup=TRUE` causes lengthy execution times.
+
 2. Setting `plot=TRUE` can overwhelm the saving capacity within a jupyter-lab notebook - 
    this sets to print all the voom plots.
+   
+3. Adjusting `splice_type` will allow you to play with a variety of results
+
+   a. all splice types desired to be run:
+    
+    `splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")`
+    
+   b. a subset (leaving out say `splice_type = "se_"` since it is the largest, for example)
+    
+    `splice_list       = c("a3ss_","a5ss_","mxe_","ri_")`
+    
+   
 
 **output directories**
 
@@ -1572,30 +1586,37 @@ Additional values set to enable this notebook to be executed as a nextflow workf
 
 
 ```{r}
-splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
+# splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
 
-tissue_list_m_f     = levels(reduced_metadata_pData$tissue)
-tissue_of_interest  = tissue_list_m_f[tissue_index]
-splice_type         = splice_list    [splice_index] 
-fromGTF             = a3ss_fromGTF_no_chrY
+splice_list       = c("a3ss_","a5ss_","mxe_","ri_")
+
+# parameters that do not change with splice_type
+tissue_list_m_f     = levels(ocouts_metadata$tissue)
 metadata            = ocounts_metadata
-ijc                 = a3ss_jc_ijc_no_chrY
-sjc                 = a3ss_jc_sjc_no_chrY
 plot                = FALSE
 dup                 = FALSE
 obj                 = reduced_obj2
 
+# parameters that change with each splice type (3)
+# fromGTF
+# ijc
+# sjc
+
 for (tissue_index in 1:length(tissue_list_m_f)) {
 
     # a3ss
-    splice_index        = 1
-    splice_type         = splice_list    [splice_index] 
-    tissue_of_interest  = tissue_list_m_f[tissue_index]
-    fromGTF             = a3ss_fromGTF_no_chrY
-    metadata            = reduced_metadata_pData
-    ijc                 = a3ss_jc_ijc_no_chrY
-    sjc                 = a3ss_jc_sjc_no_chrY
-    print_exploratory_plots (plot, 
+    splice_type = "a3ss_"
+    res = splice_list %in% splice_type
+    if (sum(res) == 1) {
+        message ("splice_list does contain\n",
+             paste(splice_type), " continuing with processing\n")
+        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        message ("processing ",
+             paste(tissue_of_interest), " \n")
+        fromGTF             = a3ss_fromGTF_no_chrY
+        ijc                 = a3ss_jc_ijc_no_chrY
+        sjc                 = a3ss_jc_sjc_no_chrY
+        print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
                              splice_type, 
@@ -1605,15 +1626,20 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
                              sjc, 
                              obj, 
                              metadata )
+    }
     # a5ss
-    splice_index        = 2
-    splice_type         = splice_list    [splice_index] 
-    tissue_of_interest  = tissue_list_m_f[tissue_index]
-    fromGTF             = a5ss_fromGTF_no_chrY
-    metadata            = reduced_metadata_pData
-    ijc                 = a5ss_jc_ijc_no_chrY
-    sjc                 = a5ss_jc_sjc_no_chrY
-    print_exploratory_plots (plot, 
+    splice_type = "a5ss_"
+    res = splice_list %in% splice_type
+    if (sum(res) == 1) {
+        message ("splice_list does contain\n",
+             paste(splice_type), " continuing with processing\n")
+        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        message ("processing ",
+             paste(tissue_of_interest), " \n")
+        fromGTF             = a5ss_fromGTF_no_chrY
+        ijc                 = a5ss_jc_ijc_no_chrY
+        sjc                 = a5ss_jc_sjc_no_chrY
+        print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
                              splice_type, 
@@ -1623,15 +1649,20 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
                              sjc, 
                              obj, 
                              metadata )
+    }
     # mxe
-    splice_index        = 3
-    splice_type         = splice_list    [splice_index] 
-    tissue_of_interest  = tissue_list_m_f[tissue_index]
-    fromGTF             = mxe_fromGTF_no_chrY
-    metadata            = reduced_metadata_pData
-    ijc                 = mxe_jc_ijc_no_chrY
-    sjc                 = mxe_jc_sjc_no_chrY
-    print_exploratory_plots (plot, 
+    splice_type = "mxe_"
+    res = splice_list %in% splice_type
+    if (sum(res) == 1) {
+        message ("splice_list does contain\n",
+             paste(splice_type), " continuing with processing\n")
+        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        message ("processing ",
+             paste(tissue_of_interest), " \n")
+        fromGTF             = mxe_fromGTF_no_chrY
+        ijc                 = mxe_jc_ijc_no_chrY
+        sjc                 = mxe_jc_sjc_no_chrY
+        print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
                              splice_type, 
@@ -1641,15 +1672,20 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
                              sjc, 
                              obj, 
                              metadata )
+    }
     # ri
-    splice_index        = 4
-    splice_type         = splice_list    [splice_index] 
-    tissue_of_interest  = tissue_list_m_f[tissue_index]
-    fromGTF             = ri_fromGTF_no_chrY
-    metadata            = reduced_metadata_pData
-    ijc                 = ri_jc_ijc_no_chrY
-    sjc                 = ri_jc_sjc_no_chrY
-    print_exploratory_plots (plot, 
+    splice_type = "ri_"
+    res = splice_list %in% splice_type
+    if (sum(res) == 1) {
+        message ("splice_list does contain\n",
+             paste(splice_type), " continuing with processing\n")
+        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        message ("processing ",
+             paste(tissue_of_interest), " \n")
+        fromGTF             = ri_fromGTF_no_chrY
+        ijc                 = ri_jc_ijc_no_chrY
+        sjc                 = ri_jc_sjc_no_chrY
+        print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
                              splice_type, 
@@ -1659,24 +1695,30 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
                              sjc, 
                              obj, 
                              metadata )
+    }
     # se
-#    splice_index        = 5
-#    splice_type         = splice_list    [splice_index] 
-#    tissue_of_interest  = tissue_list_m_f[tissue_index]
-#    fromGTF             = se_fromGTF_no_chrY
-#    metadata            = reduced_metadata_pData
-#    ijc                 = se_jc_ijc_no_chrY
-#    sjc                 = se_jc_sjc_no_chrY
-#    print_exploratory_plots (plot, 
-#                             dup,
-#                             tissue_of_interest, 
-#                             splice_type, 
-#                             fromGTF, 
-#                             tissue_list, 
-#                             ijc, 
-#                             sjc, 
-#                             obj, 
-#                             metadata )
+    splice_type = "se_"
+    res = splice_list %in% splice_type
+    if (sum(res) == 1) {
+        message ("splice_list does contain\n",
+             paste(splice_type), " continuing with processing\n")
+        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        message ("processing ",
+             paste(tissue_of_interest), " \n")
+        fromGTF             = se_fromGTF_no_chrY
+        ijc                 = se_jc_ijc_no_chrY
+        sjc                 = se_jc_sjc_no_chrY
+        print_exploratory_plots (plot, 
+                              dup,
+                              tissue_of_interest, 
+                              splice_type, 
+                              fromGTF, 
+                              tissue_list, 
+                              ijc, 
+                              sjc, 
+                              obj, 
+                              metadata )
+    }
 }
 ```
 
