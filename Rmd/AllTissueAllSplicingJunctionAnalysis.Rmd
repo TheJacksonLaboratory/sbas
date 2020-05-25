@@ -1157,6 +1157,10 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
         pdf_sub_directory = '../pdf_no_dup_corr/'
         csv_directory = '../significant_events_no_dup_corr/'
     }
+    message("mkdir -p pdf_sub_directory")
+    system ("mkdir -p pdf_sub_directory")
+    message("mkdir -p csv_sub_directory")
+    system ("mkdir -p csv_sub_directory")
     
     filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                                      snakecase::to_snake_case(tissue_of_interest)),"-ijc-MDSplot-100.pdf")
@@ -1497,6 +1501,7 @@ metadata            = ocounts_metadata
 ijc                 = a3ss_jc_ijc_no_chrY
 sjc                 = a3ss_jc_sjc_no_chrY
 plot                = FALSE
+dup                 = FALSE
 obj                 = reduced_obj2
 
 for (tissue_index in 1:length(tissue_list_m_f)) {
@@ -1510,6 +1515,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     ijc                 = a3ss_jc_ijc_no_chrY
     sjc                 = a3ss_jc_sjc_no_chrY
     print_exploratory_plots (plot, 
+                             dup,
                              tissue_of_interest, 
                              splice_type, 
                              fromGTF, 
@@ -1527,6 +1533,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     ijc                 = a5ss_jc_ijc_no_chrY
     sjc                 = a5ss_jc_sjc_no_chrY
     print_exploratory_plots (plot, 
+                             dup,
                              tissue_of_interest, 
                              splice_type, 
                              fromGTF, 
@@ -1544,6 +1551,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     ijc                 = mxe_jc_ijc_no_chrY
     sjc                 = mxe_jc_sjc_no_chrY
     print_exploratory_plots (plot, 
+                             dup,
                              tissue_of_interest, 
                              splice_type, 
                              fromGTF, 
@@ -1561,6 +1569,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     ijc                 = ri_jc_ijc_no_chrY
     sjc                 = ri_jc_sjc_no_chrY
     print_exploratory_plots (plot, 
+                             dup,
                              tissue_of_interest, 
                              splice_type, 
                              fromGTF, 
@@ -1578,6 +1587,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
 #    ijc                 = se_jc_ijc_no_chrY
 #    sjc                 = se_jc_sjc_no_chrY
 #    print_exploratory_plots (plot, 
+#                             dup,
 #                             tissue_of_interest, 
 #                             splice_type, 
 #                             fromGTF, 
@@ -1600,13 +1610,13 @@ To use this snippet - set *test = `TRUE`*.
 # set test = FALSE to ignore
 
 test = TRUE
+dup  = FALSE
 if (test == TRUE) {
     splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
     tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
     splice_index        = 5
     tissue_index        = 21
     plot                = TRUE
-    dup                 = TRUE
     splice_type         = splice_list    [splice_index] 
     tissue_of_interest  = tissue_list_m_f[tissue_index]
     fromGTF             = se_fromGTF_no_chrY
