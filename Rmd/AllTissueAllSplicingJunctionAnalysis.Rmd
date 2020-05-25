@@ -1552,14 +1552,18 @@ To play with using or not using duplicate correlation, set *dup = `TRUE`* accord
 
 test = TRUE
 dup  = TRUE
+tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+tissue_list
+length(tissue_list)
+
 if (test == TRUE) {
     splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")
-    tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
+
     splice_index        = 5
     tissue_index        = 21
     plot                = TRUE
     splice_type         = splice_list    [splice_index] 
-    tissue_of_interest  = tissue_list_m_f[tissue_index]
+    tissue_of_interest  = tissue_list[tissue_index]
     fromGTF             = se_fromGTF_no_chrY
     metadata            = ocounts_metadata
     ijc                 = se_jc_ijc_no_chrY
@@ -1573,7 +1577,7 @@ if (test == TRUE) {
         paste(dim(sjc), collapse = "\n") )
     message("\nsjc\n", 
         paste(sjc[1:5,1:5], collapse = " ") )
-    tissue_list         = tissue_list_m_f
+    tissue_list         = tissue_list
     obj                 = reduced_obj2
     message("\nobj\n", 
         paste(dim(obj), collapse = "\n") )
@@ -1633,8 +1637,9 @@ Additional values set to enable this notebook to be executed as a nextflow workf
 
 
 ```{r}
-tissue_list_m_f     = levels(pData(reduced_obj2)$tissue)
-tissue_list_m_f
+tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+tissue_list
+length(tissue_list)
 ```
 
 ```{r}
@@ -1644,6 +1649,9 @@ splice_list  <- c("a3ss_","a5ss_","mxe_","ri_")
 
 # parameters that do not change with splice_type
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+tissue_list
+length(tissue_list)
+
 metadata     <- ocounts_metadata
 plot         <- FALSE
 dup          <- FALSE
@@ -1654,7 +1662,7 @@ obj          <- reduced_obj2
 # ijc
 # sjc
 
-for (tissue_index in 1:length(tissue_list_m_f)) {
+for (tissue_index in 1:length(tissue_list)) {
 
     # a3ss
     splice_type = "a3ss_"
@@ -1662,7 +1670,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        tissue_of_interest  = tissue_list[tissue_index]
         message ("processing ",
              paste(tissue_of_interest), " \n")
         fromGTF             = a3ss_fromGTF_no_chrY
@@ -1685,7 +1693,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        tissue_of_interest  = tissue_list[tissue_index]
         message ("processing ",
              paste(tissue_of_interest), " \n")
         fromGTF             = a5ss_fromGTF_no_chrY
@@ -1708,7 +1716,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        tissue_of_interest  = tissue_list[tissue_index]
         message ("processing ",
              paste(tissue_of_interest), " \n")
         fromGTF             = mxe_fromGTF_no_chrY
@@ -1731,7 +1739,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        tissue_of_interest  = tissue_list[tissue_index]
         message ("processing ",
              paste(tissue_of_interest), " \n")
         fromGTF             = ri_fromGTF_no_chrY
@@ -1754,7 +1762,7 @@ for (tissue_index in 1:length(tissue_list_m_f)) {
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        tissue_of_interest  = tissue_list_m_f[tissue_index]
+        tissue_of_interest  = tissue_list[tissue_index]
         message ("processing ",
              paste(tissue_of_interest), " \n")
         fromGTF             = se_fromGTF_no_chrY
