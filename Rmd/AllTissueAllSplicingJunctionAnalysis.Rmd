@@ -99,162 +99,162 @@ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 Did you remember to delete your private github token?  Now is a good time to do so, before you save your work and checkit in inadvertantly....
 
 ```{r}
-if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files("../rmats_counts/"))) {    
+if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files("../data/"))) {    
     # SE
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     # RI
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     # MXE
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     # A3SS
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
      # A5SS
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../rmats_counts/")
+        dest = "../data/")
 } 
 ```
 
@@ -262,38 +262,38 @@ if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files("../rmats_counts/"))) {
 
 ```{r}
 message("loading a3ss.jc.ijc rMATS 3.2.5 counts\n")
-a3ss.jc.ijc <- data.table::fread("../rmats_counts/rmats_final.a3ss.jc.ijc.txt.gz")
+a3ss.jc.ijc <- data.table::fread("../data/rmats_final.a3ss.jc.ijc.txt.gz")
 message("done!\n")
 message("loading a3ss.jc.sjc rMATS 3.2.5 counts\n")
-a3ss.jc.sjc <- data.table::fread("../rmats_counts/rmats_final.a3ss.jc.sjc.txt.gz")    
+a3ss.jc.sjc <- data.table::fread("../data/rmats_final.a3ss.jc.sjc.txt.gz")    
 message("done!\n")
 
 message("loading a5ss.jc.ijc rMATS 3.2.5 counts\n")
-a5ss.jc.ijc <- data.table::fread("../rmats_counts/rmats_final.a5ss.jc.ijc.txt.gz")    
+a5ss.jc.ijc <- data.table::fread("../data/rmats_final.a5ss.jc.ijc.txt.gz")    
 message("done!\n")
 message("loading a5ss.jc.sjc rMATS 3.2.5 counts\n")
-a5ss.jc.sjc <- data.table::fread("../rmats_counts/rmats_final.a5ss.jc.sjc.txt.gz")    
+a5ss.jc.sjc <- data.table::fread("../data/rmats_final.a5ss.jc.sjc.txt.gz")    
 message("done!\n")
 
 message("loading mxe.jc.ijc rMATS 3.2.5 counts\n")
-mxe.jc.ijc  <- data.table::fread("../rmats_counts/rmats_final.mxe.jc.ijc.txt.gz")    
+mxe.jc.ijc  <- data.table::fread("../data/rmats_final.mxe.jc.ijc.txt.gz")    
 message("done!\n")
 message("loading mxe.jc.sjc rMATS 3.2.5 counts\n")
-mxe.jc.sjc  <- data.table::fread("../rmats_counts/rmats_final.mxe.jc.sjc.txt.gz")    
+mxe.jc.sjc  <- data.table::fread("../data/rmats_final.mxe.jc.sjc.txt.gz")    
 message("done!\n")
 
 message("loading ri.jc.ijc rMATS 3.2.5 counts\n")
-ri.jc.ijc   <- data.table::fread("../rmats_counts/rmats_final.ri.jc.ijc.txt.gz")    
+ri.jc.ijc   <- data.table::fread("../data/rmats_final.ri.jc.ijc.txt.gz")    
 message("done!\n")
 message("loading ri.jc.sjc rMATS 3.2.5 counts\n")
-ri.jc.sjc   <- data.table::fread("../rmats_counts/rmats_final.ri.jc.sjc.txt.gz")    
+ri.jc.sjc   <- data.table::fread("../data/rmats_final.ri.jc.sjc.txt.gz")    
 message("done!\n")
 
 message("loading se.jc.ijc rMATS 3.2.5 counts\n")
-se.jc.ijc   <- data.table::fread("../rmats_counts/rmats_final.se.jc.ijc.txt.gz")    
+se.jc.ijc   <- data.table::fread("../data/rmats_final.se.jc.ijc.txt.gz")    
 message("done!\n")
 message("loading se.jc.sjc rMATS 3.2.5 counts\n")
-se.jc.sjc   <- data.table::fread("../rmats_counts/rmats_final.se.jc.sjc.txt.gz")
+se.jc.sjc   <- data.table::fread("../data/rmats_final.se.jc.sjc.txt.gz")
 message("done!\n")
 
 a3ss.jc.ijc[1:5,1:5]
@@ -1201,21 +1201,8 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     y_ijc_voom <- voom (y_ijc, design=design, plot=plot)
 
     Gender <- substring(sex,1,1)
-    if (dup == TRUE) {
-        pdf_sub_directory = '../pdf_dup_corr/'
-        csv_sub_directory = '../csv_dup_corr/'
-        message("mkdir -p pdf_sub_directory")
-        system ("mkdir -p '../pdf_dup_corr/'")
-        message("mkdir -p csv_sub_directory")
-        system ("mkdir -p '../csv_dup_corr/'")
-    } else {
-        pdf_sub_directory = '../pdf_no_dup_corr/'
-        csv_sub_directory = '../csv_no_dup_corr/'
-        message("mkdir -p pdf_sub_directory")
-        system ("mkdir -p '../pdf_no_dup_corr/'")
-        message("mkdir -p csv_sub_directory")
-        system ("mkdir -p '../csv_no_dup_corr/'")
-    }
+    pdf_sub_directory = '../pdf/'
+    csv_sub_directory = '../csv/'
     
     filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                                      snakecase::to_snake_case(tissue_of_interest)),"-ijc-MDSplot-100.pdf")
@@ -1621,22 +1608,6 @@ Additional values set to enable this notebook to be executed as a nextflow workf
     
     `splice_list       = c("a3ss_","a5ss_","mxe_","ri_")`
     
-   
-
-**output directories**
-
-### analysis results
-
-1. csv results will be either:
-
-   a. `../csv_no_dup` *when `dup == FALSE`*
-   b. `../csv_dup`    *when `dup == TRUE`*
-
-2. pdf results will be either:tissue_index -- enables this to run as a NextFlow notebook
- 
-   a. `../pdf_no_dup` *when `dup == FALSE`*
-   b. `../pdf_dup`    *when `dup == TRUE`*
-
 
 ```{r}
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
@@ -1660,7 +1631,7 @@ length(tissue_list)
 
 metadata     <- ocounts_metadata
 plot         <- FALSE
-dup          <- FALSE
+dup          <- TRUE
 obj          <- reduced_obj2
 
 # parameters that change with each splice type (3)
@@ -1789,7 +1760,7 @@ For replicability and reproducibility purposes, we also print the following meta
 
 ```{r}
 rm (notebookid)
-notebookid   = "AllTissueJunctionAnalysis"
+notebookid   = "AllTissueAllSplicingJunctionAnalysis"
 notebookid
 
 message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
