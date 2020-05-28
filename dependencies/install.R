@@ -1,6 +1,6 @@
 Sys.setenv(TAR = "/bin/tar")
 BiocManager::install(c( 'minfi','bumphunter' , 'GenomeInfoDb', 'GenomeInfoDbData', 'edgeR', 'statmod'))
-install.packages(c('doParallel', 'doRNG', 'foreach', 'stringi', 'pheatmap'), repo = 'https://cran.r-project.org')
+install.packages(c('doParallel', 'doRNG', 'foreach', 'stringi', 'pheatmap', 'R.utils'), repo = 'https://cran.r-project.org')
 devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0", upgrade="never")
 devtools::install_github("ropensci/piggyback@87f71e8", upgrade="never")
 install.packages("runjags", repos = "https://cran.r-project.org")
