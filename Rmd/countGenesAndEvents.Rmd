@@ -75,7 +75,10 @@ for (i in 1:length(files)) {
             ASE[i] <- "A3SS"
             Tissue[i] <- tissue
             idx <- match(event_idx, a3ss_annot$ID)
-            res <- data.frame(Tissue = tissue, ASE = "A3SS", 
+            res <- data.frame(GeneJunction = event,
+                              ASE = "A3SS", 
+                              ASE_IDX = idx,
+                              Tissue = tissue, 
                               GeneSymbol = a3ss_annot$geneSymbol[idx],
                               chr = a3ss_annot$chr[idx])
         }
@@ -84,7 +87,10 @@ for (i in 1:length(files)) {
             ASE[i] <- "A5SS"
             Tissue[i] <- tissue
             idx <- match(event_idx, a5ss_annot$ID)
-            res <- data.frame(Tissue = tissue, ASE = "A5SS", 
+            res <- data.frame(GeneJunction = event,
+                              ASE = "A5SS", 
+                              ASE_IDX = idx,
+                              Tissue = tissue, 
                               GeneSymbol = a5ss_annot$geneSymbol[idx],
                               chr = a5ss_annot$chr[idx])
         }
@@ -93,7 +99,10 @@ for (i in 1:length(files)) {
             tissue <- gsub("mxe_","", tissue, fixed = TRUE)
             Tissue[i] <- tissue
             idx <- match(event_idx, a3ss_annot$ID)
-            res <- data.frame(Tissue = tissue, ASE = "MXE", 
+            res <- data.frame(GeneJunction = event,
+                              ASE = "MXE", 
+                              ASE_IDX = idx,
+                              Tissue = tissue, 
                               GeneSymbol = mxe_annot$geneSymbol[idx],
                               chr = mxe_annot$chr[idx])
         }
@@ -102,7 +111,10 @@ for (i in 1:length(files)) {
             tissue <- gsub("se_","", tissue, fixed = TRUE)
             Tissue[i] <- tissue
             idx <- match(event_idx, se_annot$ID)
-            res <- data.frame(Tissue = tissue, ASE = "SE", 
+            res <- data.frame(GeneJunction = event,
+                              ASE = "SE", 
+                              ASE_IDX = idx,
+                              Tissue = tissue, 
                               GeneSymbol = se_annot$geneSymbol[idx],
                               chr = se_annot$chr[idx])
         }
@@ -111,7 +123,10 @@ for (i in 1:length(files)) {
             tissue <- gsub("ri_","", tissue, fixed = TRUE)
             Tissue[i] <- tissue
             idx <- match(event_idx, ri_annot$ID)
-            res <- data.frame(Tissue = tissue, ASE = "RI", 
+            res <- data.frame(GeneJunction = event,
+                              ASE = "RI", 
+                              ASE_IDX = idx,
+                              Tissue = tissue, 
                               GeneSymbol = ri_annot$geneSymbol[idx],
                               chr = a3ss_annot$chr[idx])
         }
@@ -123,28 +138,150 @@ for (i in 1:length(files)) {
 message ("\nDone reading significant events!\n")
 ```
 
+### Glimpse into what we have
+
 ```{r}
+glimpse(gene_as)
+table(is.na(gene_as$Tissue))
+colnames(gene_as)
+write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 head(gene_as)
-tail(gene_as)
-dim(gene_as)
-data <- data.frame(Tissue = Tissue, ASE = ASE, Counts = counts)
-head(data)
-tail(data)
-dim(data)
 ```
 
 ```{r}
-# Count most frequent spliced genes
-res <- gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+res <-   dplyr::group_by(gene_as, Tissue, GeneJunction, GeneSymbol)
+res2 <- res %>%
+        group_by(Tissue,ASE) %>%
+        count(Tissue,GeneSymbol) %>%
+        arrange(desc(n)) %>%
+        as.data.frame()
+
+res3 <- gene_as %>%
+        group_by(GeneJunction, ASE) %>%
+        count(GeneJunction, ASE) %>%
+        arrange(desc(n)) %>% 
+        as.data.frame()
+
+head(res3,50)
+#   count(Tissue, GeneSymbol) %>%
+#   arrange(desc(n)) %>%
+#dim(res2) 
+#genes <- as.character(unique(gene_as$GeneSymbol))
+#length(genes)
+#genes.o <- genes[order(genes)]
+#sum(length(unique_genes))
+#sum(res2[res2$GeneSymbol == "XIST",]$n)
+```
+
+### Count splicing event by chromosome
+
+```{r}
+res <- gene_as          %>% 
+       group_by(chr)    %>% 
+       count(chr)       %>% 
+       arrange(desc(n)) %>% 
+       as.data.frame()
+res$chr <- factor(res$chr, levels = res$chr)
+length(res$chr)
+res
+glimpse(res)
+write.table(res, file= "../data/Totals_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
+```
+
+###  Count most frequent spliced genes 
+
+```{r}
+res <- gene_as %>% 
+       group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
 res$GeneSymbol <- factor(res$GeneSymbol, levels = res$GeneSymbol)
 length(res$GeneSymbol)
+head(res)
+write.table(res, file = "../data/Totals_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
 ```
 
 ```{r}
-res2 <- data %>% group_by(Tissue) %>% 
-    summarise(Total = sum(Counts)) %>%
-    arrange(desc(Total)) %>%
-    as.data.frame()
+
+```
+
+
+
+
+### Count most frequent splicing by tissue
+
+```{r}
+res <- gene_as %>% 
+       group_by(Tissue) %>% 
+       count(Tissue) %>% 
+       arrange(desc(n)) %>% 
+       as.data.frame()
+res$Tissue <- factor(res$Tissue, levels = res$Tissue)
+length(res$Tissue)
+res
+write.table(res, file = "../data/Totals_by_tissue.tsv", sep = "\t", row.names = F)
+```
+
+###  Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
+
+Our starting values were the significant events, all meeting the criteria FC > 1.5 and pVal < 0.05
+
+
+```{r}
+res <- gene_as %>% group_by(ASE) %>% count(ASE) %>% arrange(desc(n)) %>% as.data.frame()
+res$ASE <- factor(res$ASE, levels = res$ASE)
+head(res)
+write.table(res, file= "../data/Totals_by_splicingtype.tsv")
+```
+
+###  Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
+
+```{r}
+A3SS_keep <- as.character(gene_as$ASE) %in% "A3SS"
+table(A3SS_keep)
+A3SS.gene_as <- data.frame(A3SS.gene_as[A3SS_keep == TRUE,])
+
+A5SS_keep <- as.character(gene_as$ASE) %in% "A5SS"
+table(A5SS_keep)
+A5SS.gene_as <- data.frame(A5SS.gene_as[A5SS_keep == TRUE,])
+
+MXE_keep  <- as.character(gene_as$ASE) %in% "MXE"
+table(MXE_keep)
+MXE.gene_as <- data.frame(MXE.gene_as[MXE_keep == TRUE,])
+
+SE_keep   <- as.character(gene_as$ASE) %in% "SE"
+table(SE_keep)
+SE.gene_as <- data.frame(SE.gene_as[SE_keep == TRUE,])
+
+RI_keep   <- as.character(gene_as$ASE) %in% "RI"
+table(RI_keep)
+RI.gene_as <- data.frame(RI.gene_as[RI_keep == TRUE,])
+
+dim(A3SS.gene_as)
+dim(A5SS.gene_as)
+dim(MXE.gene_as)
+dim(SE.gene_as)
+dim(RI.gene_as)
+
+```
+
+```{r}
+A3SS.res <- A3SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+A3SS.res$GeneSymbol <- factor(A3SS.res$GeneSymbol, levels = A3SS.res$GeneSymbol)
+length(res$GeneSymbol)
+head(res)
+
+#A3SS.res <- A3SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+#A3SS.res$GeneSymbol <- factor(A3SS.res$GeneSymbol, levels = A3SS.res$GeneSymbol)
+head(A3SS.res)
+```
+
+```{r}
+glimpse(data)
+
+res2 <- data             %>% 
+        group_by(Tissue) %>% 
+        summarise(Total = sum(Counts)) %>% 
+        arrange(desc(Total)) %>% as.data.frame()
+glimpse(res2)
 ```
 
 ```{r}
@@ -217,48 +354,65 @@ legend(1.5, 0.5, c("1 tissue","2-5 tissues","> 5 tissues"), cex=1.2,
        fill=colors)
 ```
 
+### Count most frequent spliced chromosomes
+To get an indication of which chromosome has the most frequent slicing event (regardless of type)
+We create an index based upon the number of exons per chromosome.
+
+get the annotation file, at this writing, gencode.v30.annotation.gtf
+The information as to the number of exons within the chromosome may be found there
+
 ```{r}
-getwd()
+message("getting the annotation file used in the analysis\n")
 setwd("../data")
-getwd()
 system("wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
 system("gunzip gencode.v30.annotation.gtf.gz")
-getwd()
 setwd("../jupyter")
-getwd()
+message("done\n")
 ```
+
+Import the gencode annotation file and extract the exon information
 
 ```{r}
 # Number of splicing events normalized per chromosome
 library(rtracklayer)
-
 gencode <- import.gff("../data/gencode.v30.annotation.gtf")
-```
-
-```{r}
 exons <- gencode[ gencode$type == "exon", ]
 exons <- as.data.frame(exons)
 ```
 
+Obtain chromosomes we have splicing information for (recall we did not use chr Y in our analysis
+
 ```{r}
 all_chr <- as.character(unique(gene_as$chr))
 chr_counts <- rep(0, length(all_chr))
+exon_counts <- data.frame(chr = all_chr, counts = chr_counts)
 ```
+
+
 
 ```{r}
 for (i in 1:length(all_chr)) {
   chr_counts[i] <- nrow(exons[exons$seqnames == all_chr[i], ])
 }
+glimpse (chr_counts)
 ```
 
 ```{r}
-exon_counts <- data.frame(chr = all_chr, counts = chr_counts)
-```
-
-```{r}
-# Count most frequent spliced chromosomes
 res <- gene_as %>% group_by(chr) %>% count(chr) %>% arrange(desc(n)) %>% as.data.frame()
+glimpse(res)
 res$chr <- factor(res$chr, levels = res$chr)
+idx <- match(res$chr, exon_counts$chr)
+res$ExonCounts <- exon_counts$counts[idx]
+res$Index <- res$n / res$ExonCounts) * 1000
+res_sorted <- res %>% arrange(desc(Index))
+```
+
+```{r}
+
+```
+
+```{r}
+
 ```
 
 ```{r}
@@ -300,7 +454,6 @@ ggplot(res_sorted, aes(x = chr, y = Index, size = n)) +
 ```
 
 ```{r}
-write.table(res2,       file = "../data/Totals_by_tissue.tsv", sep = "\t", row.names = F)
 write.table(data,       file = "../data/Significant_events.tsv", sep = "\t", row.names = F, quote = F)
 write.table(res_sorted, file = "../data/SplicingIndex_chr.tsv", sep = "\t", quote = F, row.names = F)
 ```

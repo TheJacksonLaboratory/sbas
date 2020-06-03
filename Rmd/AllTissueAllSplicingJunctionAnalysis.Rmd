@@ -80,6 +80,16 @@ library(tibble)
 library(R.utils)
 ```
 
+## Nextflow execution parameter execution
+
+Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
+
+
+```{r}
+# parameters for nextflow execution of notebook
+tissue_index = 1
+```
+
 <!-- #region -->
 ## Analysis 
 
@@ -1196,6 +1206,9 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
         paste(dim(sjc.dm), collapse = " ") )
     message("\n")
     
+        
+    
+    
     for (i in (1:length(metadata_samples))) {
         sample = metadata_tissue[i,]$SAMPID
         sample_sex = pData(tissue_count_obj)$SEX[pData(tissue_count_obj)$SAMPID == sample]
@@ -1551,12 +1564,6 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
 }
 ```
 
-#### Testing Snippet
-
-To use this snippet - set *test = `TRUE`*.
-To play with using or not using duplicate correlation, set *dup = `TRUE`* accordingly.
-
-
 ## Execution of All Tissues and All Splicing Variants
 
 Additional values set to enable this notebook to be executed as a nextflow workflow or to run in place with appropriate settings.
@@ -1609,7 +1616,7 @@ obj          <- reduced_obj2
 # ijc
 # sjc
 
-for (tissue_index in 1:length(tissue_list)) {
+#for (tissue_index in 1:length(tissue_list)) {
 
     # a3ss
     splice_type = "a3ss_"
@@ -1715,7 +1722,7 @@ for (tissue_index in 1:length(tissue_list)) {
                               obj, 
                               metadata )
     }
-}
+#}
 ```
 
 ## Metadata
