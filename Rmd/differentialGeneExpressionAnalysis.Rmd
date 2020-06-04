@@ -1,0 +1,567 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.2
+  kernelspec:
+    display_name: R
+    language: R
+    name: ir
+---
+
+# Differential Gene Expression Analysis
+
+This notebook generates the sex-biased differential gene expression analysis.   Differential Analysis (DE) was performed using voom (Law et.al., 2014) with gene expression counts with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma. 
+
+Within each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression:
+
+
+           y = B0 + B1 sex + epsilon (error)
+           
+
+where y is the gene expression to be modeled sex denotes the reported sex of the subject.   The function named `fit_tissue()` performs this analysis and accepts two arguments, the `tissue` and an `object` and create the **model matrix** based  that tissue's sex. We will perform a linear fit after calculating normal factors (based on the library size) and calculate the dispersion using `voom` (mean variance model of dispersion). We are saving the resulting matrixes as files.
+
+
+## 1. Introduction:  Running this notebook:
+
+A few steps are needed before you can run this document on your own. The GitHub repository (https://github.com/TheJacksonLaboratory/sbas) of the project contains detailed instructions for setting up the environment in the **`dependencies/README.md`** document. Before starting with the analysis, make sure you have first completed the dependencies set up by following the instructions described there. If you have not done this already, you will need to close and restart this notebook before running it.
+
+All paths defined in this Notebook are relative to the parent directory (repository). 
+
+Next - you could execute the entire notebook and it will generate output to both `../data` and diagnostic plots to `../pdf`.
+
+### 1.1 Input
+
+#### 1.1.1 SraRunTable.txt.gz 
+This is the SRR run metadata manifest from the dbGaP.   This is released as part of this code release and accessible using `piggyback` from `github` with the users own `github` token.
+
+#### 1.1.2 gtex.rds 
+This is generated from a forked version of yarn, explained in detail in section `1.2`.  It is an edgeR expressionSet object.   This object is built using `yarn` and R package. 
+
+### 1.2 Process
+
+Using `EdgeR`, an `expressionSet object` is built, normalization factors are calculated with `calcNormFactors`, variance is modeled using mean-variance method using `Limma`'s `voom`.   A linear model is built to model the `sex-biased` differences.  Diagnostic plots and differential gene expression analysis results reported.  The function that accomplishes this step is `fit_tissue` and carried out in section 5.
+
+### 1.3 Output
+
+For each tissue, as selected and specified in the tissues.tsv file found in the `../assets` directory.  The following files are produced:
+
+#### 1.3.1 `tissue`_DGE.csv
+
+This file contains the `topTable` results, reporting the `ENSG`- gene identification,`logFC` - log fold change, `AveExpr`, `t` - the model result for the sex-bias (see section 2, `P.Value`, `adj.P.Val` - bon, and `B (FDR)`.
+
+#### 1.3.2 `tissue`_refined.csv
+
+This are the values that are differentially expressed with results that are 1.5 fold change greater than the mean and with a p-value of less than 0.05.
+
+#### 1.3.3 `tissue`_ensg_map.csv
+
+This is the mapping using `gprofiler` of the `ENSG` identifiers to their `geneSymbols` for ease of filtering prior to creating the linear model of the junctions in the computational step for the differential alternative splicing is completed.
+
+
+## 2. Setup
+### 2.1 Loading dependencies
+
+```{r}
+library(gprofiler2)
+library(downloader)
+library(readr)
+library(edgeR)
+library(biomaRt)
+library(DBI) # v >= 1.1.0 required for biomaRt
+library(devtools)
+library(yarn)
+library(statmod)
+library(piggyback)
+library(snakecase)
+library(stringr)
+library(pheatmap)
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(viridis)
+library(scales)
+
+Sys.setenv(TAR = "/bin/tar") # for gzfile
+```
+
+### 2.2 Retrieving the GTEx archive
+
+We used the R package [yarn](https://bioconductor.org/packages/release/bioc/html/yarn.html) to retrieve the GTEx Biobank data. In order to download the latest GTEx version (8.0) for RNA-seq and genotype data (phs000424.v8.v2), released 2019-08-26, we created a fork of the package's GitHub repository and created a new version of the function **`yarn::downloadGTEx()`**, namely **`yarn::downloadGTExV8()`** to download this release. 
+
+We used the function to perform quality control, gene filtering and normalization pre-processing on the GTEx RNA-seq data. This pipeline tested for sample sex-misidentification, merged related sub-tissues and performed tissue-aware normalization using the **`{yarn::qsmooth}`**  function ([Paulson et al, 2017](https://pubmed.ncbi.nlm.nih.gov/28974199/)).
+
+We have archived the output of the **`yarn::downloadGTExV8()`** function, which is an `ExpressionSet` object in the repo `lifebitai/lifebitCloudOSDREgtex` for replicability and decreasing the runtime of this analysis. Below we retrieve this `gtex.rds` object from the GitHub releases using the **`{ropensci/piggyback}`** package, but we have also added the relevant command to retrieve the data from GTEx and generate the `ExpressionSet` object using  **`yarn::downloadGTExV8()`**. For the current analysis we are utilising a compute resource with 8 vCPUs and 60 GB of memory available.
+
+You need to set your github token
+Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
+
+
+```{r}
+ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
+```
+
+Did you remember to remove the token
+
+#### Download with yarn, if the data are not already in your repository
+
+
+```{r}
+# Download with yarn if you wish, this requires several minutes to complete
+if (!("gtex.rds" %in% list.files("../data/"))) {
+    message("Downloading GTEx v8 with 'yarn::downloadGTExV8()'")
+    obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+    message("Done!")
+
+} else {
+# Load with readRDS() if gtex.rds available in data/
+    message("Loading GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
+    obj <- readRDS(file = "../data/gtex.rds")
+    message("Done!\n")
+    message("Generating sha256sum for gtex.rds ..\n")    
+    message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+    message("Done!\n")
+} 
+# Confirm that it is an expression set.
+# and check the dimensions of the objects, and the phenotype information of the objects
+class(obj) 
+dim(phenoData(obj))
+dim(obj)
+```
+
+### 2.3 download the Annotation file saved from getting the GTEx Fastq's
+
+This is the annotation file as organized by dbGaP, we use yarn as the annotations for sex have been noted to be incorrect.
+This file and the object from yarn will be joined in this way the differences can be noted, and managed.
+
+```{r}
+# If the SraRunTable from SRA's dbGaP not already in our directories, download with SraRunTable.noCram.noExome.noWGS.totalRNA.txt.gz 
+# the annotations in this file have errors -- so for the samples we will use the yarn annotations
+if (!("SraRunTable.txt.gz" %in% list.files("../data/"))) {
+    piggyback::pb_download(
+        repo = "TheJacksonLaboratory/sbas", 
+        file = "SraRunTable.txt.gz",
+        tag  = "GTExV8.v1.0", 
+        dest = "../data/")
+    metadata          <- data.table::fread("../data/SraRunTable.txt.gz")
+} else {
+    metadata          <- data.table::fread("../data/SraRunTable.txt.gz")
+    
+}
+```
+
+### 2.4: Quality control, preprocessing of data 
+
+We observed above that our phenotype data have 2 more observations than our expression data. Let's inspect what these samples are:
+
+```{r}
+sample_names=as.vector(as.character(colnames(exprs(obj))))
+pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
+length(pheno_sample_names)
+length(sample_names)
+
+if (length(pheno_sample_names) > length(sample_names)) {
+    superset <- pheno_sample_names
+    subset   <- sample_names    
+} 
+
+if (length(pheno_sample_names) < length(sample_names)) {
+    superset <- sample_names
+    subset   <- pheno_sample_names   
+} 
+
+non_overlaps <- setdiff( superset, subset)
+
+message("The non-overlapping IDs between pheno and count data are:\n\n", 
+        paste(non_overlaps, collapse = "\n") )
+logical_match_names=superset %in% subset
+length(logical_match_names)
+table(logical_match_names)
+pData(obj) <- (pData(obj)[logical_match_names==TRUE,])
+dim(pData(obj))
+dim(obj)
+```
+
+#### 2.4.2   Replace all *dashes* with **dots "."**
+
+```{r}
+pData(obj)$SAMPID[1]
+pData(obj)$SAMPID <- gsub('-','\\.',pData(obj)$SAMPID)
+pData(obj)$SAMPID[1]
+```
+
+#### 2.4.3   Synchronize Clinical Annotations and Accession Run, reducing to only tissues of interest
+
+Join the yarn metadata with the metadata we have (there are redundant samples that have been sequenced multiple times). We want to be sure that we can obtain all required Clinical Annotation information from the YARN GTEx Annotation information, as the SRA metadata is not as reliable.    This will be a one-to-many mapping, as there are multiple sequence runs per 69 samples -- expanding our data set.  There are only a handful of annotations we require: SEX, AGE, DTHHRDY (which is cause of death), SMCENTER.
+
+Note that the numbers in specific age groups expand because of the one to many relationship from sample to sequencing runs. 
+
+Using results from analysis of number of samples stored in `tissues.tsv` we keep only those that are members of this reduced tissue list.
+
+```{r}
+# read in all requirements so that the stage is properly set -- 
+# if it is clear here -- it will remain clear for the rest of the time
+# tissues.tsv contains the subset of files desired for analysis.
+tissue_reduction <- read.table(file="../assets/tissues.tsv", header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
+
+message("\nsize tissue_reduction\n",
+        paste(dim(tissue_reduction), collapse=" "))
+message("\nsize obj\n",
+        paste(dim(obj)), collapse="\n")
+message("\nsize pData(obj)\n",
+        paste(dim(pData(obj)), collapse=" "))
+
+# only include those tissues we wish to continue with
+table(tissue_reduction$include)
+tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
+
+# create a matching tissue name to go with the expressionSet phenotype object
+pData(obj)$SMTSD       <- factor(snakecase::to_snake_case(as.character(pData(obj)$SMTSD)))
+tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+
+message("\nlength tissues in phenotype data\n",
+        paste(length(levels(pData(obj)$SMTSD)), collapse = " "))
+message("\nlength tissues in tissue_reduction data\n",
+        paste(length(tissue_reduction$SMTSD), collapse = " "))
+
+keep <- pData(obj)$SMTSD %in% tissue_reduction$SMTSD
+message("\nlength tissue in samples phenotype data\n",
+        paste(length(pData(obj)$SMTSD), collapse = " "))
+message("\nlength keep obj \n",
+        paste(length(keep), collapse = " "))
+message("\nhow many to keep in phenotype data\n",
+        paste(table(keep), collapse = " "))
+
+# both obj and pData(obj) need to be adjusted
+reduced_obj        <- obj       [          ,keep==TRUE]
+pData(reduced_obj) <- pData(obj)[keep==TRUE,          ]
+rm(keep)
+message("\nsize reduced_obj\n",
+        paste(dim(reduced_obj)), collapse=" ")
+message("\nsize pData(reduced_obj)\n",
+        paste(dim(pData(reduced_obj)), collapse=" "))
+message("\nlength tissues in phenotype data\n",
+        paste(length(levels(pData(reduced_obj)$SMTSD)), collapse = " "))
+
+# test to make sure we don't have nonsense
+keep = pData(reduced_obj)$SMTSD== "breast_mammary_tissue"
+message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
+        paste(table(keep), collapse = " "))
+tobj        = reduced_obj       [          ,keep==TRUE]
+pData(tobj) = pData(reduced_obj)[keep==TRUE,          ]
+message("\nTEST: size breast_mammary_tissue obj:tobj\n",
+        paste(dim(tobj), collapse=" "))
+message("\nTEST: size phenotype object pData(tobj)\n",
+        paste(dim(pData(tobj)), collapse=" "))
+pData(tobj)[1,]
+rm(keep)
+# end test
+```
+
+#### 2.4.4 Synchronize accession metadata and phenotype data
+A kind of transitive closure.   Metadata links the count data to the phenotype data.
+Begin with synchronizing accession metadata and phenotype data - which has been reduced - `reduced_obj` inputs here 
+
+```{r}
+# let's limit the phenotype object and then align the metadata file
+# input assumption is expressionSet object is now `reduced_obj`
+metadata <- data.table::fread("../data/SraRunTable.txt.gz")
+metadata$SAMPID           <- gsub('-','\\.',metadata$'Sample Name')
+pData(reduced_obj)$SAMPID <- gsub('-','\\.',pData(reduced_obj)$SAMPID)
+
+message("\nsize accession SraRunTable \n",
+        paste(dim(metadata), collapse=" "))
+message("\nsize reduced_obj\n",
+        paste(dim(reduced_obj), collapse=" "))
+message("\nsize pData(reduced_obj)\n",
+        paste(dim(pData(reduced_obj)), collapse=" "))
+rownames(pData(reduced_obj))<- pData(reduced_obj)$SAMPID
+
+# keep only those runs (as epitomized by the metadata_samples) in the phenotype set
+metadata_samples   <- as.character(metadata$SAMPID)
+phenotype_samples  <- as.character(pData(reduced_obj)$SAMPID)
+
+# any undefined (N/A) sample names? These results will be zero
+message("\n any undefined (NA) sample names?\n",
+        paste(sum(is.na(metadata_samples)), collapse=" "))
+message("\n any undefined (NA) sample names?\n",
+        paste(sum(is.na(phenotype_samples)), collapse=" "))
+
+keep <- phenotype_samples %in% metadata_samples
+message("\nlength keep metadata samples in phenotype samples \n",
+        paste(length(keep), collapse = " "))
+message("\nhow many to keep in phenotype obj\n",
+        paste(table(keep), collapse = " "))
+
+reduced_obj2        <- reduced_obj       [          ,keep==TRUE]
+pData(reduced_obj2) <- pData(reduced_obj)[keep==TRUE,          ]
+message("\nsize reduced_obj2\n",
+        paste(dim(reduced_obj2), collapse=" "))
+message("\nsize pData(reduced_obj2)\n",
+        paste(dim(pData(reduced_obj2)), collapse=" "))
+
+# test to make sure we don't have nonsense
+keep = pData(reduced_obj2)$SMTSD == "breast_mammary_tissue"
+message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
+        paste(table(keep), collapse = " "))
+tobj        = reduced_obj2       [          ,keep==TRUE]
+pData(tobj) = pData(reduced_obj2)[keep==TRUE,          ]
+message("\nTEST: size breast_mammary_tissue obj:tobj\n",
+        paste(dim(tobj), collapse=" "))
+message("\nTEST: size phenotype object pData(tobj)\n",
+        paste(dim(pData(tobj)), collapse=" "))
+pData(tobj)[1,]
+rm(keep)
+# end test
+
+# now go the other way - make sure the metadata samples are in sync with the phenotype samples
+# note that we are now with `reduced_obj2`
+metadata_samples   <- as.character(metadata$SAMPID)
+phenotype_samples  <- as.character(pData(reduced_obj2)$SAMPID)
+message("\nlength of metadata_samples\n",
+        paste(length(metadata_samples), collapse=" "))
+message("\nlength of phenotype_samples\n",
+        paste(length(phenotype_samples), collapse=" "))
+message("\ndimension of metadata\n",
+        paste(dim(metadata), collapse=" "))
+keep <- metadata_samples %in% phenotype_samples
+message("\nlength keep phenotype samples in metadata samples \n",
+        paste(length(keep), collapse = " "))
+message("\nhow many to keep in metadata samples\n")
+
+reduced_metadata <- metadata[keep==TRUE,]
+message("\ndimension of reduced_metadata\n",
+        paste(dim(reduced_metadata), collapse=" "))
+rm(keep)
+
+# test to make sure we don't have nonsense
+keep = pData(reduced_obj2)$SMTSD== "breast_mammary_tissue"
+message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
+        paste(table(keep), collapse = " "))
+tobj        = reduced_obj2       [          ,keep==TRUE]
+pData(tobj) = pData(reduced_obj2)[keep==TRUE,          ]
+message("\nTEST: size breast_mammary_tissue obj:tobj\n",
+        paste(dim(tobj), collapse=" "))
+message("\nTEST: size phenotype object pData(tobj)\n",
+        paste(dim(pData(tobj)), collapse=" "))
+pData(tobj)[1,]
+rm(keep)
+
+breast_metadata_samples   <- as.character(reduced_metadata$SAMPID)
+breast_phenotype_samples  <- as.character(pData(tobj)$SAMPID)
+keep = breast_metadata_samples %in% breast_phenotype_samples
+table(keep)
+message("\nTEST: how many breast_mammary_tissue samples in reduced_metadata\n",
+        paste(table(keep), collapse = " "))
+breast_samples <- reduced_metadata[keep,]
+message("\nTEST: number reduced_metadata breast_samples\n",
+        paste(length(breast_samples$SAMPID), collapse=" "))
+message("\nTEST: number phenotype obj breast_samples\n",
+        paste(length(pData(tobj)$SAMPID), collapse=" "))
+breast_samples[1,]
+# end test
+
+```
+
+## 3.  Differential Expression using `edgeR`
+
+
+###  3.1  For each tissue, model gene expression by tissue
+
+Differential Analysis (DE) was performed using voom (Law et.al., 2014) with gene expression counts with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma. 
+
+Within each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression:
+
+
+           y = B0 + B1 sex + epsilon (error)
+           
+
+where y is the gene expression to be modeled sex denotes the reported sex of the subject
+
+
+###   3.2 remove all zero rows
+
+expressionSet object is now `reduced_obj3`
+
+```{r}
+y_rowsums <- rowSums(exprs(reduced_obj2))
+is_zero   <- y_rowsums == 0
+table(is_zero)
+
+reduced_obj3  <- reduced_obj2[is_zero==FALSE,]
+
+dim(reduced_obj3)
+dim(pData(reduced_obj3))
+dim(exprs(reduced_obj3))
+```
+
+### 4. Separate the data by male and by female
+
+```{r}
+reduced_male   <- pData(reduced_obj3)$SEX==1
+reduced_female <- pData(reduced_obj3)$SEX==2
+```
+
+```{r}
+reduced_obj_male   <- reduced_obj3[,reduced_male==TRUE]
+reduced_obj_female <- reduced_obj3[,reduced_female==TRUE]
+```
+
+```{r}
+dim(reduced_obj_male)
+dim(reduced_obj_female)
+```
+
+```{r}
+tissue_groups_male <- factor(pData(reduced_obj_male)$SMTSD)
+tissue_groups_female <- factor(pData(reduced_obj_female)$SMTSD)
+```
+
+### 5. Differential gene analysis on a per tissue basis.
+Loop through the tissues and for those tissues that are shared between the two sexes perform the analysis
+
+```{r}
+tissue_groups <- factor(pData(reduced_obj3)$SMTSD)
+tissue_male_female <- tissue_groups_male %in% tissue_groups_female
+table(tissue_male_female)
+tissue_shared_male_female <- factor(tissue_groups_male[tissue_male_female])
+table(tissue_shared_male_female)
+# SEX is coded 1 == Male
+#              2 == Female
+sex = factor(pData(reduced_obj3)$SEX)
+```
+
+Let's now define a function named `fit_tissue()`that accepts two arguments, the `tissue` and an `object` and create the **model matrix** based  that tissue's sex. We will perform a linear fit after calculating normal factors (based on the library size) and calculate the dispersion using `voom` (mean variance model of dispersion). We are saving the resulting matrixes as files.
+
+
+```{r}
+fit_tissue <- function (tissue, obj) {
+    tissue_true             <- pData(obj)$SMTSD == tissue
+    tissue_obj              <- obj[,tissue_true ==TRUE]
+    tissue_sex              <- factor(pData(tissue_obj)$SEX)
+    tissue_design           <- model.matrix(~tissue_sex)
+    colnames(tissue_design) <- c("intercept","sex")
+    
+    y_tissue       <- DGEList(counts=exprs(tissue_obj), group=tissue_sex)
+    y_tissue       <- calcNormFactors(y_tissue, method = "RLE")
+    y_tissue_voom  <- voom(y_tissue, tissue_design)
+    
+    sex            <- ifelse(pData(tissue_obj)$SEX==1,'male','female')
+    Gender         <- substring(sex,1,1)
+    filename       <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue)),"-gene-y-MDSplot-100.pdf")
+    pdf (filename)
+        plotMDS(y_tissue, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+                gene.selection="common")
+    dev.off()
+    filename       <- paste0(paste0("../pdf/", snakecase::to_snake_case(tissue)),"-gene-y-voom-MDSplot-100.pdf")
+    pdf (filename)    
+        plotMDS(y_tissue_voom, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+                gene.selection="common")
+    dev.off()
+
+    fit_tissue      <- lmFit(y_tissue_voom, tissue_design)
+    fit_tissue      <- eBayes(fit_tissue, robust=TRUE)
+    results_tissue  <- topTable (fit_tissue, coef='sex', number=nrow(y_tissue))
+    results_refined <- results_tissue$adj.P.Val <= 0.05 & abs(results_tissue$logFC) >= abs(log2(1.5))
+    
+    
+    filename  = paste(paste("../data",gsub(" ","",tissue), sep="/"),"DGE.csv", sep="_")
+    rfilename = paste(paste("../data",gsub(" ","",tissue), sep="/"),"DGE_refined.csv", sep="_")
+    ensgfile  = paste(paste("../data",gsub(" ","",tissue), sep="/"),"DGE_ensg_map.csv", sep="_")
+  
+    ensg_names <- as.character(rownames(results_tissue[results_refined,]))
+    ensg_genes <- ensg_names
+    for (i in (1:length(ensg_names))) {
+        dont_convert = 0
+        ensg <- as.character(strsplit(ensg_names[i],'\\.\\w+$'))
+        ensg_names[i] = ensg[1]
+        if (ensg_names[i] == "ENSG00000233864") {
+            ensg_genes[i] = as.character("TTTY15")
+            dont_convert = 1
+        } 
+        if (ensg_names[i] == "ENSG00000240800") {
+            ensg_genes[i] = as.character("ATP8A2P1")
+            dong_convert = 1
+        } 
+        if (!dont_convert) {
+            
+            res <- gconvert(c(as.character(ensg_names[i])),
+                                      organism = "hsapiens",
+                                      target = "ENSG",
+                                      numeric_ns = "", 
+                                      mthreshold = Inf,
+                                      filter_na = TRUE)
+            if (!is.null(res)) {
+                ensg_genes[i] <- res$name
+            }
+        }
+    }
+    ensg_maps <- cbind(ensg_names, ensg_genes)
+    write.table(results_tissue, filename, sep=',', quote=FALSE)
+    write.table(results_tissue[results_refined,], rfilename, sep=',', quote=FALSE)
+    write.table(ensg_maps, ensgfile, sep=',', quote=FALSE, row.names=FALSE)
+    return (results_tissue)
+}
+```
+
+```{r}
+# TEST: use this piece for code changes
+# TEST: tissue <- factor('breast_mammary_tissue')
+# TEST: all_logFC <- lapply(X=levels(tissue), FUN=fit_tissue, obj=reduced_obj3)
+# 
+#  Production run - uncomment below
+all_logFC <- lapply(X=levels(tissue_shared_male_female), FUN=fit_tissue, obj=reduced_obj3)
+
+
+```
+
+```{r}
+dim(reduced_obj3)[2]
+length(levels(tissue_shared_male_female))
+```
+
+### 6 Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+#### 6.1. Checksums with the sha256 algorithm
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+```{r}
+figure_id   = "differentialGeneExpression"
+
+message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
+system(paste0("cd ../data && find . -type f -exec sha256sum {} \\;  >  ../metadata/", figure_id, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+data.table::fread(paste0("../metadata/", figure_id, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
+```
+
+### 5.2. Library metadata
+
+```{r}
+dev_session_info   <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
+message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
+saveRDS(dev_session_info, file = paste0("../metadata/", figure_id, "_devtools_session_info.rds"))
+message("Done!\n")
+
+message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
+saveRDS(utils_session_info, file = paste0("../metadata/", figure_id ,"_utils_info.rds"))
+message("Done!\n")
+
+dev_session_info$platform
+dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
+
+```{r}
+
+```
