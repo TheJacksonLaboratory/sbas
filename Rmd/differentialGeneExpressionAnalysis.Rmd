@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.3.3
+      jupytext_version: 1.4.2
   kernelspec:
     display_name: R
     language: R
@@ -25,18 +25,56 @@ Within each tissue, the following linear regression model was used to detec secu
 where y is the gene expression to be modeled sex denotes the reported sex of the subject.   The function named `fit_tissue()` performs this analysis and accepts two arguments, the `tissue` and an `object` and create the **model matrix** based  that tissue's sex. We will perform a linear fit after calculating normal factors (based on the library size) and calculate the dispersion using `voom` (mean variance model of dispersion). We are saving the resulting matrixes as files.
 
 
-## Running this notebook:
+## 1. Introduction:  Running this notebook:
 
 A few steps are needed before you can run this document on your own. The GitHub repository (https://github.com/TheJacksonLaboratory/sbas) of the project contains detailed instructions for setting up the environment in the **`dependencies/README.md`** document. Before starting with the analysis, make sure you have first completed the dependencies set up by following the instructions described there. If you have not done this already, you will need to close and restart this notebook before running it.
 
 All paths defined in this Notebook are relative to the parent directory (repository). 
 
+Next - you could execute the entire notebook and it will generate output to both `../data` and diagnostic plots to `../pdf`.
 
-## 1. Setup
-### 1.1 Loading dependencies
+### 1.1 Input
+
+#### 1.1.1 SraRunTable.txt.gz 
+This is the SRR run metadata manifest from the dbGaP.   This is released as part of this code release and accessible using `piggyback` from `github` with the users own `github` token.
+
+#### 1.1.2 gtex.rds 
+This is generated from a forked version of yarn, explained in detail in section `1.2`.  It is an edgeR expressionSet object.   This object is built using `yarn` and R package. 
+
+### 1.2 Process
+
+Using `EdgeR`, an `expressionSet object` is built, normalization factors are calculated with `calcNormFactors`, variance is modeled using mean-variance method using `Limma`'s `voom`.   A linear model is built to model the `sex-biased` differences.  Diagnostic plots and differential gene expression analysis results reported.  The function that accomplishes this step is `fit_tissue` and carried out in section 5.
+
+### 1.3 Output
+
+For each tissue, as selected and specified in the tissues.tsv file found in the `../assets` directory.  The following files are produced:
+
+#### 1.3.1 ../data/`tissue`_DGE.csv
+
+This file contains the `topTable` results, reporting the `ENSG`- gene identification,`logFC` - log fold change, `AveExpr`, `t` - the model result for the sex-bias (see section 2, `P.Value`, `adj.P.Val` - bon, and `B (FDR)`.
+
+#### 1.3.2 ../data/`tissue`_refined.csv
+
+This are the values that are differentially expressed with results that are 1.5 fold change greater than the mean and with a p-value of less than 0.05.
+
+#### 1.3.3 ../data/`tissue`_ensg_map.csv
+
+This is the mapping using `gprofiler` of the `ENSG` identifiers to their `geneSymbols` for ease of filtering prior to creating the linear model of the junctions in the computational step for the differential alternative splicing is completed.
+
+### 1.3.4  ../pdf/`tissue`-gene-y-voom-MDSplot-100.pdf
+
+These are the counts in a multi-dimensional scaling plot (MDSplot), showing the ability for the model to segregate the sex as illustrated with `red` `m` for the male and `blue` `f` for the female self-reported sex phenotypes.  In these plots, voom has been used to model the variance.
+
+### 1.3.5  ../pdf/`tissue`-gene-y-MDSplot-100.pdf
+
+These are the counts in a multi-dimensional scaling plot (MDSplot), showing the ability for the model to segregate the sex as illustrated with `red` `m` for the male and `blue` `f` for the female self-reported sex phenotypes.  In these plots, this is without the application of the results from modeling the variance with voom.
+
+
+
+## 2. Setup
+### 2.1 Loading dependencies
 
 ```{r}
-install.packages("gprofiler2")
 library(gprofiler2)
 library(downloader)
 library(readr)
@@ -60,7 +98,7 @@ library(scales)
 Sys.setenv(TAR = "/bin/tar") # for gzfile
 ```
 
-### 1.2 Retrieving the GTEx archive
+### 2.2 Retrieving the GTEx archive
 
 We used the R package [yarn](https://bioconductor.org/packages/release/bioc/html/yarn.html) to retrieve the GTEx Biobank data. In order to download the latest GTEx version (8.0) for RNA-seq and genotype data (phs000424.v8.v2), released 2019-08-26, we created a fork of the package's GitHub repository and created a new version of the function **`yarn::downloadGTEx()`**, namely **`yarn::downloadGTExV8()`** to download this release. 
 
@@ -73,8 +111,7 @@ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 
 
 ```{r}
-#Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
-
+ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 ```
 
 Did you remember to remove the token
@@ -105,7 +142,7 @@ dim(phenoData(obj))
 dim(obj)
 ```
 
-### 1.3 download the Annotation file saved from getting the GTEx Fastq's
+### 2.3 download the Annotation file saved from getting the GTEx Fastq's
 
 This is the annotation file as organized by dbGaP, we use yarn as the annotations for sex have been noted to be incorrect.
 This file and the object from yarn will be joined in this way the differences can be noted, and managed.
@@ -126,7 +163,7 @@ if (!("SraRunTable.txt.gz" %in% list.files("../data/"))) {
 }
 ```
 
-### 1.4: Quality control, preprocessing of data 
+### 2.4: Quality control, preprocessing of data 
 
 We observed above that our phenotype data have 2 more observations than our expression data. Let's inspect what these samples are:
 
@@ -158,7 +195,7 @@ dim(pData(obj))
 dim(obj)
 ```
 
-#### 1.4.2   Replace all *dashes* with **dots "."**
+#### 2.4.2   Replace all *dashes* with **dots "."**
 
 ```{r}
 pData(obj)$SAMPID[1]
@@ -166,7 +203,7 @@ pData(obj)$SAMPID <- gsub('-','\\.',pData(obj)$SAMPID)
 pData(obj)$SAMPID[1]
 ```
 
-#### 1.4.3   Synchronize Clinical Annotations and Accession Run, reducing to only tissues of interest
+#### 2.4.3   Synchronize Clinical Annotations and Accession Run, reducing to only tissues of interest
 
 Join the yarn metadata with the metadata we have (there are redundant samples that have been sequenced multiple times). We want to be sure that we can obtain all required Clinical Annotation information from the YARN GTEx Annotation information, as the SRA metadata is not as reliable.    This will be a one-to-many mapping, as there are multiple sequence runs per 69 samples -- expanding our data set.  There are only a handful of annotations we require: SEX, AGE, DTHHRDY (which is cause of death), SMCENTER.
 
@@ -236,7 +273,7 @@ rm(keep)
 # end test
 ```
 
-#### 1.4.4 Synchronize accession metadata and phenotype data
+#### 2.4.4 Synchronize accession metadata and phenotype data
 A kind of transitive closure.   Metadata links the count data to the phenotype data.
 Begin with synchronizing accession metadata and phenotype data - which has been reduced - `reduced_obj` inputs here 
 
@@ -341,10 +378,10 @@ breast_samples[1,]
 
 ```
 
-## 2.  Differential Expression using `edgeR`
+## 3.  Differential Expression using `edgeR`
 
 
-###  2.1  For each tissue, model gene expression by tissue
+###  3.1  For each tissue, model gene expression by tissue
 
 Differential Analysis (DE) was performed using voom (Law et.al., 2014) with gene expression counts with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma. 
 
@@ -357,7 +394,7 @@ Within each tissue, the following linear regression model was used to detec secu
 where y is the gene expression to be modeled sex denotes the reported sex of the subject
 
 
-###   2.2 remove all zero rows
+###   3.2 remove all zero rows
 
 expressionSet object is now `reduced_obj3`
 
@@ -373,7 +410,7 @@ dim(pData(reduced_obj3))
 dim(exprs(reduced_obj3))
 ```
 
-## 3. Separate the data by male and by female
+### 4. Separate the data by male and by female
 
 ```{r}
 reduced_male   <- pData(reduced_obj3)$SEX==1
@@ -395,7 +432,7 @@ tissue_groups_male <- factor(pData(reduced_obj_male)$SMTSD)
 tissue_groups_female <- factor(pData(reduced_obj_female)$SMTSD)
 ```
 
-## 4. Differential gene analysis on a per tissue basis.
+### 5. Differential gene analysis on a per tissue basis.
 Loop through the tissues and for those tissues that are shared between the two sexes perform the analysis
 
 ```{r}
@@ -498,11 +535,11 @@ dim(reduced_obj3)[2]
 length(levels(tissue_shared_male_female))
 ```
 
-## 5 Metadata
+### 6 Metadata
 
 For replicability and reproducibility purposes, we also print the following metadata:
 
-### 5.1. Checksums with the sha256 algorithm
+#### 6.1. Checksums with the sha256 algorithm
 1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
 2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
 
@@ -532,4 +569,8 @@ message("Done!\n")
 
 dev_session_info$platform
 dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
+
+```{r}
+
 ```
