@@ -1068,56 +1068,54 @@ Additional values set to enable this notebook to be executed as a nextflow workf
 #
 # Main routine
 #
-# get the released rmats matrices (rows junction ids, columns accessions (SRR)
+# 1.2.1 get the released rmats matrices (rows junction ids, columns accessions (SRR)
 # 
 getReleasedRMATSData (destDir <- "../data/")
+```
 
+```{r}
 #
-# 1.2.1 get the rmats 3.2.5 discovered/annoated junction information in GTF format
+# 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
 #
 getReleasedGTFAnnotations (destDir <- "../data")
-
-#
-# 1.2.2 get released GTF Annotations (destDir)
-#
-getReleasedGTFAnnotations (destDir <- "../data/")
-
+```
+```{r}
 #
 # 1.2.3 get SRR Accession Metadata (available through dbGaP)
 #
 srr_metadata <- getSraRunData (destDir <- "../data/")
-
+```
+```{r}
 #
 # 1.2.4 get GTEx expression Set Data
 #
 obj <- getGTExExpressionSet (destDir <- "../data/")
-
-#
-# 1.2.4 inspect and correct GTEx ExpressionSet obj
-#
-obj <- inspectAndCorrectExpressionSetObject ( obj )
-
+```
+```{r}
 #
 # 1.2.5 get reduced Tissue data
 #
 tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
-
+```
+```{r}
 #
 # 1.3.1 inspect and correct the expressionSet object
 #
 obj <- inspectAndCorrectExpressionSetObject ( obj )
-
+```
+```{r}
 #
 # 1.3.2 Reduce Sample Set
 #
 obj <- reduceSampleSet ( tissue_reduction, obj )
-
+```
+```{r}
 #
 # 1.3.3 Eliminate ChrY
 #
 obj <- eliminateChrY (obj, fromGTF) 
-
-
+```
+```{r}
 #
 # Replace `.` with `_` for ease and display. 
 # snakecase to ensure comparisons are like to like
@@ -1125,7 +1123,8 @@ obj <- eliminateChrY (obj, fromGTF)
 srr_metadata$SAMPID <- gsub('-','\\.',srr_metadata$'Sample Name')
 pData(obj)$SAMPID   <- gsub('-','\\.',pData(reduced_obj)$SAMPID)
 tissue_list         <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
-
+```
+```{r}
 #
 # Useful for debugging to play with these parameters
 # and to reduce to a subset of entire splice_list
@@ -1135,6 +1134,8 @@ plot         <- TRUE
 dup          <- FALSE
 splice_list  <- c( "se_")
 
+```
+```{r}
 #
 # parameters that change with each splice type (3)
 # 1. fromGTF
@@ -1146,7 +1147,8 @@ splice_list  <- c( "se_")
 # Requirements are that all required input are in a bucket data.tar.gz
 # and assets 
 # for (tissue_index in 1:length(tissue_list)) {
-
+```
+```{r}
     # a3ss
     splice_type = "a3ss_"
     res = splice_list %in% splice_type
@@ -1169,6 +1171,8 @@ splice_list  <- c( "se_")
                              obj, 
                              metadata )
     }
+```
+```{r}
     # a5ss
     splice_type = "a5ss_"
     res = splice_list %in% splice_type
@@ -1192,6 +1196,8 @@ splice_list  <- c( "se_")
                              obj, 
                              metadata )
     }
+```
+```{r}
     # mxe
     splice_type = "mxe_"
     res = splice_list %in% splice_type
@@ -1215,6 +1221,8 @@ splice_list  <- c( "se_")
                              obj, 
                              metadata )
     }
+```
+```{r}
     # ri
     splice_type = "ri_"
     res = splice_list %in% splice_type
@@ -1238,6 +1246,8 @@ splice_list  <- c( "se_")
                              obj, 
                              metadata )
     }
+```
+```{r}
     # se
     splice_type = "se_"
     res = splice_list %in% splice_type
