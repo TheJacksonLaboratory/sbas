@@ -14,13 +14,13 @@ jupyter:
 
 # differenticalSplicingJunctionExpressionAnalysis as a Notebook 
 
-rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stored in the Sequence Read Archive with controlled access managed by dbGaP.   The data were generated under the Gene Tissue Expression.
+rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stored in the Sequence Read Archive with controlled access managed by dbGaP.   This experiment was run with the fastq files from GTEx v8.
 
-## rMATS RNASeq-MATS.py produces 10 different output types which get assembled into as type junction ID by sample ID matrices
+The output (read in by section 1.2.1) are matrices which are the result of executing the rmats-nf nextflow workflow on all the samples from GTEx V8 https://github.com/lifebit-ai/rmats-nf.   The workflow begins with the accessions file and continues until a matrix.  Run without statistics, for the purposes of rMATS creating an annotated junction file for each of the five (5) splicing types.  The matrix is possible with this version of rMATS, as the junction ID is unique per annotation GTF.  In this running, we used gencode.v30.annotation.gtf (complete annotation).   The result is 5 matrices per splicing type.
 
-### Alternative Splice Site Types are: (se, a3ss, a5ss, mxe, ri)
+rMATS RNASeq-MATS.py produces 10 different output types which get assembled into as type junction ID by sample ID matrices
 
- This is input as ARGV1 into variable 'astype'
+## Alternative Splice Site Types are: (se, a3ss, a5ss, mxe, ri)
 
   * Skipped Exon events (se),
   * Alternative 3' splice site (a3ss),
@@ -28,12 +28,13 @@ rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stor
   * Mutually exclusive exon (mxe),
   * and retention intron (ri)
 
-### There are two different kinds of junction counts
+## There are two different kinds of junction counts
 
+For our analysis here, we used just the jc count matrices.
   * jc = junction counts - reads that cross the junction
-  * jcec = junction counts plus reads on the target (such as included exon
+  * jcec = junction counts plus reads on the target (such as included exon)
 
-### And the count type -- there are 5 types
+## And the count type -- there are 5 types
 
   * inclusion levels (percent spliced in)
   * included junction counts (ijc)
@@ -41,1061 +42,521 @@ rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stor
   * inclusion length (inclen)
   * skipped length (skiplen)
 
-### function: fit_iso_tissue 
-
-fit_iso_tissue expects the following input:
-
-  * the tissue of interest (SMSTD) 
-  * an ordered_merged_rmats -- which will be ordered to fit the count matrix
-  * count matrix (inc or ijc & sjc merged)
-  * splice type (a3ss, a5ss, mxe, ri or se)
-  * junction_count type (jc or jcec)
-  * count type (inc or the merged ijc,sjc)
-  
-### reordering to match annotations between count matrix and annotation matrix
-
-Common problem is to match specifically the rows of an annotation matrix with the columns of a count matrix
-`match` is the function that gives the re-ordering index required to accomplish this
-
-
-
-## **NOTE**:
-
-We assume that you have cloned the analysis repository and have `cd` into the parent directory. Before starting with the analysis make sure you have first completed the dependencies set up by following the instructions described in the **`dependencies/README.md`** document. All paths defined in this Notebook are relative to the parent directory (repository). Please close this Notebook and start again by following the above guidelines if you have not completed the aforementioned steps.
-
-## rMATS-final-merged
-the rmats-nf NextFlow was executed and the results released here:
-
-
-## Loading dependencies
+# 1.0 Loading dependencies
 
 ```{r}
+#devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0")
+#install.packages("gprofiler2")
+library(gprofiler2)
+library(downloader)
+library(readr)
+library(edgeR)
+library(biomaRt)
+library(DBI) # v >= 1.1.0 required for biomaRt
+library(devtools)
 library(limma)
 library(piggyback)
 library(multtest)
 library(Biobase)
+library(yarn)
 library(edgeR)
 library(tibble)
 #install.packages('R.utils')
 library(R.utils)
+install.packages("snakecase")
+library(snakecase)
+
 ```
 
-## Nextflow execution parameter execution
+## 1.1 Nextflow execution parameter execution
 
 Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
-
-
 ```{r}
 # parameters for nextflow execution of notebook
 tissue_index = 21
 ```
 
-<!-- #region -->
-## Analysis 
-
-This analysis uses edgeR.  Normalization takes the form of correction factors computed internally by edgeR functions, but it is also possible for a user to supply them. The correction factors may take the form of scaling factors for the library sizes, such as computed by calcNormFactors, which are then used to compute the effective library sizes. 
-
-In this analysis, we are using the raw counts as provided by rMATS 3.2.5.  The raw counts we are using in the model are `ijc` and `sjc`, the sample specific raw read counts as they align to the junctions of the `included exon (ijc)` and the junctions of the `excluded or skipped exon (sjc)` respectively.
-
+## 1.2 Retrieve Released data
 
 Be sure to set your GITHUB_TOKEN, prior to downloading files
 
 One suggestion is change it to your token and then run it then immediately change it back to this:
 
 Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
-<!-- #endregion -->
 
 ```{r}
 Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 ```
-
 ### Did you remember?
+
 Did you remember to delete your private github token?  Now is a good time to do so, before you save your work and checkit in inadvertantly....
 
+### 1.2.1 rmats_final matrices
+
 ```{r}
-if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files("../data/"))) {    
+getReleasedRMATSData <- function ( destDir ) {
+
+  if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files(destDir))) {    
     # SE
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.se.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     # RI
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.ri.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     # MXE
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.mxe.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     # A3SS
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a3ss.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
      # A5SS
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.ijc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.sjc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.inc.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.inclen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
+        dest = destDir)
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "adeslatt/sbas_test", 
         file = "rmats_final.a5ss.jc.skiplen.txt.gz",
         tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = "../data/")
-} 
+        dest = destDir)
+   }
+   return (0)
+}
 ```
+### 1.2.2 get released rMATS GTF annotations
 
-## Read in the count data
+For each splicing type, the junctions are defined, so we have 5 specific annotated splicing specific junction ID annotation files:
+fromGTF.A3SS.txt <- annotations for the alternative 3' splice site junctions
+fromGTF.A5SS.txt <- annotations for the alternative 5' splice site junctions
+fromGTF.MXE.txt <- annotations for the mutually exclusive exon junctions
+fromGTF.RI.txt <- annotations for the retained introns junctions
+fromGTF.SE.txt <- annotations for the skipped exon junctions
 
 ```{r}
-message("loading a3ss.jc.ijc rMATS 3.2.5 counts\n")
-a3ss.jc.ijc <- data.table::fread("../data/rmats_final.a3ss.jc.ijc.txt.gz")
-message("done!\n")
-message("loading a3ss.jc.sjc rMATS 3.2.5 counts\n")
-a3ss.jc.sjc <- data.table::fread("../data/rmats_final.a3ss.jc.sjc.txt.gz")    
-message("done!\n")
+getReleasedGTFAnnotations <- function ( destDir ) {
 
-message("loading a5ss.jc.ijc rMATS 3.2.5 counts\n")
-a5ss.jc.ijc <- data.table::fread("../data/rmats_final.a5ss.jc.ijc.txt.gz")    
-message("done!\n")
-message("loading a5ss.jc.sjc rMATS 3.2.5 counts\n")
-a5ss.jc.sjc <- data.table::fread("../data/rmats_final.a5ss.jc.sjc.txt.gz")    
-message("done!\n")
+   if (! (file.exists("../data/fromGTF.tar.gz"))) {
+       system("mkdir -p ../data", intern = TRUE)
+       message("Fetching fromGTF.tar.gz from GitHub ..")
+       # Download archive from GitHub release with tag "dge"
+       piggyback::pb_download(file = "fromGTF.tar.gz",
+                           dest = "../data",
+                           repo = "adeslatt/sbas_gtf",
+                           tag  = "rMATS.3.2.5.gencode.v30",
+                           show_progress = TRUE)
+       message("Done!\n")
+       message("Decompressing fromGTF.tar.gz into ../data")
+       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+       message("Done!\n")
+       message("Decompressing fromGTF.*.txt.gz into ../data")
+       system("gunzip  ../data/fromGTF*.txt.gz ", intern = TRUE)
+       message("Done!\n")
+   }
+   return (0)
+}
 
-message("loading mxe.jc.ijc rMATS 3.2.5 counts\n")
-mxe.jc.ijc  <- data.table::fread("../data/rmats_final.mxe.jc.ijc.txt.gz")    
-message("done!\n")
-message("loading mxe.jc.sjc rMATS 3.2.5 counts\n")
-mxe.jc.sjc  <- data.table::fread("../data/rmats_final.mxe.jc.sjc.txt.gz")    
-message("done!\n")
-
-message("loading ri.jc.ijc rMATS 3.2.5 counts\n")
-ri.jc.ijc   <- data.table::fread("../data/rmats_final.ri.jc.ijc.txt.gz")    
-message("done!\n")
-message("loading ri.jc.sjc rMATS 3.2.5 counts\n")
-ri.jc.sjc   <- data.table::fread("../data/rmats_final.ri.jc.sjc.txt.gz")    
-message("done!\n")
-
-message("loading se.jc.ijc rMATS 3.2.5 counts\n")
-se.jc.ijc   <- data.table::fread("../data/rmats_final.se.jc.ijc.txt.gz")    
-message("done!\n")
-message("loading se.jc.sjc rMATS 3.2.5 counts\n")
-se.jc.sjc   <- data.table::fread("../data/rmats_final.se.jc.sjc.txt.gz")
-message("done!\n")
-
-a3ss.jc.ijc[1:5,1:5]
-a3ss.jc.sjc[1:5,1:5]
-
-a5ss.jc.ijc[1:5,1:5]
-a5ss.jc.sjc[1:5,1:5]
-
-mxe.jc.ijc[1:5,1:5]
-mxe.jc.sjc[1:5,1:5]
-
-ri.jc.ijc[1:5,1:5]
-ri.jc.sjc[1:5,1:5]
-
-se.jc.ijc[1:5,1:5]
-se.jc.sjc[1:5,1:5]
 ```
+## 1.2.3 Read in SraRunData metadata 
 
-## Read in metadata 
-
-- `Sequence Read Archive (SRA)` Accession Data, `SRR` numbers
-- `Genome Tissue Expression (GTEx)` Clinical Annotation
+- `Sequence Read Archive (SRA)` Accession Data, `SRR` numbers, this is used to map the SRR accession numbers to the sample information (SAMPID) which will be used to obtain the phenotype information.
 
 ```{r}
-if (!("SraRunTable.txt.gz" %in% list.files("../data/"))) {
+getSraRunData <- function ( destDir ) {
+
+  if (!("SraRunTable.txt.gz" %in% list.files(destDir))) {
     piggyback::pb_download(
         show_progress = TRUE,
         repo = "TheJacksonLaboratory/sbas", 
         file = "SraRunTable.txt.gz",
         tag  = "GTExV8.v1.0", 
-        dest = "../data/")
-    
-    message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")   
-    metadata <- data.table::fread("../data/SraRunTable.txt.gz")
-    message("done!")
-} else {
-    message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")   
-    metadata <- data.table::fread("../data/SraRunTable.txt.gz")
-    message("done!\n")
-}
+        dest = destDir)
+  }
+  message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")
+  metadata <- data.table::fread("../data/SraRunTable.txt.gz")
+  message("done!\n")
+  
+  return(metadata)
 
-if (!("gtex.rds" %in% list.files("../data/"))) {
+}
+```
+## 1.2.4 Read in GTEx expression object
+
+- `Genome Tissue Expression (GTEx)` Clinical Annotation - this is the expressionSet object that has the phenotype information
+In this analysis there will be 3 expressionSet objects.  This one contains the gene Expression Count Data and phenotypes
+
+```{r}
+getGTExExpressionSet <- function ( destDir ) {
+
+  if (!("gtex.rds" %in% list.files(destDir))) {
     message("Downloading and loading obj with GTEx v8 with 'yarn::downloadGTExV8()'\n")
     obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
     message("Done!\n")
 
-} else {
-# Load with readRDS() if gtex.rds available in data/
-    message("Loading obj GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
-    obj <- readRDS(file = "../data/gtex.rds")
-    message("Done!\n")
-    message("Generating sha256sum for gtex.rds ..\n")    
-    message(system("sha256sum ../data/gtex.rds", intern = TRUE))
-    message("Done!\n")
-} 
-if (! (file.exists("../data/fromGTF.tar.gz"))) {
-    system("mkdir -p ../data", intern = TRUE)
-    message("Fetching fromGTF.tar.gz from GitHub ..")
-    # Download archive from GitHub release with tag "dge"
-    piggyback::pb_download(file = "fromGTF.tar.gz",
-                           dest = "../data",
-                           repo = "adeslatt/sbas_gtf",
-                           tag  = "rMATS.3.2.5.gencode.v30",
-                           show_progress = TRUE)
-    message("Done!\n")
-    message("Decompressing fromGTF.tar.gz into ../data")
-    system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-    message("Done!\n")
-    message("Decompressing fromGTF.*.txt.gz into ../data")
-    system("gunzip  ../data/fromGTF*.txt.gz ", intern = TRUE)
-    message("Done!\n")
-    message("Reading fromGTF.SE.txt into fromGTF.SE")    
-    fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
-    message("Done!\n") 
-} else {
-    message("Decompressing fromGTF.tar.gz into ../data")
-    system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-    message("Done!\n")
-    message("Decompressing fromGTF.*.txt.gz into ../data")
-    system("gunzip  ../data/fromGTF*.txt.gz ", intern = TRUE)
-    message("Done!\n")
-    message("Reading fromGTF.SE.txt into fromGTF.SE")    
-    fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
-    message("Done!\n")     
+  } else {
+    # Load with readRDS() if gtex.rds available in data/
+      message("Loading obj GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
+      obj <- readRDS(file = "../data/gtex.rds")
+      message("Done!\n")
+      message("Generating sha256sum for gtex.rds ..\n")    
+      message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+      message("Done!\n")
+  }
+  return (es)
+
+}
+```
+### 1.2.5 get reduced Tissue Data
+
+Stored in the assets subdirectory, reduced by inspection and selection focusing on those tissues with sufficient samples.
+
+```{r}
+getTissueReduction <- function ( filename ) {
+
+    tissue_reduction <- read.table(filename, header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+    colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
+
+    return(tissue_reduction)
+}
+```
+### 1.2.6 read in and make Splicing Expression Set Object
+
+Using the expressionSet object, we will make an expression set object for each of the count matrices for each of the alternative splicing matrices.
+
+```{r}
+makeSplicingExpressionSetObject <- function (gtexPhenoDataObj, srr_metadata, filename_gz) {
+
+    message("\nloading ", paste(counts_filename_gz), collapse=" ")
+    counts <- data.table::fread(counts_filename_gz)
+    message("done!")
+    rownames(counts) <- counts$ID
+    counts <- counts[,-1]
+    counts <- data.matrix(counts)
+
+    metadata_for_counts = colnames(counts)%in% srr_metadata$Run
+    counts_for_metadata = srr__metadata$Run %in% colnames(counts)
+    message("\nmetadata runs matching counts\n",
+       paste(table(metadata_for_counts)), collapse = " ")
+    message("\ncounts matching metadata\n",
+       paste(table(counts_for_metadata)), collapse = " ")
+
+    counts       <- counts      [                         ,metadata_for_counts==TRUE]
+    srr_metadata <- srr_metadata[counts_for_metadata==TRUE,                         ]
+
+    # now we arrange metadata and counts to be in the same order
+    # Run numbers are unique, but we will replace the columns with SAMPID as metadata is by SAMPID
+    i = order(colnames(counts))
+    j = order(srr_metadata$Run)
+
+    counts        = counts[,i]
+    srr__metadata = srr_metadata[j,]
+
+   
+    # phenotype data will be repeated - for samples that are shared
+    # because of that we have to build the matrix
+    # build the matrix from the first one, rbind within the loop
+    sample_match = srr_metadata[colnames(counts[,1]) == metadata$Run,]
+    pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID==metadata$SAMPID,])
+    pd$SRR <- metadata$Run
+    pdfinal <- pd
+    for (i in 2:dim(counts)[2]) {
+        sample_match = srr_metadata[colnames(counts[,i]) == metadata$Run,]
+        pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID==metadata$SAMPID,])
+        pd$SRR <- metadata$Run
+        pdfinal <- rbind(pdfinal, pd)
+    }
+
+    # because we have multiple SRR per Sample, 
+    es  <- ExpressionSet(as.matrix(counts))
+    pData(es) <- pdfinal
+
+    return(es)
 }
 ```
 
-## Quality control, preprocessing of data 
+## 1.3 Quality control, preprocessing of gene ExpressionSet Object
 
-We observed above that our phenotype data have 2 more observations than our expression data. Let's inspect what these samples are:
+### 1.3.1 Inspect and correct ExpressionSet Object
+
+Ensure the expression set object is in sync with its phenotype information (as before in the differentialGeneExpression notebook.
 
 ```{r}
-message("\nBEFORE: phenotype of expressionSet Object\n",
-        paste(tail (pData(obj),2)), collapse=" ")
-message("\nBEFORE: dimension of expressionSet Object\n",
-        paste(dim(exprs(obj))), collapse=" ")
-message("\nBEFORE: dimension of expressionSet Object\n",
-        paste(dim(obj)), collapse=" ")
+inspectAndCorrectExpressionSetObject <- function ( es ) {
 
-sample_names=as.vector(as.character(colnames(exprs(obj))))
-pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
-
-if (length(pheno_sample_names) > length(sample_names)) {
-    superset <- pheno_sample_names
-    subset   <- sample_names    
-} 
-
-if (length(pheno_sample_names) < length(sample_names)) {
-    superset <- sample_names
-    subset   <- pheno_sample_names   
-} 
-
-non_overlaps <- setdiff( superset, subset)
-message("\nThe non-overlapping IDs between pheno and count data are:\n", 
+   sample_names=as.vector(as.character(colnames(exprs(obj))))
+   pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
+   
+   if (length(pheno_sample_names) > length(sample_names)) {
+      superset <- pheno_sample_names
+      subset   <- sample_names    
+   }
+   if (length(pheno_sample_names) < length(sample_names)) {
+      superset <- sample_names
+      subset   <- pheno_sample_names   
+   } 
+   non_overlaps <- setdiff( superset, subset)
+   message("\nThe non-overlapping IDs between pheno and count data are:\n", 
         paste(length(non_overlaps)), collapse = " ")
 
-logical_match_names=superset %in% subset
-message("\nLogical diff pheno_sample_names, expression_sample_names\n",
+   logical_match_names=superset %in% subset
+   message("\nLogical diff pheno_sample_names, expression_sample_names\n",
         paste(table(logical_match_names)), collapse = " ")
 
-obj        <- obj       [logical_match_names==TRUE,]
-pData(obj) <- pData(obj)[logical_match_names==TRUE,]
+   es        <- es       [logical_match_names==TRUE,]
+   pData(es) <- pData(es)[logical_match_names==TRUE,]
 
-message("\nAFTER: phenotype of expressionSet Object\n",
-        paste(tail (pData(obj),2)), collapse=" ")
-message("\nAFTER: dimension of expressionSet Object\n",
-        paste(dim(exprs(obj))), collapse=" ")
-message("\nAFTER: dimension of expressionSet Object\n",
-        paste(dim(obj)), collapse=" ")
-```
+   message("\nAFTER: phenotype of expressionSet Esect\n",
+        paste(tail (pData(es),2)), collapse=" ")
+   message("\nAFTER: dimension of expressionSet Esect\n",
+        paste(dim(exprs(es))), collapse=" ")
+   message("\nAFTER: dimension of expressionSet Esect\n",
+        paste(dim(es)), collapse=" ")
 
-## Read in junction Annotation Data
-
-```{r}
-message("Reading fromGTF.A3SS.txt into fromGTF.A3SS")    
-fromGTF.A3SS <- read.table("../data/fromGTF.A3SS.txt", header=TRUE)
-message("Done!\n")
-
-message("Reading fromGTF.A5SS.txt into fromGTF.A5SS")    
-fromGTF.A5SS <- read.table("../data/fromGTF.A5SS.txt", header=TRUE)
-message("Done!\n")
-
-message("Reading fromGTF.MXE.txt into fromGTF.MXE")    
-fromGTF.MXE <- read.table("../data/fromGTF.MXE.txt", header=TRUE)
-message("Done!\n")
-
-message("Reading fromGTF.RI.txt into fromGTF.RI")    
-fromGTF.RI <- read.table("../data/fromGTF.RI.txt", header=TRUE)
-message("Done!\n")
-
-message("Reading fromGTF.SE.txt into fromGTF.SE")    
-fromGTF.SE <- read.table("../data/fromGTF.SE.txt", header=TRUE)
-message("Done!\n")
+   return(es)
+}
 
 ```
-
-## Preparing our Data
-### Aligning Annotations with Run Data and with Count Data
-
-A description of the GTEx V8 release may be found here https://www.gtexportal.org/home/datasets.   To facilitate the analysis, the Quackenbush lab's Joe Paulson's Yarn Package, https://github.com/jnpaulson/yarn, forked and upgraded to GTEx V8 here https://github.com/TheJacksonLaboratory/yarn/tree/annes-changes.  
-
-The sequences we used for our analysis with rMATS are specified by their SRR number and were obtained from dbGaP, with our application to the controlled access human data.  Beginning with these raw unfiltered fastq files, we ran them through the NextFlow workflow rmats-nf https://github.com/lifebit-ai/rmats-nf. The accession data was downloaded with a repository key from the google cloud bucket (g3).
-
-- `obj`      : GTEx V8 expressionSet 
-- `metadata` : SraRunTable.txt holds the SRR accession numbers used to extract samples from dbGaP SRA
-- `ijc`      : inclusion junction counts as reported by `rMATS 3.2.5`
-- `sjc`      : skipped junction counts as reported by `rMATS 3.2.5`  
-
-For each of the splicing events:
-
-- `a3ss`     : alternative 3` splice site
-- `a5ss`     : alternative 5` splice site
-- `mxe`      : mutually exclusive exon
-- `ri`       : retention intron
-- `se`       : skipped exon
-
-In `rMATS 3.2.5`, each junction is encoded in a unique `ID` that is immutable regardless of comparison.  
-This `ID` is different for each of the differing splicing events.
-
-
-### Move Junction ID to Row definition
+### 1.3.2  Reduce Sample Set 
+Read in all requirements so that the stage is properly set -- tissues.tsv contains the subset of files desired for analysis.
+It is found in the `assets` subdirectory
 
 ```{r}
-rownames(a3ss.jc.ijc) <- a3ss.jc.ijc$ID
-rownames(a3ss.jc.sjc) <- a3ss.jc.sjc$ID
-a3ss.jc.ijc <- a3ss.jc.ijc[,-1]
-a3ss.jc.sjc <- a3ss.jc.sjc[,-1]
+reduceSampleSet <- function (tissue_reduction, es) {
 
-rownames(a5ss.jc.ijc) <- a3ss.jc.ijc$ID
-rownames(a5ss.jc.sjc) <- a3ss.jc.sjc$ID
-a5ss.jc.ijc <- a5ss.jc.ijc[,-1]
-a5ss.jc.sjc <- a5ss.jc.sjc[,-1]
-
-rownames(mxe.jc.ijc)  <- mxe.jc.ijc$ID
-rownames(mxe.jc.sjc)  <- mxe.jc.sjc$ID
-mxe.jc.ijc <- mxe.jc.ijc[,-1]
-mxe.jc.sjc <- mxe.jc.sjc[,-1]
-
-rownames(ri.jc.ijc)   <- ri.jc.ijc$ID
-rownames(ri.jc.sjc)   <- ri.jc.sjc$ID
-ri.jc.ijc <- ri.jc.ijc[,-1]
-ri.jc.sjc <- ri.jc.sjc[,-1]
-
-rownames(se.jc.ijc)   <- se.jc.ijc$ID
-rownames(se.jc.sjc)   <- se.jc.sjc$ID
-se.jc.ijc <- se.jc.ijc[,-1]
-se.jc.sjc <- se.jc.sjc[,-1]
-
-dim(a3ss.jc.ijc)
-dim(a3ss.jc.sjc)
-dim(a5ss.jc.ijc)
-dim(a5ss.jc.sjc)
-dim(mxe.jc.ijc)
-dim(mxe.jc.sjc)
-dim(ri.jc.ijc)
-dim(ri.jc.sjc)
-dim(se.jc.ijc)
-dim(se.jc.sjc)
-
-a3ss.jc.ijc[1:5,1:5]
-a3ss.jc.sjc[1:5,1:5]
-
-a5ss.jc.ijc[1:5,1:5]
-a5ss.jc.sjc[1:5,1:5]
-
-mxe.jc.ijc[1:5,1:5]
-mxe.jc.sjc[1:5,1:5]
-
-ri.jc.ijc[1:5,1:5]
-ri.jc.sjc[1:5,1:5]
-
-se.jc.ijc[1:5,1:5]
-se.jc.sjc[1:5,1:5]
-
-
-```
-
-### Synchronize Clinical Annotations and Accession Run, reducing to only tissues of interest
-
-Join the yarn metadata with the metadata we have (there are redundant samples that have been sequenced multiple times). We want to be sure that we can obtain all required Clinical Annotation information from the YARN GTEx Annotation information, as the SRA metadata is not as reliable.    This will be a one-to-many mapping, as there are multiple sequence runs per 69 samples -- expanding our data set.  There are only a handful of annotations we require: SEX, AGE, DTHHRDY (which is cause of death), SMCENTER.
-
-Note that the numbers in specific age groups expand because of the one to many relationship from sample to sequencing runs. 
-
-#### Using results from analysis of number of samples stored in `tissues.tsv` we keep only those that are members of this reduced tissue list.
-
-```{r}
-# read in all requirements so that the stage is properly set -- 
-# if it is clear here -- it will remain clear for the rest of the time
-# tissues.tsv contains the subset of files desired for analysis.
-tissue_reduction <- read.table(file="../assets/tissues.tsv", header=TRUE, sep="\t",
-                               skipNul=FALSE, stringsAsFactors = FALSE)
-colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
-
-message("\nsize tissue_reduction\n",
+   message("\nsize tissue_reduction\n",
         paste(dim(tissue_reduction), collapse=" "))
-message("\nsize obj\n",
-        paste(dim(obj)), collapse="\n")
-message("\nsize pData(obj)\n",
-        paste(dim(pData(obj)), collapse=" "))
+   message("\nsize es\n",
+        paste(dim(es)), collapse=" ")
+   message("\nsize pData(es)\n",
+        paste(dim(pData(es)), collapse=" "))
+   # only include those tissues we wish to continue with
+   message("\n number of tissue types to keep\n",
+        paste(table(tissue_reduction$include)), collapse = " ")
+	
+   tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 
-# only include those tissues we wish to continue with
-table(tissue_reduction$include)
-tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
-
-# test to make sure we don't have nonsense
-keep <- (pData(obj)$SMTSD== "breast_mammary_tissue")
-message("\nTEST: how many to keep of obj in breast_mammary_tissue\n",
+   # test to make sure we don't have nonsense
+   keep <- (pData(es)$SMTSD== "breast_mammary_tissue")
+   message("\nTEST: how many to keep of es in breast_mammary_tissue\n",
         paste(table(keep), collapse = " "))
-tobj        = obj      [,keep]
-pData(tobj) = pData(obj[,keep])
-message("\nTEST: size breast_mammary_tissue obj:tobj\n",
-        paste(dim(tobj), collapse=" "))
-message("\nTEST: size phenotype object pData(tobj)\n",
-        paste(dim(pData(tobj)), collapse=" "))
-pData(tobj)[1,]
-rm(keep)
-# end test
+   tes        = es      [,keep]
+   pData(tes) = pData(es[,keep])
+   message("\nTEST: size breast_mammary_tissue es:tes\n",
+        paste(dim(tes), collapse=" "))
+   message("\nTEST: size phenotype esect pData(tes)\n",
+        paste(dim(pData(tes)), collapse=" "))
+   pData(tes)[1,]
+   rm(keep)
+   # end test
 
-# create a matching tissue name to go with the expressionSet phenotype object
-pData(obj)$SMTSD       <- factor(snakecase::to_snake_case(as.character(pData(obj)$SMTSD)))
-tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+   # create a matching tissue name to go with the expressionSet phenotype esect
+   pData(es)$SMTSD       <- factor(snakecase::to_snake_case(as.character(pData(es)$SMTSD)))
+   tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
 
-message("\nlength tissues in phenotype data\n",
-        paste(length(levels(pData(obj)$SMTSD)), collapse = " "))
-message("\nlength tissues in tissue_reduction data\n",
+   message("\nlength tissues in phenotype data\n",
+        paste(length(levels(pData(es)$SMTSD)), collapse = " "))
+   message("\nlength tissues in tissue_reduction data\n",
         paste(length(tissue_reduction$SMTSD), collapse = " "))
 
-keep <- pData(obj)$SMTSD %in% tissue_reduction$SMTSD
-message("\nlength tissue in samples phenotype data\n",
-        paste(length(pData(obj)$SMTSD), collapse = " "))
-message("\nlength keep obj \n",
+   keep <- pData(es)$SMTSD %in% tissue_reduction$SMTSD
+   message("\nlength tissue in samples phenotype data\n",
+        paste(length(pData(es)$SMTSD), collapse = " "))
+   message("\nlength keep es \n",
         paste(length(keep), collapse = " "))
-message("\nhow many to keep in phenotype data\n",
+   message("\nhow many to keep in phenotype data\n",
         paste(table(keep), collapse = " "))
 
-# both obj and pData(obj) need to be adjusted
-reduced_obj        <- obj       [          ,keep==TRUE]
-pData(reduced_obj) <- pData(obj)[keep==TRUE,          ]
-rm(keep)
-message("\nsize reduced_obj\n",
-        paste(dim(reduced_obj)), collapse=" ")
-message("\nsize pData(reduced_obj)\n",
-        paste(dim(pData(reduced_obj)), collapse=" "))
-message("\nlength tissues in phenotype data\n",
-        paste(length(levels(pData(reduced_obj)$SMTSD)), collapse = " "))
+   es        <- es       [          ,keep==TRUE]
+   pData(es) <- pData(es)[keep==TRUE,          ]
+   rm(keep) 
+   message("\nsize reduced es\n",
+        paste(dim(es)), collapse=" ")
+   message("\nsize pData(es)\n",
+        paste(dim(pData(es)), collapse=" "))
+   message("\nlength tissues in phenotype data\n",
+        paste(length(levels(pData(es)$SMTSD)), collapse = " "))
 
-# test to make sure we don't have nonsense
-keep = pData(reduced_obj)$SMTSD== "breast_mammary_tissue"
-message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
+   # test to make sure we don't have nonsense
+   keep = pData(es)$SMTSD== "breast_mammary_tissue"
+   message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
         paste(table(keep), collapse = " "))
-tobj        = reduced_obj       [          ,keep==TRUE]
-pData(tobj) = pData(reduced_obj)[keep==TRUE,          ]
-message("\nTEST: size breast_mammary_tissue obj:tobj\n",
-        paste(dim(tobj), collapse=" "))
-message("\nTEST: size phenotype object pData(tobj)\n",
-        paste(dim(pData(tobj)), collapse=" "))
-pData(tobj)[1,]
-rm(keep)
-# end test
+   tes        = es       [          ,keep==TRUE]
+   pData(tes) = pData(es)[keep==TRUE,          ]
+   message("\nTEST: size breast_mammary_tissue tes\n",
+        paste(dim(tes), collapse=" "))
+   message("\nTEST: size phenotype object pData(tes)\n",
+        paste(dim(pData(tes)), collapse=" "))
+   pData(tes)[1,]
+   rm(keep)
+   # end test
+   return (es)
+}
 ```
+### 1.3.3 Eliminate ChrY fromGTF
 
-#### Synchronize accession metadata and phenotype data
-A kind of transitive closure.   Metadata links the count data to the phenotype data.
-Begin with synchronizing accession metadata and phenotype data - which has been reduced - `reduced_obj` inputs here 
+We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
 
 ```{r}
-# let's limit the phenotype object and then align the metadata file
-metadata <- data.table::fread("../data/SraRunTable.txt.gz")
-metadata$SAMPID           <- gsub('-','\\.',metadata$'Sample Name')
-pData(reduced_obj)$SAMPID <- gsub('-','\\.',pData(reduced_obj)$SAMPID)
+eliminateChrYfromGTF <- function ( fromGTF ) {
 
-message("\nsize accession SraRunTable \n",
-        paste(dim(metadata), collapse=" "))
-message("\nsize reduced_obj\n",
-        paste(dim(reduced_obj), collapse=" "))
-message("\nsize pData(reduced_obj)\n",
-        paste(dim(pData(reduced_obj)), collapse=" "))
-rownames(pData(reduced_obj))<- pData(reduced_obj)$SAMPID
-
-# keep only those runs (as epitomized by the metadata_samples) in the phenotype set
-metadata_samples   <- as.character(metadata$SAMPID)
-phenotype_samples  <- as.character(pData(reduced_obj)$SAMPID)
-
-# any undefined (N/A) sample names? These results will be zero
-message("\n any undefined (NA) sample names?\n",
-        paste(sum(is.na(metadata_samples)), collapse=" "))
-message("\n any undefined (NA) sample names?\n",
-        paste(sum(is.na(phenotype_samples)), collapse=" "))
-
-keep <- phenotype_samples %in% metadata_samples
-message("\nlength keep metadata samples in phenotype samples \n",
-        paste(length(keep), collapse = " "))
-message("\nhow many to keep in phenotype obj\n",
-        paste(table(keep), collapse = " "))
-
-reduced_obj2        <- reduced_obj       [          ,keep==TRUE]
-pData(reduced_obj2) <- pData(reduced_obj)[keep==TRUE,          ]
-message("\nsize reduced_obj2\n",
-        paste(dim(reduced_obj2), collapse=" "))
-message("\nsize pData(reduced_obj2)\n",
-        paste(dim(pData(reduced_obj2)), collapse=" "))
-
-# test to make sure we don't have nonsense
-keep = pData(reduced_obj2)$SMTSD == "breast_mammary_tissue"
-message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
-        paste(table(keep), collapse = " "))
-tobj        = reduced_obj2       [          ,keep==TRUE]
-pData(tobj) = pData(reduced_obj2)[keep==TRUE,          ]
-message("\nTEST: size breast_mammary_tissue obj:tobj\n",
-        paste(dim(tobj), collapse=" "))
-message("\nTEST: size phenotype object pData(tobj)\n",
-        paste(dim(pData(tobj)), collapse=" "))
-pData(tobj)[1,]
-rm(keep)
-# end test
-
-# now go the other way - make sure the metadata samples are in sync with the phenotype samples
-# note that we are now with `reduced_obj2`
-metadata_samples   <- as.character(metadata$SAMPID)
-phenotype_samples  <- as.character(pData(reduced_obj2)$SAMPID)
-message("\nlength of metadata_samples\n",
-        paste(length(metadata_samples), collapse=" "))
-message("\nlength of phenotype_samples\n",
-        paste(length(phenotype_samples), collapse=" "))
-message("\ndimension of metadata\n",
-        paste(dim(metadata), collapse=" "))
-keep <- metadata_samples %in% phenotype_samples
-message("\nlength keep phenotype samples in metadata samples \n",
-        paste(length(keep), collapse = " "))
-message("\nhow many to keep in metadata samples\n")
-
-reduced_metadata <- metadata[keep==TRUE,]
-message("\ndimension of reduced_metadata\n",
-        paste(dim(reduced_metadata), collapse=" "))
-rm(keep)
-
-# test to make sure we don't have nonsense
-keep = pData(reduced_obj2)$SMTSD== "breast_mammary_tissue"
-message("\nTEST: how many to keep in to have only breast_mammary_tissue\n",
-        paste(table(keep), collapse = " "))
-tobj        = reduced_obj2       [          ,keep==TRUE]
-pData(tobj) = pData(reduced_obj2)[keep==TRUE,          ]
-message("\nTEST: size breast_mammary_tissue obj:tobj\n",
-        paste(dim(tobj), collapse=" "))
-message("\nTEST: size phenotype object pData(tobj)\n",
-        paste(dim(pData(tobj)), collapse=" "))
-pData(tobj)[1,]
-rm(keep)
-
-breast_metadata_samples   <- as.character(reduced_metadata$SAMPID)
-breast_phenotype_samples  <- as.character(pData(tobj)$SAMPID)
-keep = breast_metadata_samples %in% breast_phenotype_samples
-table(keep)
-message("\nTEST: how many breast_mammary_tissue samples in reduced_metadata\n",
-        paste(table(keep), collapse = " "))
-breast_samples <- reduced_metadata[keep,]
-message("\nTEST: number reduced_metadata breast_samples\n",
-        paste(length(breast_samples$SAMPID), collapse=" "))
-message("\nTEST: number phenotype obj breast_samples\n",
-        paste(length(pData(tobj)$SAMPID), collapse=" "))
-breast_samples[1,]
-# end test
-
+   fromGTF.keepAllButChrY <- (fromGTF$chr != "Y")
+   fromGTF           <- fromGTF[fromGTF.keepAllButChrY,]
+   rownames(fromGTF) <- fromGTF$ID
+   return(fromGTF)
+}
 ```
+### 1.3.4 Eliminate ChrY from expressionSet Object
 
-###  Limit obj and metadata to size of the ijc and sjc columns 
-
-Things are complicated and can easily lead to data disaster.
-We need to go forward and backwards with these data - and see how to have them arranged.  
-Things we know to be true:
-1. Run numbers are unique
-2. Samples (which are Donor and Tissue combined) have been sequenced more than once.
-
-We need to keep this clear as the metadata are used to sort out tissues, sex, and other factors - and these are based upon a Donor.  Relationships are as follows:
-
-* One Donor can have many tissues (one donor has as many as 54 tissues)
-* One Tissue may have many sequencing runs (One Tissue has been as of this writing sequenced as many as 3 times)
-
-The analyst must keep this information in mind as manipulations occur.
-
-Here we use `se.jc.ijc` as exemplar as well as model for all subsequent matrices.  Arrangements of `se.jc.ijc` will ripple to all other matrices because sample order is the same between all samples.
-
-Entering into this step we have for our phenotype object:
-1. reduced_obj2
-2. reduced_metadata
+We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
+This time from the expressionSet Object
 
 ```{r}
-metadata_for_counts = colnames(se.jc.ijc)%in% reduced_metadata$Run
-counts_for_metadata = reduced_metadata$Run %in% colnames(se.jc.ijc)
-table(metadata_for_counts)
-table(counts_for_metadata)
-
-counts          <- data.matrix(se.jc.ijc)
-counts_metadata <- reduced_metadata
-dim(counts)
-dim(counts_metadata)
-
-counts          <- counts         [                         ,metadata_for_counts==TRUE]
-counts_metadata <- counts_metadata[counts_for_metadata==TRUE,                         ]
-
-# now we arrange metadata and counts to be in the same order
-# Run numbers are unique, but we will replace the columns with SAMPID as metadata is by SAMPID
-i = order(colnames(counts))
-j = order(counts_metadata$Run)
-
-ose.jc.ijc       = counts[,i]
-ocounts_metadata = counts_metadata[j,]
-
-tail(colnames(ose.jc.ijc),3)
-tail(ocounts_metadata$Run,3)
-
-colnames(ose.jc.ijc) = as.character(ocounts_metadata$SAMPID)
-tail(colnames(ose.jc.ijc),3)
-tail(ocounts_metadata$SAMPID,3)
-sum(table(colnames(ose.jc.ijc))==1)
-sum(table(colnames(ose.jc.ijc))==2)
-sum(table(colnames(ose.jc.ijc))==3)
-sum(table(colnames(ose.jc.ijc))==4)
-dim(ose.jc.ijc)
-```
-
-## Now extend this organization to all count matrices
-now that the data are organized and accounted for, extend to the rest of the splicing factors and their count matrices
-
-```{r}
-oa3ss.jc.ijc  <- data.matrix(a3ss.jc.ijc)
-oa3ss.jc.sjc  <- data.matrix(a3ss.jc.sjc)
-oa3ss.jc.ijc  <- oa3ss.jc.ijc[,metadata_for_counts==TRUE]
-oa3ss.jc.sjc  <- oa3ss.jc.sjc[,metadata_for_counts==TRUE]
-
-oa5ss.jc.ijc  <- data.matrix(a5ss.jc.ijc)
-oa5ss.jc.sjc  <- data.matrix(a5ss.jc.sjc)
-oa5ss.jc.ijc  <- oa5ss.jc.ijc[,metadata_for_counts==TRUE]
-oa5ss.jc.sjc  <- oa5ss.jc.sjc[,metadata_for_counts==TRUE]
-
-omxe.jc.ijc   <- data.matrix(mxe.jc.ijc)
-omxe.jc.sjc   <- data.matrix(mxe.jc.sjc)
-omxe.jc.ijc   <- omxe.jc.ijc[,metadata_for_counts==TRUE]
-omxe.jc.sjc   <- omxe.jc.sjc[,metadata_for_counts==TRUE]
-
-ori.jc.ijc    <- data.matrix(ri.jc.ijc)
-ori.jc.sjc    <- data.matrix(ri.jc.sjc)
-ori.jc.ijc    <- ori.jc.ijc[,metadata_for_counts==TRUE]
-ori.jc.sjc    <- ori.jc.sjc[,metadata_for_counts==TRUE]
-
-ose.jc.ijc    <- data.matrix(se.jc.ijc)
-ose.jc.sjc    <- data.matrix(se.jc.sjc)
-ose.jc.ijc    <- ose.jc.ijc[,metadata_for_counts==TRUE]
-ose.jc.sjc    <- ose.jc.sjc[,metadata_for_counts==TRUE]
-
-oa3ss.jc.ijc  <- oa3ss.jc.ijc[,i]
-oa3ss.jc.sjc  <- oa3ss.jc.sjc[,i]
-
-oa5ss.jc.ijc  <- oa5ss.jc.ijc[,i]
-oa5ss.jc.sjc  <- oa5ss.jc.sjc[,i]
-
-omxe.jc.ijc   <- omxe.jc.ijc[,i]
-omxe.jc.sjc   <- omxe.jc.sjc[,i]
-
-ori.jc.ijc    <- ori.jc.ijc[,i]
-ori.jc.sjc    <- ori.jc.sjc[,i]
-
-ose.jc.ijc    <- ose.jc.ijc  [,i]
-ose.jc.sjc    <- ose.jc.sjc  [,i]
-
-oa3ss.jc.ijc[1:5,1:5]
-oa3ss.jc.sjc[1:5,1:5]
-
-oa5ss.jc.ijc[1:5,1:5]
-oa5ss.jc.sjc[1:5,1:5]
-
-omxe.jc.ijc[1:5,1:5]
-omxe.jc.sjc[1:5,1:5]
-
-ori.jc.ijc[1:5,1:5]
-ori.jc.sjc[1:5,1:5]
-
-ose.jc.ijc[1:5,1:5]
-ose.jc.sjc[1:5,1:5]
-
-colnames(oa3ss.jc.ijc) = as.character(ocounts_metadata$SAMPID)
-colnames(oa3ss.jc.sjc) = as.character(ocounts_metadata$SAMPID)
-
-colnames(oa5ss.jc.ijc) = as.character(ocounts_metadata$SAMPID)
-colnames(oa5ss.jc.sjc) = as.character(ocounts_metadata$SAMPID)
-
-colnames(omxe.jc.ijc) = as.character(ocounts_metadata$SAMPID)
-colnames(omxe.jc.sjc) = as.character(ocounts_metadata$SAMPID)
-
-colnames(ori.jc.ijc) = as.character(ocounts_metadata$SAMPID)
-colnames(ori.jc.sjc) = as.character(ocounts_metadata$SAMPID)
-
-colnames(ose.jc.ijc) = as.character(ocounts_metadata$SAMPID)
-colnames(ose.jc.sjc) = as.character(ocounts_metadata$SAMPID)
-
-tail(colnames(oa3ss.jc.ijc),3)
-tail(colnames(oa3ss.jc.sjc),3)
-
-tail(colnames(oa5ss.jc.ijc),3)
-tail(colnames(oa5ss.jc.sjc),3)
-
-tail(colnames(omxe.jc.ijc),3)
-tail(colnames(omxe.jc.sjc),3)
-
-tail(colnames(ori.jc.ijc),3)
-tail(colnames(ori.jc.sjc),3)
-
-tail(colnames(ose.jc.ijc),3)
-tail(colnames(ose.jc.sjc),3)
-
-```
-
-### Sanity Check
-
-Spot check one tissue and make sure there isn't nonsense
-Our current matrices are:
-1. ocounts_metadata for the connection from counts to phenotype via the Run and SAMPID
-2. pData(reduced_obj2)
-
-```{r}
-# test to make sure we don't have nonsense
-rm(keep)
-keep = pData(reduced_obj2)$SMTSD == "breast_mammary_tissue"
-table(keep)
-tobj = reduced_obj2[,keep]
-dim(tobj)
-dim(pData(tobj))
-breast_metadata_samples   <- as.character(ocounts_metadata$SAMPID)
-breast_phenotype_samples  <- as.character(pData(tobj)$SAMPID)
-rm(keep)
-keep = breast_metadata_samples %in% breast_phenotype_samples
-table(keep)
-breast_samples <- ocounts_metadata[keep,]
-length(breast_samples$SAMPID)
-length(pData(tobj)$SAMPID)
-breast_samples[1,]
-# end test
-```
-
-### which metadata shall we use?
-There is a lack of correspondeence between the metadata in the Sequence Read Archive table as obtained from dbGaP SRR Run Explorer and the GTEx V8 Release.   Not sure which one to use!  
-
-```{r}
-table(pData(reduced_obj2)$AGE)
-table(pData(reduced_obj2)$DTHHRDY)
-table(pData(reduced_obj2)$SMCENTER)
-table(pData(reduced_obj2)$SEX)
-table(ocounts_metadata$sex)
-```
-
-#### Exploring the ijc and sjc Count data 
-
-For each sample, we have ijc and sjc count data, for each alternative splicing type, we have the following number of alternative splicing events:
-
-* `A3SS`: ` 8,920`
-* `A5SS`: ` 5,584`
-* `MXE `: ` 2,979`
-* `RI`  : ` 6,312`
-* `SE  `: `42,611`
-
-For exon skipping events (SE), we have 42,611 non-zero junction IDs the (first dimension of the ijc and sjc cout table) for the skipped exon event for breast-Mammary Tissue, 191 individuals.  These are healthy individuals, and we are studying the impact of sex on the occurrence or non-occurance of specific alternative splicing events.   We explore the information we ahve about these junctions and create a construct, as_event, which accounts for the junction under exploration.
-
-The `IJC` and `SJC` counts are in many ways two sides of the same coin.  Both our the observational output and we wish to see how robust each are in their ability to separate out the samples to provide for us differentially expressed isoform events as measured by their counts.   Each junction is in a manner a specific marker to specific isoform events that may or may not be shared between the genders.   If there is significant results, then this is indicative of the separation achieved by isoform specific differentiation.   In our model we will use these in combination, it is important to see if they will yield the results we are looking for.
-
-
-
-### Reduce count matrices based upon the reduced tissue information - count matrix by column adjustment
-
-We wish to keep only those samples (columns) in our count data that are a member of the reduced tissue set.
-
-```{r}
-metadata_names <- as.character(ocounts_metadata$SAMPID)
-count_names    <- as.character(colnames(ose.jc.ijc))
-
-keep  <- count_names %in% metadata_names
-
-table(keep)
-length(keep)
-length(metadata_names)
-length(count_names)
-
-a3ss.jc.ijc2 = oa3ss.jc.ijc[,keep==TRUE] 
-a3ss.jc.sjc2 = oa3ss.jc.sjc[,keep==TRUE] 
-
-a5ss.jc.ijc2 = oa5ss.jc.ijc[,keep==TRUE] 
-a5ss.jc.sjc2 = oa5ss.jc.sjc[,keep==TRUE] 
-
-mxe.jc.ijc2 = omxe.jc.ijc[,keep==TRUE] 
-mxe.jc.sjc2 = omxe.jc.sjc[,keep==TRUE] 
-
-ri.jc.ijc2 = ori.jc.ijc[,keep==TRUE] 
-ri.jc.sjc2 = ori.jc.sjc[,keep==TRUE] 
-
-se.jc.ijc2 = ose.jc.ijc[,keep==TRUE] 
-se.jc.sjc2 = ose.jc.sjc[,keep==TRUE] 
-
-dim(a3ss.jc.ijc2)
-dim(a3ss.jc.sjc2)
-dim(a5ss.jc.ijc2)
-dim(a5ss.jc.sjc2)
-dim(mxe.jc.ijc2)
-dim(mxe.jc.sjc2)
-dim(ri.jc.ijc2)
-dim(ri.jc.sjc2)
-dim(se.jc.ijc2)
-dim(se.jc.sjc2)
-
-a3ss.jc.ijc2[1:5,1:5]
-a3ss.jc.sjc2[1:5,1:5]
-
-a5ss.jc.ijc2[1:5,1:5]
-a5ss.jc.sjc2[1:5,1:5]
-
-mxe.jc.ijc2[1:5,1:5]
-mxe.jc.sjc2[1:5,1:5]
-
-ri.jc.ijc2[1:5,1:5]
-ri.jc.sjc2[1:5,1:5]
-
-se.jc.ijc2[1:5,1:5]
-se.jc.sjc2[1:5,1:5]
-
-```
-
-### Keeping only chromosomes shared male female - count matrix by junction row adjustment 
-
-The Y chromosome spans more than 59 million base pairs of DNA and represents almost 2 percent of the total DNA in cells. Each person normally has one pair of sex chromosomes in each cell. The Y chromosome is present in males, who have one X and one Y chromosome, while females have two X chromosomes. Since our analysis is on the comparative differences, we must eliminate chrY from our analyses.
-
-To do so, we grab the annotation from the GTF file and remove those junctions that correspond to the genes on this chromosome.
-
-So this is a count matrix row adjustment.
-
-```{r}
-dim(fromGTF.A3SS)
-dim(fromGTF.A5SS)
-dim(fromGTF.MXE)
-dim(fromGTF.RI)
-dim(fromGTF.SE)
-
-A3SS.genes <- factor(fromGTF.A3SS$geneSymbol)
-A5SS.genes <- factor(fromGTF.A5SS$geneSymbol)
-MXE.genes  <- factor(fromGTF.MXE$geneSymbol)
-RI.genes   <- factor(fromGTF.RI$geneSymbol)
-SE.genes   <- factor(fromGTF.SE$geneSymbol)
-
-length(levels(A3SS.genes))    
-length(levels(A5SS.genes))    
-length(levels(MXE.genes))    
-length(levels(RI.genes))    
-length(levels(SE.genes))    
-
-table(fromGTF.A3SS$chr)
-table(fromGTF.A5SS$chr)
-table(fromGTF.MXE$chr)
-table(fromGTF.RI$chr)
-table(fromGTF.SE$chr)
-
-A3SS.keepAllJunctionsButChrY <- (fromGTF.A3SS$chr != "chrY")
-A5SS.keepAllJunctionsButChrY <- (fromGTF.A5SS$chr != "chrY")
-MXE.keepAllJunctionsButChrY  <- (fromGTF.MXE$chr  != "chrY")
-RI.keepAllJunctionsButChrY   <- (fromGTF.RI$chr   != "chrY")
-SE.keepAllJunctionsButChrY   <- (fromGTF.SE$chr   != "chrY")
-
-table(A3SS.keepAllJunctionsButChrY)
-sum(table(A3SS.keepAllJunctionsButChrY))
-
-table(A5SS.keepAllJunctionsButChrY)
-sum(table(A5SS.keepAllJunctionsButChrY))
-
-table(MXE.keepAllJunctionsButChrY)
-sum(table(MXE.keepAllJunctionsButChrY))
-
-table(RI.keepAllJunctionsButChrY)
-sum(table(RI.keepAllJunctionsButChrY))
-
-table(SE.keepAllJunctionsButChrY)
-sum(table(SE.keepAllJunctionsButChrY))
-
-a3ss_fromGTF_no_chrY          <- fromGTF.A3SS[A3SS.keepAllJunctionsButChrY,]
-a3ss_jc_ijc_no_chrY           <- a3ss.jc.ijc2[A3SS.keepAllJunctionsButChrY,]
-a3ss_jc_sjc_no_chrY           <- a3ss.jc.sjc2[A3SS.keepAllJunctionsButChrY,]
-rownames(a3ss_jc_ijc_no_chrY) <- rownames(a3ss_fromGTF_no_chrY)
-rownames(a3ss_jc_sjc_no_chrY) <- rownames(a3ss_fromGTF_no_chrY)
-
-a5ss_fromGTF_no_chrY          <- fromGTF.A5SS[A5SS.keepAllJunctionsButChrY,]
-a5ss_jc_ijc_no_chrY           <- a5ss.jc.ijc2[A5SS.keepAllJunctionsButChrY,]
-a5ss_jc_sjc_no_chrY           <- a5ss.jc.sjc2[A5SS.keepAllJunctionsButChrY,]
-rownames(a5ss_jc_ijc_no_chrY) <- rownames(a5ss_fromGTF_no_chrY)
-rownames(a5ss_jc_sjc_no_chrY) <- rownames(a5ss_fromGTF_no_chrY)
-
-mxe_fromGTF_no_chrY          <- fromGTF.MXE[MXE.keepAllJunctionsButChrY,]
-mxe_jc_ijc_no_chrY           <- mxe.jc.ijc2[MXE.keepAllJunctionsButChrY,]
-mxe_jc_sjc_no_chrY           <- mxe.jc.sjc2[MXE.keepAllJunctionsButChrY,]
-rownames(mxe_jc_ijc_no_chrY) <- rownames(mxe_fromGTF_no_chrY)
-rownames(mxe_jc_sjc_no_chrY) <- rownames(mxe_fromGTF_no_chrY)
-
-ri_fromGTF_no_chrY          <- fromGTF.RI[RI.keepAllJunctionsButChrY,]
-ri_jc_ijc_no_chrY           <- ri.jc.ijc2[RI.keepAllJunctionsButChrY,]
-ri_jc_sjc_no_chrY           <- ri.jc.sjc2[RI.keepAllJunctionsButChrY,]
-rownames(ri_jc_ijc_no_chrY) <- rownames(ri_fromGTF_no_chrY)
-rownames(ri_jc_sjc_no_chrY) <- rownames(ri_fromGTF_no_chrY)
-
-se_fromGTF_no_chrY          <- fromGTF.SE[SE.keepAllJunctionsButChrY,]
-se_jc_ijc_no_chrY           <- se.jc.ijc2[SE.keepAllJunctionsButChrY,]
-se_jc_sjc_no_chrY           <- se.jc.sjc2[SE.keepAllJunctionsButChrY,]
-rownames(se_jc_ijc_no_chrY) <- rownames(se_fromGTF_no_chrY)
-rownames(se_jc_sjc_no_chrY) <- rownames(se_fromGTF_no_chrY)
-
-dim(a3ss_fromGTF_no_chrY)
-dim(a5ss_fromGTF_no_chrY)
-dim(mxe_fromGTF_no_chrY)
-dim(ri_fromGTF_no_chrY)
-dim(se_fromGTF_no_chrY)
-
-dim(a3ss_jc_ijc_no_chrY)
-dim(a3ss_jc_sjc_no_chrY)
-
-dim(a5ss_jc_ijc_no_chrY)
-dim(a5ss_jc_sjc_no_chrY)
-
-dim(mxe_jc_ijc_no_chrY)
-dim(mxe_jc_sjc_no_chrY)
-
-dim(ri_jc_ijc_no_chrY)
-dim(ri_jc_sjc_no_chrY)
-
-dim(se_jc_ijc_no_chrY)
-dim(se_jc_sjc_no_chrY)
+eliminateChrYfromExpressionSet <- function ( fromGTF, es ) {
+
+   fromGTF.keepAllButChrY <- (fromGTF$chr != "Y")
+   fromGTF           <- fromGTF[fromGTF.keepAllButChrY,]
+   rownames(fromGTF) <- fromGTF$ID
+
+   es_ids <- rownames(es)
+   gtf_ids <- fromGTF$ID
+   keep <- es_ids %in% gtf_ids
+
+   es <- es[keep==TRUE,]
+   return(fromGTF)
+}
 ```
 
 ## Exploratory and Differential analysis as_event:ijc, sjc 
@@ -1604,50 +1065,99 @@ Additional values set to enable this notebook to be executed as a nextflow workf
     
 
 ```{r}
-tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
-tissue_list
-length(tissue_list)
-pdata_tissue_list <- factor(snakecase::to_snake_case(as.character(pData(reduced_obj2)$SMTSD)))
-levels(pdata_tissue_list)
-length(levels(pdata_tissue_list))
+#
+# Main routine
+#
+# get the released rmats matrices (rows junction ids, columns accessions (SRR)
+# 
+getReleasedRMATSData (destDir <- "../data/")
 
-```
+#
+# 1.2.1 get the rmats 3.2.5 discovered/annoated junction information in GTF format
+#
+getReleasedGTFAnnotations (destDir <- "../data")
 
-```{r}
+#
+# 1.2.2 get released GTF Annotations (destDir)
+#
+getReleasedGTFAnnotations (destDir <- "../data/")
+
+#
+# 1.2.3 get SRR Accession Metadata (available through dbGaP)
+#
+srr_metadata <- getSraRunData (destDir <- "../data/")
+
+#
+# 1.2.4 get GTEx expression Set Data
+#
+obj <- getGTExExpressionSet (destDir <- "../data/")
+
+#
+# 1.2.4 inspect and correct GTEx ExpressionSet obj
+#
+obj <- inspectAndCorrectExpressionSetObject ( obj )
+
+#
+# 1.2.5 get reduced Tissue data
+#
+tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
+
+#
+# 1.3.1 inspect and correct the expressionSet object
+#
+obj <- inspectAndCorrectExpressionSetObject ( obj )
+
+#
+# 1.3.2 Reduce Sample Set
+#
+obj <- reduceSampleSet ( tissue_reduction, obj )
+
+#
+# 1.3.3 Eliminate ChrY
+#
+obj <- eliminateChrY (obj, fromGTF) 
+
+
+#
+# Replace `.` with `_` for ease and display. 
+# snakecase to ensure comparisons are like to like
+#
+srr_metadata$SAMPID <- gsub('-','\\.',srr_metadata$'Sample Name')
+pData(obj)$SAMPID   <- gsub('-','\\.',pData(reduced_obj)$SAMPID)
+tissue_list         <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
+
+#
+# Useful for debugging to play with these parameters
+# and to reduce to a subset of entire splice_list
 # splice_list <- c("a3ss_","a5ss_","mxe_","ri_","se_")
-
-splice_list  <- c( "se_")
-
-# parameters that do not change with splice_type
-tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
-tissue_list
-length(tissue_list)
-
-metadata     <- ocounts_metadata
+#
 plot         <- TRUE
 dup          <- FALSE
-obj          <- reduced_obj2
+splice_list  <- c( "se_")
 
+#
 # parameters that change with each splice type (3)
-# fromGTF
-# ijc
-# sjc
+# 1. fromGTF
+# 2. ijc
+# 3. sjc
 
-#for (tissue_index in 1:length(tissue_list)) {
+# Could run this as a loop - or rather, using a package [package name]
+# run this notebook as a nextflow workflow
+# Requirements are that all required input are in a bucket data.tar.gz
+# and assets 
+# for (tissue_index in 1:length(tissue_list)) {
 
     # a3ss
     splice_type = "a3ss_"
     res = splice_list %in% splice_type
     tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
-    message ("processing ",
-             paste(tissue_of_interest), " \n")
-    
     if (sum(res) == 1) {
-        message ("splice_list does contain\n",
-             paste(splice_type), " continuing with processing\n")
-        fromGTF             = a3ss_fromGTF_no_chrY
-        ijc                 = a3ss_jc_ijc_no_chrY
-        sjc                 = a3ss_jc_sjc_no_chrY
+        fromGTF  <- read.table("../data/fromGTF.A3SS.txt", header=TRUE)
+        fromGTF  <- eliminateChrYfromGTF (fromGTF)
+        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a3ss.jc.ijc.txt.gz")
+        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a3ss.jc.sjc.txt.gz")
+        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
         print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
@@ -1665,9 +1175,12 @@ obj          <- reduced_obj2
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF             = a5ss_fromGTF_no_chrY
-        ijc                 = a5ss_jc_ijc_no_chrY
-        sjc                 = a5ss_jc_sjc_no_chrY
+        fromGTF  <- read.table("../data/fromGTF.A5SS.txt", header=TRUE)
+        fromGTF  <- eliminateChrYfromGTF (fromGTF)
+        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a5ss.jc.ijc.txt.gz")
+        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a5ss.jc.sjc.txt.gz")
+        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
         print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
@@ -1685,9 +1198,12 @@ obj          <- reduced_obj2
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF             = mxe_fromGTF_no_chrY
-        ijc                 = mxe_jc_ijc_no_chrY
-        sjc                 = mxe_jc_sjc_no_chrY
+        fromGTF  <- read.table("../data/fromGTF.MXE.txt", header=TRUE)
+        fromGTF  <- eliminateChrYfromGTF (fromGTF)
+        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.mxe.jc.ijc.txt.gz")
+        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.mxe.jc.sjc.txt.gz")
+        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
         print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
@@ -1705,9 +1221,12 @@ obj          <- reduced_obj2
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF             = ri_fromGTF_no_chrY
-        ijc                 = ri_jc_ijc_no_chrY
-        sjc                 = ri_jc_sjc_no_chrY
+        fromGTF  <- read.table("../data/fromGTF.RI.txt", header=TRUE)
+        fromGTF  <- eliminateChrYfromGTF (fromGTF)
+        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.ri.jc.ijc.txt.gz")
+        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.ri.jc.sjc.txt.gz")
+        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
         print_exploratory_plots (plot, 
                              dup,
                              tissue_of_interest, 
@@ -1725,9 +1244,12 @@ obj          <- reduced_obj2
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF             = se_fromGTF_no_chrY
-        ijc                 = se_jc_ijc_no_chrY
-        sjc                 = se_jc_sjc_no_chrY
+        fromGTF  <- read.table("../data/fromGTF.SE.txt", header=TRUE)
+        fromGTF  <- eliminateChrYfromGTF (fromGTF)
+        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.ijc.txt.gz")
+        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.sjc.txt.gz")
+        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
         print_exploratory_plots (plot, 
                               dup,
                               tissue_of_interest, 
