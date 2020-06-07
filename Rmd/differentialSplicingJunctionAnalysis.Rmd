@@ -322,13 +322,13 @@ getGTExExpressionSet <- function ( destDir ) {
 
   if (!("gtex.rds" %in% list.files(destDir))) {
     message("Downloading and loading obj with GTEx v8 with 'yarn::downloadGTExV8()'\n")
-    obj <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+    es <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
     message("Done!\n")
 
   } else {
     # Load with readRDS() if gtex.rds available in data/
       message("Loading obj GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
-      obj <- readRDS(file = "../data/gtex.rds")
+      es <- readRDS(file = "../data/gtex.rds")
       message("Done!\n")
       message("Generating sha256sum for gtex.rds ..\n")    
       message(system("sha256sum ../data/gtex.rds", intern = TRUE))
@@ -438,8 +438,6 @@ inspectAndCorrectExpressionSetObject <- function ( es ) {
    es        <- es       [logical_match_names==TRUE,]
    pData(es) <- pData(es)[logical_match_names==TRUE,]
 
-   message("\nAFTER: phenotype of expressionSet Esect\n",
-        paste(tail (pData(es),2)), collapse=" ")
    message("\nAFTER: dimension of expressionSet Esect\n",
         paste(dim(exprs(es))), collapse=" ")
    message("\nAFTER: dimension of expressionSet Esect\n",
