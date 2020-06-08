@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.4.2
+      jupytext_version: 1.3.3
   kernelspec:
     display_name: R
     language: R
@@ -45,8 +45,8 @@ For our analysis here, we used just the jc count matrices.
 # 1.0 Loading dependencies
 
 ```{r}
-#devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0")
-#install.packages("gprofiler2")
+devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0")
+install.packages("gprofiler2")
 library(gprofiler2)
 library(downloader)
 library(readr)
@@ -305,119 +305,32 @@ getSraRunData <- function ( destDir ) {
         dest = destDir)
   }
   message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")
-  metadata <- data.table::fread("../data/SraRunTable.txt.gz")
+  srr_metadata <- data.table::fread("../data/SraRunTable.txt.gz")
   message("done!\n")
-  
-  return(metadata)
+  message("Replacing dashes with dots in sample name")
+  srr_metadata$SAMPID <- gsub('-','\\.',srr_metadata$biospecimen_repository_sample_id)
+  message("done!\n")
+  return(srr_metadata)
 
 }
 ```
-## 1.2.4 Read in GTEx expression object
+## 1.2.4 Renew GTEx expression object
 
 - `Genome Tissue Expression (GTEx)` Clinical Annotation - this is the expressionSet object that has the phenotype information
-In this analysis there will be 3 expressionSet objects.  This one contains the gene Expression Count Data and phenotypes
-
-```{r}
-getGTExExpressionSet <- function ( destDir ) {
-
-  if (!("gtex.rds" %in% list.files(destDir))) {
-    message("Downloading and loading obj with GTEx v8 with 'yarn::downloadGTExV8()'\n")
-    es <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
-    message("Done!\n")
-
-  } else {
-    # Load with readRDS() if gtex.rds available in data/
-      message("Loading obj GTEx v8 rds object with readRDS from ../data/gtex.rds ..\n")   
-      es <- readRDS(file = "../data/gtex.rds")
-      message("Done!\n")
-      message("Generating sha256sum for gtex.rds ..\n")    
-      message(system("sha256sum ../data/gtex.rds", intern = TRUE))
-      message("Done!\n")
-  }
-  return (es)
-
-}
-```
-### 1.2.5 get reduced Tissue Data
-
-Stored in the assets subdirectory, reduced by inspection and selection focusing on those tissues with sufficient samples.
-
-```{r}
-getTissueReduction <- function ( filename ) {
-
-    tissue_reduction <- read.table(filename, header=TRUE, sep="\t",
-                               skipNul=FALSE, stringsAsFactors = FALSE)
-    colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
-
-    return(tissue_reduction)
-}
-```
-### 1.2.6 read in and make Splicing Expression Set Object
-
-Using the expressionSet object, we will make an expression set object for each of the count matrices for each of the alternative splicing matrices.
-
-```{r}
-makeSplicingExpressionSetObject <- function (gtexPhenoDataObj, srr_metadata, filename_gz) {
-
-    message("\nloading ", paste(counts_filename_gz), collapse=" ")
-    counts <- data.table::fread(counts_filename_gz)
-    message("done!")
-    rownames(counts) <- counts$ID
-    counts <- counts[,-1]
-    counts <- data.matrix(counts)
-
-    metadata_for_counts = colnames(counts)%in% srr_metadata$Run
-    counts_for_metadata = srr__metadata$Run %in% colnames(counts)
-    message("\nmetadata runs matching counts\n",
-       paste(table(metadata_for_counts)), collapse = " ")
-    message("\ncounts matching metadata\n",
-       paste(table(counts_for_metadata)), collapse = " ")
-
-    counts       <- counts      [                         ,metadata_for_counts==TRUE]
-    srr_metadata <- srr_metadata[counts_for_metadata==TRUE,                         ]
-
-    # now we arrange metadata and counts to be in the same order
-    # Run numbers are unique, but we will replace the columns with SAMPID as metadata is by SAMPID
-    i = order(colnames(counts))
-    j = order(srr_metadata$Run)
-
-    counts        = counts[,i]
-    srr__metadata = srr_metadata[j,]
-
-   
-    # phenotype data will be repeated - for samples that are shared
-    # because of that we have to build the matrix
-    # build the matrix from the first one, rbind within the loop
-    sample_match = srr_metadata[colnames(counts[,1]) == metadata$Run,]
-    pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID==metadata$SAMPID,])
-    pd$SRR <- metadata$Run
-    pdfinal <- pd
-    for (i in 2:dim(counts)[2]) {
-        sample_match = srr_metadata[colnames(counts[,i]) == metadata$Run,]
-        pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID==metadata$SAMPID,])
-        pd$SRR <- metadata$Run
-        pdfinal <- rbind(pdfinal, pd)
-    }
-
-    # because we have multiple SRR per Sample, 
-    es  <- ExpressionSet(as.matrix(counts))
-    pData(es) <- pdfinal
-
-    return(es)
-}
-```
-
-## 1.3 Quality control, preprocessing of gene ExpressionSet Object
-
-### 1.3.1 Inspect and correct ExpressionSet Object
-
-Ensure the expression set object is in sync with its phenotype information (as before in the differentialGeneExpression notebook.
+In this analysis there will be 3 expressionSet objects.  This one contains the gene Expression Count Data and phenotypes  -- this is done in two parts, pull it from yarn, and then inspect and correct.
 
 ```{r}
 inspectAndCorrectExpressionSetObject <- function ( es ) {
 
-   sample_names=as.vector(as.character(colnames(exprs(obj))))
-   pheno_sample_names=as.vector(as.character(rownames(pData(obj))))
+   message("\nBEFORE: dim(exprs(es))[2]\n",
+        paste(dim(exprs(es))[2]), collapse=" ")
+   message("\nBEFORE: dim(pData(es))[1]\n",
+        paste(dim(pData(es))[1]), collapse=" ")
+   message("\nBEFORE: dimension of expressionSet\n",
+        paste(dim(es)[2]), collapse=" ")
+
+   sample_names=as.vector(as.character(colnames(exprs(es))))
+   pheno_sample_names=as.vector(as.character(rownames(pData(es))))
    
    if (length(pheno_sample_names) > length(sample_names)) {
       superset <- pheno_sample_names
@@ -435,19 +348,188 @@ inspectAndCorrectExpressionSetObject <- function ( es ) {
    message("\nLogical diff pheno_sample_names, expression_sample_names\n",
         paste(table(logical_match_names)), collapse = " ")
 
-   es        <- es       [logical_match_names==TRUE,]
    pData(es) <- pData(es)[logical_match_names==TRUE,]
 
-   message("\nAFTER: dimension of expressionSet Esect\n",
-        paste(dim(exprs(es))), collapse=" ")
-   message("\nAFTER: dimension of expressionSet Esect\n",
-        paste(dim(es)), collapse=" ")
+   message("\nAFTER: dim(exprs(es))[2]\n",
+        paste(dim(exprs(es))[2]), collapse=" ")
+   message("\nAFTER:: dim(pData(es))[1]\n",
+        paste(dim(pData(es))[1]), collapse=" ")
+   message("\nAFTER:: dimension of es\n",
+        paste(dim(es)[2]), collapse=" ")
+   message("Saving corrected gtex.rds..\n")
+   saveRDS(es, file="../data/gtex.corrected.rds")   
+   message("Generating sha256sum for gtex.corrected.rds ..\n")    
+   message(system("sha256sum ../data/gtex.corrected.rds", intern = TRUE))
+   message("Done!\n")
 
    return(es)
 }
 
 ```
-### 1.3.2  Reduce Sample Set 
+```{r}
+
+getGTExExpressionSet <- function ( destDir ) {
+  if (!("gtex.rds" %in% list.files(destDir))) {
+      message("Downloading and loading obj with GTEx v8 with 'yarn::downloadGTExV8()'\n")
+      es <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
+      message("Done!\n")
+      message("Generating sha256sum for gtex.rds ..\n")    
+      message(system("sha256sum ../data/gtex.rds", intern = TRUE))
+      message("Done!\n")
+      message("running inspectAndCorrectExpressionSet to generate gtex.corrected.rds\n")
+      es <- inspectAndCorrectExpressionSetObject (es)
+      message("Done!\n")
+      
+  } else {
+    # Load with readRDS() if gtex.rds available in data/
+      message("Loading obj GTEx v8 corrected rds object with readRDS from ../data/gtex.corrected.rds\n")   
+      es <- readRDS(file = "../data/gtex.corrected.rds")
+      message("Done!\n")
+      message("Generating sha256sum for gtex.corrected.rds ..\n")    
+      message(system("sha256sum ../data/gtex.corrected.rds", intern = TRUE))
+      message("Done!\n")
+  }
+  return (es)
+
+}
+```
+
+### 1.2.5 get gtex.corrected.rds
+
+```{r}
+getGTExCorrectedRDS <- function ( destDir ) {
+
+  if (!("gtex.corrected.rds" %in% list.files(destDir))) {
+    piggyback::pb_download(
+        show_progress = TRUE,
+        repo = "TheJacksonLaboratory/sbas", 
+        file = "gtex.corrected.rds",
+        tag  = "GTExV8.v1.0", 
+        dest = destDir)
+  }
+  message("Loading gtex.corrected.rds ..\n")
+  es <- readRDS(file = "../data/gtex.corrected.rds")
+  message("done!\n")
+  return(es)
+
+}
+```
+
+### 1.2.6 get reduced Tissue Data
+
+Stored in the assets subdirectory, reduced by inspection and selection focusing on those tissues with sufficient samples.
+
+```{r}
+getTissueReduction <- function ( filename ) {
+
+    tissue_reduction <- read.table(filename, header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+    colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
+
+    return(tissue_reduction)
+}
+```
+### 1.2.7 read in and make Splicing Expression Set Object
+
+Using the expressionSet object, we will make an expression set object for each of the count matrices for each of the alternative splicing matrices.
+
+```{r}
+gtexPhenoDataObj <- obj
+srr_metadata <- srr_metadata
+filename_gz <- "../data/rmats_final.se.jc.ijc.txt.gz"
+dim(pData(gtexPhenoDataObj))
+dim(srr_metadata)
+```
+
+```{r}
+    message("\nloading ", paste(filename_gz), collapse=" ")
+    counts <- data.table::fread(filename_gz)
+    message("done!")
+    rownames(counts) <- counts$ID
+    counts <- counts[,-1]
+    counts <- data.matrix(counts)
+    metadata_for_counts = colnames(counts)%in% srr_metadata$Run
+    counts_for_metadata = srr_metadata$Run %in% colnames(counts)
+    message("\nmetadata runs matching counts\n",
+       paste(table(metadata_for_counts)), collapse = " ")
+    message("\ncounts matching metadata\n",
+       paste(table(counts_for_metadata)), collapse = " ")
+    count_srrs <- colnames(counts)
+    srr_metadata_match <- as.character(srr_metadata$Run) %in% as.character(count_srrs[1])
+    message("\n SraRunTable match to SRR counts\n",
+            paste(table(srr_metadata_match)), collapse = " ")
+    srr_metadata_sampid <- srr_metadata[srr_metadata_match==TRUE,]$SAMPID
+
+    write.csv(pData(gtexPhenoDataObj), "../data/pData_gtex_corrected_obj.csv", quote=FALSE, row.names=FALSE)
+
+    pData(gtexPhenoDataObj)$SAMPID <- gsub('-','\\.',pData(gtexPhenoDataObj)$SAMPID)
+    pd_sampid_match <- as.character(pData(gtexPhenoDataObj)$SAMPID) %in% as.character(srr_metadata_sampid)
+    message("\n counts SAMPID match to phenotype Data SAMPID\n",
+            paste(table(pd_sampid_match)), collapse = " ")
+    pd     <- pData(gtexPhenoDataObj)[pd_sampid_match,]
+    srr_metadata_srr <- srr_metadata[srr_metadata_match==TRUE,]$Run
+    pd$SRR <- srr_metadata_srr
+    pdfinal <- pd
+
+    for (i in 2:dim(counts)[2]) {
+        srr_metadata_match <- as.character(srr_metadata$Run) %in% as.character(count_srrs[i])
+        message("\n SraRunTable match to SRR counts\n",
+            paste(table(srr_metadata_match)), collapse = " ")
+        srr_metadata_sampid <- srr_metadata[srr_metadata_match==TRUE,]$SAMPID
+        pData(gtexPhenoDataObj)$SAMPID <- gsub('-','\\.',pData(gtexPhenoDataObj)$SAMPID)
+        pd_sampid_match <- as.character(pData(gtexPhenoDataObj)$SAMPID) %in% as.character(srr_metadata_sampid)
+        message("\n counts SAMPID match to phenotype Data SAMPID\n",
+            paste(table(pd_sampid_match)), collapse = " ")
+        pd     <- pData(gtexPhenoDataObj)[pd_sampid_match,]
+        srr_metadata_srr <- srr_metadata[srr_metadata_match==TRUE,]$Run
+        pd$SRR <- srr_metadata_srr
+        pdfinal <- rbind(pdfinal, pd)
+    }
+
+
+```
+
+```{r}
+i
+```
+
+```{r}
+makeSplicingExpressionSetObject <- function (gtexPhenoDataObj, srr_metadata, filename_gz) {
+
+    message("\nloading ", paste(filename_gz), collapse=" ")
+    counts <- data.table::fread(filename_gz)
+    message("done!")
+    rownames(counts) <- counts$ID
+    counts <- counts[,-1]
+    counts <- data.matrix(counts)
+
+    # getting the SRR accession names for counts
+    count_srrs <- colnames(counts)
+    match = as.character(srr_metadata$Run) %in% as.character(count_srrs[1])
+    pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID== srr_metadata[match,"SAMPID"],])
+                    
+    pd$SRR <- srr_metadata$Run
+    pdfinal <- pd
+    for (i in 2:dim(counts)[2]) {
+        sample_match = srr_metadata[colnames(counts[,i]) == srr_metadata$Run,]
+        pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID== srr_metadata$SAMPID,])
+        pd$SRR <- srr_metadata$Run
+        pdfinal <- rbind(pdfinal, pd)
+    }
+
+    # because we have multiple SRR per Sample, 
+    es  <- ExpressionSet(as.matrix(counts))
+    pData(es) <- pdfinal
+
+    return(es)
+}
+```
+
+## 1.3 Preprocessing 
+
+
+
+### 1.3.1  Reduce Sample Set 
 Read in all requirements so that the stage is properly set -- tissues.tsv contains the subset of files desired for analysis.
 It is found in the `assets` subdirectory
 
@@ -523,30 +605,26 @@ reduceSampleSet <- function (tissue_reduction, es) {
    return (es)
 }
 ```
-### 1.3.3 Eliminate ChrY fromGTF
+### 1.3.2 Eliminate ChrY fromGTF
 
 We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
 
 ```{r}
 eliminateChrYfromGTF <- function ( fromGTF ) {
 
-   fromGTF.keepAllButChrY <- (fromGTF$chr != "Y")
+   fromGTF.keepAllButChrY <- (fromGTF$chr != "chrY")
    fromGTF           <- fromGTF[fromGTF.keepAllButChrY,]
    rownames(fromGTF) <- fromGTF$ID
    return(fromGTF)
 }
 ```
-### 1.3.4 Eliminate ChrY from expressionSet Object
+### 1.3.3 Eliminate ChrY from expressionSet Object
 
 We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
 This time from the expressionSet Object
 
 ```{r}
 eliminateChrYfromExpressionSet <- function ( fromGTF, es ) {
-
-   fromGTF.keepAllButChrY <- (fromGTF$chr != "Y")
-   fromGTF           <- fromGTF[fromGTF.keepAllButChrY,]
-   rownames(fromGTF) <- fromGTF$ID
 
    es_ids <- rownames(es)
    gtf_ids <- fromGTF$ID
@@ -1085,42 +1163,16 @@ srr_metadata <- getSraRunData (destDir <- "../data/")
 ```
 ```{r}
 #
-# 1.2.4 get GTEx expression Set Data
+# 1.2.5 get corrected GTEx expression Set Data
 #
-obj <- getGTExExpressionSet (destDir <- "../data/")
+obj <- getGTExCorrectedRDS (destDir <- "../data/")
+
 ```
 ```{r}
 #
 # 1.2.5 get reduced Tissue data
 #
 tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
-```
-```{r}
-#
-# 1.3.1 inspect and correct the expressionSet object
-#
-obj <- inspectAndCorrectExpressionSetObject ( obj )
-```
-```{r}
-#
-# 1.3.2 Reduce Sample Set
-#
-obj <- reduceSampleSet ( tissue_reduction, obj )
-```
-```{r}
-#
-# 1.3.3 Eliminate ChrY
-#
-obj <- eliminateChrY (obj, fromGTF) 
-```
-```{r}
-#
-# Replace `.` with `_` for ease and display. 
-# snakecase to ensure comparisons are like to like
-#
-srr_metadata$SAMPID <- gsub('-','\\.',srr_metadata$'Sample Name')
-pData(obj)$SAMPID   <- gsub('-','\\.',pData(reduced_obj)$SAMPID)
-tissue_list         <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
 ```
 ```{r}
 #
@@ -1131,10 +1183,8 @@ tissue_list         <- factor(snakecase::to_snake_case(as.character(tissue_reduc
 plot         <- TRUE
 dup          <- FALSE
 splice_list  <- c( "se_")
-
 ```
 ```{r}
-#
 # parameters that change with each splice type (3)
 # 1. fromGTF
 # 2. ijc
@@ -1147,6 +1197,7 @@ splice_list  <- c( "se_")
 # for (tissue_index in 1:length(tissue_list)) {
 ```
 ```{r}
+    tissue_list         <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
     # a3ss
     splice_type = "a3ss_"
     res = splice_list %in% splice_type
@@ -1154,6 +1205,7 @@ splice_list  <- c( "se_")
     if (sum(res) == 1) {
         fromGTF  <- read.table("../data/fromGTF.A3SS.txt", header=TRUE)
         fromGTF  <- eliminateChrYfromGTF (fromGTF)
+        
         ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a3ss.jc.ijc.txt.gz")
         ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
         sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a3ss.jc.sjc.txt.gz")
@@ -1255,21 +1307,26 @@ splice_list  <- c( "se_")
         fromGTF  <- read.table("../data/fromGTF.SE.txt", header=TRUE)
         fromGTF  <- eliminateChrYfromGTF (fromGTF)
         ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.ijc.txt.gz")
-        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.sjc.txt.gz")
-        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-        print_exploratory_plots (plot, 
-                              dup,
-                              tissue_of_interest, 
-                              splice_type, 
-                              fromGTF, 
-                              tissue_list, 
-                              ijc, 
-                              sjc, 
-                              obj, 
-                              metadata )
+#        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+#        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.sjc.txt.gz")
+#        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+#        print_exploratory_plots (plot, 
+#                              dup,
+#                              tissue_of_interest, 
+#                              splice_type, 
+#                              fromGTF, 
+#                              tissue_list, 
+#                              ijc, 
+#                              sjc, 
+#                              obj, 
+#                              metadata )
     }
 #}
+```
+
+```{r}
+table(fromGTF$chr)
+dim(pData(obj))
 ```
 
 ## Metadata
