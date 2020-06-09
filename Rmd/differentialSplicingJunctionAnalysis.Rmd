@@ -45,8 +45,8 @@ For our analysis here, we used just the jc count matrices.
 # 1.0 Loading dependencies
 
 ```{r}
-devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0")
-install.packages("gprofiler2")
+#devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0")
+#install.packages("gprofiler2")
 library(gprofiler2)
 library(downloader)
 library(readr)
@@ -63,9 +63,8 @@ library(edgeR)
 library(tibble)
 #install.packages('R.utils')
 library(R.utils)
-install.packages("snakecase")
+#install.packages("snakecase")
 library(snakecase)
-
 ```
 
 ## 1.1 Nextflow execution parameter execution
@@ -519,15 +518,17 @@ getGTExPhenoDataForSRR <- function (destDir) {
         piggyback::pb_download(
                show_progress = TRUE,
                repo = "TheJacksonLaboratory/sbas", 
-               file = "gtex.corrected.rds",
+               file = "srr_pdata.csv",
                tag  = "GTExV8.v1.0", 
                dest = destDir)
         message("Loading srr_pdata\n")
-        srr_pdata <- read.csv(file = paste0(destDir, "srr_pdata.csv"), quote=FALSE)
+        srr_pdata <- read.table(file = "../data/srr_pdata.csv", header=TRUE, sep=",",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
         message("done!\n")
     } else {
         message("Loading srr_pdata\n")
-        srr_pdata <- read.csv(file = paste0(destDir, "srr_pdata.csv"), quote=FALSE)
+        srr_pdata <- read.table(file = "../data/srr_pdata.csv", header=TRUE, sep=",",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
         message("done!\n")
     }
     return(srr_pdata)
@@ -547,6 +548,9 @@ makeCountsMatrix <- function (filename_gz) {
     counts <- data.matrix(counts)
     return(counts)
 }
+```
+
+
 ### 1.2.10 makeSplicingExpressionSetObject 
 
 Given the phenotype data object for each of the count matrices, create an expressionSet object for each to facilitate analysis.
@@ -581,7 +585,6 @@ reduceSampleSet <- function (tissue_reduction, es) {
    # only include those tissues we wish to continue with
    message("\n number of tissue types to keep\n",
         paste(table(tissue_reduction$include)), collapse = " ")
-	
    tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 
    # test to make sure we don't have nonsense
@@ -1197,20 +1200,19 @@ getReleasedGTFAnnotations (destDir <- "../data")
 #
 srr_metadata <- getSraRunData (destDir <- "../data/")
 ```
-#
-# OPTIONAL and TIME CONSUMING
-# 1.2.4 Renew GTEx expression object
-#
 ```{r}
-renewGTExPhenoDataObj = FALSE
+#
+# 1.2.4 Renew GTEx expression object
+# OPTIONAL and TIME CONSUMINGrenewGTExPhenoDataObj = FALSE
 if (renewGTExPhenoDataObj) {
   gtexPhenoObj <- renewGTExExpressionSet(destDir <- "../data/")
 } 
 ```
+```{r}
 #
 # 1.2.5 get corrected GTEx expression Set Data
+# Released in previous runs the corrected GTEx expression Set Object, grab from the release
 #
-```{r}
 if (!renewGTExPhenoDataObj) {
    gtexPhenoDataObj <- getGTExCorrectedRDS (destDir <- "../data/")
 }
@@ -1221,24 +1223,33 @@ if (!renewGTExPhenoDataObj) {
 #
 tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
 ```
+```{r}
 #
-# OPTIONAL AND TIME CONSUMING - better to grab from release!
 # 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
-# any counts matrix will do...
+# Any counts matrix will do...
+# OPTIONAL AND TIME CONSUMING - better to grab from release!
 #
 grabFromRelease = TRUE
 if (!grabFromRelease) {
-    filename_gz <- "../data/rmats_final.se.jc.ijc.txt.gz")
+    filename_gz <- "../data/rmats_final.se.jc.ijc.txt.gz"
     counts_srr <- makeCountsMatrix (filename_gz)
     srr_pdata <- getGTExPhenoDataForSRR (counts_srr, gtexPhenoDataObj, srr_metadata)
 }
+```
+
+```{r}
 #
 # 1.2.8 get GTEx Phenotype Data accessions SRR from releaase
 #
-```{r}
 if (grabFromRelease) {
     srr_pdata <- getGTExPhenoDataForSRR ("../data/")
 }
+```
+
+```{r}
+dim(srr_pdata)
+```
+
 ```{r}
 #
 # Now the meat of our work
@@ -1248,14 +1259,11 @@ if (grabFromRelease) {
 plot         <- TRUE
 dup          <- FALSE
 splice_list  <- c( "se_")
-```
 
-```{r}
 # parameters that change with each splice type (3)
 # 1. fromGTF
 # 2. ijc
 # 3. sjc
-
 # Could run this as a loop - or rather, using a package [package name]
 # run this notebook as a nextflow workflow
 # Requirements are that all required input are in a bucket data.tar.gz
