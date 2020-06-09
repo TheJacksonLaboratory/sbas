@@ -522,13 +522,11 @@ getGTExPhenoDataForSRR <- function (destDir) {
                tag  = "GTExV8.v1.0", 
                dest = destDir)
         message("Loading srr_pdata\n")
-        srr_pdata <- read.table(file = "../data/srr_pdata.csv", header=TRUE, sep=",",
-                               skipNul=FALSE, stringsAsFactors = FALSE)
+        srr_pdata <- readr::read_csv("../data/srr_pdata.csv")
         message("done!\n")
     } else {
         message("Loading srr_pdata\n")
-        srr_pdata <- read.table(file = "../data/srr_pdata.csv", header=TRUE, sep=",",
-                               skipNul=FALSE, stringsAsFactors = FALSE)
+        srr_pdata <- readr::read_csv("../data/srr_pdata.csv")
         message("done!\n")
     }
     return(srr_pdata)
@@ -1381,8 +1379,8 @@ splice_list  <- c( "se_")
         fromGTF    <- read.table("../data/fromGTF.SE.txt", header=TRUE)
         fromGTF    <- eliminateChrYfromGTF (fromGTF)
         ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.se.jc.ijc.txt.gz")
-	ijc        <- makeSplicingExpressionSetObj (srr_pdata <- srr_pdata, counts <- ijc_counts)
-	
+        ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
+
 #        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
 #        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.sjc.txt.gz")
 #        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
