@@ -555,12 +555,72 @@ Given the phenotype data object for each of the count matrices, create an expres
 
 ```{r}
 makeSplicingExpressionSetObject <- function (srr_pdata, counts) {
+    message("making splicing expressionSet object")
+    #
+    # match srr counts with srr_pdata - there were some srr without phenodata
+    #
+    pdata_match <- as.character(colnames(counts)) %in% as.character(srr_pdata$'SRR')
+    
+    counts <- counts[,pdata_match]
 
-    es  <- ExpressionSet(as.matrix(counts))
-    pData(es) <- srr_pdata
+    #
+    # reorder the srr_pdata to match the colnames of the counts
+    #
+    reorder_idx <- match(as.character(colnames(counts)), as.character(srr_pdata$'SRR'))
+    srr_pdata   <- srr_pdata[reorder_idx,]
 
+    #
+    # make the srr_pdata an AnnotatedDataFrame
+    #
+    metadata <- data.frame(labelDescriptions=as.character(colnames(srr_pdata)))
+    phenoData <- new("AnnotatedDataFrame", data = srr_pdata, varMetadata=metadata)
+
+    #
+    # make the counts an expressionSet
+    # and provide the phenoData (the annotatedDataFrame construct from above)
+    #
+    es <- ExpressionSet(as.matrix(counts))
+    phenoData(es) <- phenoData
+    
+    message("made new expressionSet object\n",
+           paste(dim(es)), collapse = " ")
+    message("dim pData(es)\n",
+           paste(dim(pData(es))), collapse = " ")
+    message("dim exprs(es)\n",
+           paste(dim(exprs(es))), collapse = " ")
+    message("done!\n")
+    
     return(es)
 }
+```
+
+### 1.2.11 getDGEResults 
+
+Using the output of the differentialGeneExpression analysis, we will screen those genes differentially expressed prior to performing the linear regression.
+
+```{r}
+getDGEResults <- function ( destDir ) {
+
+   if (! (file.exists("../data/DGE_gene_csv.tar.gz"))) {
+       system("mkdir -p ../data", intern = TRUE)
+       message("Fetching DGE_gene_csv.tar.gz from GitHub ..")
+       # Download archive from GitHub release 
+       piggyback::pb_download(file = "DGE_gene_csv.tar.gz",
+                           dest = "../data",
+                           repo = "TheJacksonLaboratory/sbas",
+                           tag  = "GTExV8.DGE.v1.1",
+                           show_progress = TRUE)
+       message("Done!\n")
+       message("Decompressing DGE_gene_csv.tar.gz into ../data")
+       system("mkdir -p ../data && tar xvfz ../data/DGE_gene_csv.tar.gz -C ../data", intern = TRUE)
+       message("Done!\n")
+       message("Decompressing DGE_gene_csv.tar.gz into ../data")
+       system("gunzip  ../data/DGE_gene_csv.tar.gz", intern = TRUE)
+       message("Done!\n")
+   }
+   return (0)
+}
+
 ```
 
 ## 1.3 Preprocessing 
@@ -574,7 +634,7 @@ It is found in the `assets` subdirectory
 ```{r}
 reduceSampleSet <- function (tissue_reduction, es) {
 
-   message("\nsize tissue_reduction\n",
+    message("\nsize tissue_reduction\n",
         paste(dim(tissue_reduction), collapse=" "))
    message("\nsize es\n",
         paste(dim(es)), collapse=" ")
@@ -585,22 +645,8 @@ reduceSampleSet <- function (tissue_reduction, es) {
         paste(table(tissue_reduction$include)), collapse = " ")
    tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 
-   # test to make sure we don't have nonsense
-   keep <- (pData(es)$SMTSD== "breast_mammary_tissue")
-   message("\nTEST: how many to keep of es in breast_mammary_tissue\n",
-        paste(table(keep), collapse = " "))
-   tes        = es      [,keep]
-   pData(tes) = pData(es[,keep])
-   message("\nTEST: size breast_mammary_tissue es:tes\n",
-        paste(dim(tes), collapse=" "))
-   message("\nTEST: size phenotype esect pData(tes)\n",
-        paste(dim(pData(tes)), collapse=" "))
-   pData(tes)[1,]
-   rm(keep)
-   # end test
-
    # create a matching tissue name to go with the expressionSet phenotype esect
-   pData(es)$SMTSD       <- factor(snakecase::to_snake_case(as.character(pData(es)$SMTSD)))
+   pData(es)$SMTSD        <- factor(snakecase::to_snake_case(as.character(pData(es)$SMTSD)))
    tissue_reduction$SMTSD <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))
 
    message("\nlength tissues in phenotype data\n",
@@ -609,22 +655,17 @@ reduceSampleSet <- function (tissue_reduction, es) {
         paste(length(tissue_reduction$SMTSD), collapse = " "))
 
    keep <- pData(es)$SMTSD %in% tissue_reduction$SMTSD
-   message("\nlength tissue in samples phenotype data\n",
-        paste(length(pData(es)$SMTSD), collapse = " "))
-   message("\nlength keep es \n",
-        paste(length(keep), collapse = " "))
    message("\nhow many to keep in phenotype data\n",
         paste(table(keep), collapse = " "))
 
    es        <- es       [          ,keep==TRUE]
-   pData(es) <- pData(es)[keep==TRUE,          ]
-   rm(keep) 
+   pData(es)$SMTSD <- factor(pData(es)$SMTSD)
    message("\nsize reduced es\n",
         paste(dim(es)), collapse=" ")
    message("\nsize pData(es)\n",
         paste(dim(pData(es)), collapse=" "))
-   message("\nlength tissues in phenotype data\n",
-        paste(length(levels(pData(es)$SMTSD)), collapse = " "))
+   message("\nsize exprs(es)\n",
+        paste(dim(exprs(es)), collapse = " "))
 
    # test to make sure we don't have nonsense
    keep = pData(es)$SMTSD== "breast_mammary_tissue"
@@ -636,8 +677,6 @@ reduceSampleSet <- function (tissue_reduction, es) {
         paste(dim(tes), collapse=" "))
    message("\nTEST: size phenotype object pData(tes)\n",
         paste(dim(pData(tes)), collapse=" "))
-   pData(tes)[1,]
-   rm(keep)
    # end test
    return (es)
 }
@@ -663,12 +702,55 @@ This time from the expressionSet Object
 ```{r}
 eliminateChrYfromExpressionSet <- function ( fromGTF, es ) {
 
-   es_ids <- rownames(es)
-   gtf_ids <- fromGTF$ID
-   keep <- es_ids %in% gtf_ids
+    es_row_ids <- rownames(es)
+    gtf_ids <- fromGTF$ID
+    keep <- es_row_ids %in% gtf_ids
+   
+    es   <- es[keep == TRUE, ]
+    message("remade the expressionSet object\n",
+           paste(dim(es)), collapse = " ")
+    message("dim pData(es)\n",
+           paste(dim(pData(es))), collapse = " ")
+    message("dim exprs(es)\n",
+           paste(dim(exprs(es))), collapse = " ")
+    message("done!\n")
 
-   es <- es[keep==TRUE,]
-   return(fromGTF)
+    return(es)
+}
+```
+
+### 1.3.4 Remove DGE genes from expressionSet Obj
+
+DGE are removed prior to the construction of the linear model.  It is assumed that the DGE files were obtained from the release.  Using these results, we will remove the junction rows corresponding to those genes.
+
+```{r}
+removeDGEGenes <- function ( tissue_of_interest, fromGTF, es ) {
+
+    #
+    # read in the DGE refined list to get the differentially expressed genes for this tissue
+    #
+    filename <- paste0(paste0("../data/",tissue_of_interest), "_DGE_ensg_map.csv")
+    dge_list <- readr::read_csv(filename)
+    gtf_id_match <- as.character(fromGTF$geneSymbol) %in% as.character(dge_list$ensg_genes)
+    message("\n DGEs in tissue of interest remove this many", 
+           paste(table(gtf_id_match)), collapse=" ")    
+    #
+    # we want to keep all that do not match
+    #
+    gtf_ids <- fromGTF$ID[!gtf_id_match]
+    es_row_ids <- rownames(es)
+    keep <- es_row_ids %in% gtf_ids
+   
+    es   <- es[keep == TRUE, ]
+    message("remade the expressionSet object\n",
+           paste(dim(es)), collapse = " ")
+    message("dim pData(es)\n",
+           paste(dim(pData(es))), collapse = " ")
+    message("dim exprs(es)\n",
+           paste(dim(exprs(es))), collapse = " ")
+    message("done!\n")
+
+    return(es)
 }
 ```
 
@@ -701,84 +783,37 @@ For an unbalanced design in which each donor receives only a subset of the stimu
 
 Random effects approach is equivalent to The first method is twoway anova, a generalization of a paired analysis.
 
+The ijc and sjc are expressionSet objects:
+ counts are obtained from exprs(ijc) and exprs(sjc)
+ 
+ operations at the main object level will ripple to the phenotype and expression set information.
+ so filtering occurs on the expressionSet object ijc and sjc
 
 ```{r}
-print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc, obj, metadata ) {
+print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc) {
 
     fromGTF           <- fromGTF
     tissue_true       <- tissue_list == tissue_of_interest
 
-    # test to make sure we don't have nonsense
-    # like proteins - this process moves in one direction
-    # tissue will get us the phenotype selection 
-    # from the phenotype SAMPID we get the metadata SAMPID
-    # which leads us to counts - it goes in this direction.
-    # first phenotype obj subsetting for the tissue_of_interest
-
     message("\nLimiting phenotype data to tissue of interest\n",
            paste(tissue_of_interest),collapse=" ")    
-    keep = pData(obj)$SMTSD== tissue_of_interest
+    keep = pData(ijc)$SMTSD== tissue_of_interest
     message("\nkeep\n",
-           paste(table(keep)),collapse=" ")    
-    tissue_obj<- obj[,keep]
-    message("\ntissue_obj now reduced to the tissue of interest\n",
-            paste(dim(pData(tissue_obj)), collapse=" "))
-    message("\nsample value\n",
-            paste(   pData(tissue_obj)[1,], collapse=" "))
-
-    # now we get the runs via the metadata matrix via SAMPID
-    # limit the phenotype info to just the samples we care about
-    metadata_samples          <- as.character(metadata$SAMPID)
-    tissue_phenotype_samples  <- as.character(pData(tissue_obj)$SAMPID)
-
-    rm(keep)
-    keep = tissue_phenotype_samples %in% metadata_samples
-    message("\nLimit the phenotypes to those we have samples for\n", 
-        paste(table(keep), collapse = " ") )
-    message("\ntissue_count_obj now has these count specific phenotypes")    
-    tissue_count_obj        <- tissue_obj[keep,]
-    pData(tissue_count_obj) <- pData(tissue_obj)[keep,]
-    message("\nDimensions of tissue_count_obj\n", 
-        paste(dim(pData(tissue_count_obj)), collapse = " ") )
-    message("\nDimensions of tissue_count_obj \n", 
-        paste( dim(tissue_count_obj), collapse = " ") )
-
-    # and vice-versa, limit our samples to the ones we have phenotype for
-    rm(keep)
-    metadata_samples       <- as.character(metadata$SAMPID)
-    phenotype_samples      <- as.character(pData(tissue_count_obj)$SAMPID)
-    keep = metadata_samples %in% phenotype_samples
-    message("\nLimit the counts now has these count specific phenotypes \n", 
-        paste( table(keep), collapse = " ") )
-    table(keep)
-
-    ijc_tissue        <- ijc     [          ,keep==TRUE]
-    sjc_tissue        <- sjc     [          ,keep==TRUE]
-    metadata_tissue   <- metadata[keep==TRUE,          ]
+           paste(table(keep)),collapse=" ")
+    ijc <- ijc[,keep==TRUE]
+    sjc <- sjc[,keep==TRUE]
 
     message("\ndimensions of the ijc_tissue \n", 
-        paste(  dim(ijc_tissue), collapse = " ") )
-    message("\ndimensions of the ijc_tissue \n", 
-        paste(  dim(sjc_tissue), collapse = " ") )
-    message("\ndimensions of the metadata_tissue \n", 
-        paste(  dim(metadata_tissue), collapse = " ") )
-   
-    metadata_samples       <- as.character(metadata_tissue$SAMPID)
-    phenotype_samples      <- as.character(pData(tissue_count_obj)$SAMPID)
+        paste(  dim(ijc), collapse = " ") )
+    message("\ndimensions of the sjc_tissue \n", 
+        paste(  dim(sjc), collapse = " ") )
 
-    length(metadata_samples)
-    length(phenotype_samples)
-    non_overlaps <- setdiff( metadata_samples, phenotype_samples)
-    message("\nThe non-overlapping IDs between pheno and count data are:\n", 
-        paste(length(non_overlaps), collapse = " ") )
-
-    ijc.dm            <- data.matrix(ijc_tissue)
-    sjc.dm            <- data.matrix(sjc_tissue)    
-
-    ## remove features (junctions) that have zero sums
-    ijc.rs <- rowSums(ijc.dm) 
+    #
+    # ensure the matrices do not have too many zeros
+    #
+    ijc.rs <- rowSums(exprs(ijc)) 
     keep.ijc.rs <- (ijc.rs > 10)
-    sjc.rs <- rowSums(sjc.dm) 
+    sjc.rs <- rowSums(exprs(sjc)) 
     keep.sjc.rs <- (sjc.rs > 10)
     keep <- keep.ijc.rs | keep.sjc.rs
     message("\nijc.rs > 10 \n", 
@@ -788,45 +823,27 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     message("\nkeep combined ijc | sjc \n", 
         paste(table(keep), collapse = " ") )                    
     
-    # ensure the matrices do not have too many zeros
-    ijc.dm <- ijc.dm[keep,]
-    sjc.dm <- sjc.dm[keep,]
-    message("\ndim(ijc.dm)\n", 
-        paste(dim(ijc.dm), collapse = " ") )                    
-    message("\ndim(sjc.dm)\n", 
-        paste(dim(sjc.dm), collapse = " ") )
-    message("\n")
+    ijc <- ijc[keep==TRUE,]
+    sjc <- sjc[keep==TRUE,]
+    message("\ndim(ijc)\n", 
+        paste(dim(ijc), collapse = " ") )                    
+    message("\ndim(sjc)\n", 
+        paste(dim(sjc), collapse = " ") )
     
-        
-    
-    
-    for (i in (1:length(metadata_samples))) {
-        sample = metadata_tissue[i,]$SAMPID
-        sample_sex = pData(tissue_count_obj)$SEX[pData(tissue_count_obj)$SAMPID == sample]
-        if (i==1) {
-            sex = sample_sex
-        } else {
-            sex = c(sex,sample_sex)
-        }
-    }
     message("\nsex samples:\n",
-        paste0(table(sex), collapse="\n"))
-    sex      <- ifelse(sex == 1,"male","female")
-    sex      <- factor(sex,levels=c("male","female"))
-    message("\nsex samples:\n",
-        paste0(table(sex), collapse=" "))
+        paste(table(pData(ijc)$SEX)), collapse="\n")
 
-    design    <- model.matrix ( ~ sex)
+    design    <- model.matrix ( ~ pData(ijc)$SEX)
     message("\ndesign matrix ijc, alone:\n",
         paste0(head(design), collapse="\n"))
 
     colnames(design) <- c("intercept","sex")
 
-    y_ijc <- DGEList(counts=ijc.dm, group = sex)
+    y_ijc <- DGEList(counts=exprs(ijc), group = pData(ijc)$SEX)
     y_ijc <- calcNormFactors(y_ijc, method="RLE")
     y_ijc_voom <- voom (y_ijc, design=design, plot=plot)
 
-    Gender <- substring(sex,1,1)
+    Gender <- ifelse(pData(ijc)$SEX==1,"m","f")
     pdf_sub_directory = '../pdf/'
     csv_sub_directory = '../data/'
     
@@ -851,7 +868,7 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     ijc_sex_rnResults                  <- rownames(ijc_sex_results)
     ijc_sex_resultsAnnotations         <- fromGTF[ijc_sex_rnResults,]
 
-    ijc_sex_results_refinedAnnotations <- ijc_sex_resultsAnnotations[ijc_sex_results_refined      ==TRUE,]
+    ijc_sex_results_refinedAnnotations <- ijc_sex_resultsAnnotations[ijc_sex_results_refined ==TRUE,]
     message("\ndimensions of the ijc_sex_results_refined_annotations \n", 
         paste(dim (ijc_sex_results_refinedAnnotations), collapse = " ") )
 
@@ -884,11 +901,12 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
    
     message("\nstarting sjc\n")
 
-    y_sjc <- DGEList(counts=sjc.dm, group = sex)
+    # the pData object for ijc was used for the annotation - they are the same for ijc and sjc
+    y_sjc <- DGEList(counts=exprs(sjc), group = pData(ijc)$SEX)
     y_sjc <- calcNormFactors(y_sjc, method="RLE")
     y_sjc_voom <- voom (y_sjc, design=design, plot=plot)
 
-    Gender <- substring(sex,1,1)
+    Gender <- ifelse(pData(ijc)$SEX==1,"m","f")
     filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                                      snakecase::to_snake_case(tissue_of_interest)),"-sjc-MDSplot-100.pdf")
     pdf (filename)
@@ -941,57 +959,39 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     write.table(sjc_sex_refined_geneSymbols,
                 file = sjc_sex_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
     
-   
+    message("removing DGE Genes prior to making y linear model")
+    ijc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
+    sjc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- sjc)
+    
     message("starting the y prediction\n")
-    sample_names <- as.character(colnames(ijc.dm))
+    sample_names <- as.character(pData(ijc)$SAMPID)
     # we will add donor as a blocking parameter
     # rather than sample name -- we should use donor for real
     sample     <- factor(sample_names)
     
     donor    <- rep(sample, 2)
     message("\ndonor size", 
-        paste(length(donor), collapse = " ") )
-    
-    ijc_names <- as.character(colnames(ijc.dm))
-    sjc_names <- as.character(colnames(sjc.dm))
-    sjc_names <- paste0(sjc_names,"-sjc")
-    ijc_names <- paste0(ijc_names,"-ijc")
+        paste(length(donor)), collapse = " ") 
 
-    colnames(ijc.dm) <- ijc_names
-    colnames(sjc.dm) <- sjc_names
-
-    as_matrix <- cbind(ijc.dm,sjc.dm)
+    as_matrix <- cbind(exprs(ijc),exprs(sjc))
     message("\ndim as_matrix", 
-        paste(dim(as_matrix), collapse = " ")) 
+        paste(dim(as_matrix)), collapse = " ")
             
-    for (i in (1:length(metadata_samples))) {
-        sample = metadata_tissue[i,]$SAMPID
-        sample_sex = pData(tissue_count_obj)$SEX[pData(tissue_count_obj)$SAMPID == sample]
-        if (i==1) {
-            sex = sample_sex
-        } else {
-            sex = c(sex,sample_sex)
-        }
-    }
     message("sex samples:\n",
-        paste0(table(sex), collapse="\n"))
-    sex      <- ifelse(sex == 1,"male","female")
-    sex      <- factor(sex,levels=c("male","female"))
-    message("\nsex samples:\n",
-        paste0(table(sex), collapse=" "))
-    sex2      <- c(rep(sex,2))
-    table(sex2)
+        paste(table(pData(ijc)$SEX)), collapse=" ")
+    sex2      <- factor(c(rep(pData(ijc)$SEX,2)))
+    message("sex samples:\n",
+        paste(table(sex2)), collapse = " ")
     message("\nlength sex2\n", 
-        paste(length(sex2), collapse = " ") )
-    message("table sex2\n", 
-        paste(table(sex2), collapse = "\n") )
-    as_event  <- c(rep("ijc",dim(ijc.dm)[2]), rep("sjc", dim(sjc.dm)[2]))
+        paste(length(sex2)), collapse = " ") 
+
+    as_event  <- c(rep("ijc",dim(ijc)[2]), rep("sjc", dim(sjc)[2]))
     as_event  <- factor(as_event, levels=c("ijc", "sjc"))
     message("\nlength as_event\n", 
-        paste(length(as_event), collapse = " ") )
+        paste(length(as_event)), collapse = " ")
 
     design    <- model.matrix( ~ sex2 + as_event + sex2*as_event)
-    dim(design)
+
     colnames(design) <- c("intercept","sex", "as_event","sex*as_event")
     message("\ndim design <- model.matrix( ~sex + as_event + sex*as_event)\n", 
         paste(head(design), collapse = "\n") )
@@ -1006,7 +1006,7 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
         y_dup_voom <- voom (y, design=design, plot = plot, block = donor, correlation = dup_cor$consensus.correlation) 
     }
     
-    Gender <- substring(sex[1:dim(ijc.dm)[2]],1,1)
+    Gender <- ifelse(pData(ijc)$SEX==1,"m","f")
     message("\nGenders new size\n", 
         paste(length(Gender), collapse = " ") )
     message("\nplotting y for ijc portion of design <- model.matrix( ~sex + as_event + sex*as_event\n")
@@ -1014,21 +1014,21 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-ijc-MDSplot-100.pdf")
     pdf (filename)
-        plotMDS(y[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+        plotMDS(y[,c(1:dim(ijc)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
             gene.selection="common")
     dev.off()
     message("\nplotting y_voom for ijc portion of design <- model.matrix( ~sex + as_event + sex*as_event\n")
     filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-voom-ijc-MDSplot-100.pdf")
     pdf (filename)
-        plotMDS(y_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+        plotMDS(y_voom[,c(1:dim(ijc)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
             gene.selection="common")
     dev.off()
     if (dup == TRUE) {
         filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                            snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-ijc-MDSplot-100.pdf")
         pdf (filename)
-            plotMDS(y_dup_voom[,c(1:dim(ijc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+            plotMDS(y_dup_voom[,c(1:dim(ijc)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
         dev.off()
     }
@@ -1036,7 +1036,7 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-sjc-MDSplot-100.pdf")
     pdf (filename)
-        plotMDS(y[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+        plotMDS(y[,c((dim(ijc)[2]+1)):(dim(ijc)[2]+dim(sjc)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
             gene.selection="common")
     dev.off()
     
@@ -1045,13 +1045,13 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
         filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-voom-sjc-MDSplot-100.pdf")
         pdf (filename)
-            plotMDS(y_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+            plotMDS(y_voom[,c((dim(ijc)[2]+1)):(dim(ijc)[2]+dim(sjc)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
         dev.off()
         filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
                               snakecase::to_snake_case(tissue_of_interest)),"-y-dup-voom-sjc-MDSplot-100.pdf")
         pdf (filename)
-            plotMDS(y_dup_voom[,c((dim(ijc.dm)[2]+1)):(dim(ijc.dm)[2]+dim(sjc.dm)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+            plotMDS(y_dup_voom[,c((dim(ijc)[2]+1)):(dim(ijc)[2]+dim(sjc)[2])], labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
                 gene.selection="common")
         dev.off()
         
@@ -1201,7 +1201,9 @@ srr_metadata <- getSraRunData (destDir <- "../data/")
 ```{r}
 #
 # 1.2.4 Renew GTEx expression object
-# OPTIONAL and TIME CONSUMINGrenewGTExPhenoDataObj = FALSE
+# OPTIONAL and TIME CONSUMINGrenewGTExPhenoDataObj - set this to FALSE by default
+#
+renewGTExPhenoDataObj=FALSE
 if (renewGTExPhenoDataObj) {
   gtexPhenoObj <- renewGTExExpressionSet(destDir <- "../data/")
 } 
@@ -1245,7 +1247,10 @@ if (grabFromRelease) {
 ```
 
 ```{r}
-dim(srr_pdata)
+#
+# 1.2.11 getDGEResults
+#
+getDGEResults("../data/")
 ```
 
 ```{r}
@@ -1257,6 +1262,7 @@ dim(srr_pdata)
 plot         <- TRUE
 dup          <- FALSE
 splice_list  <- c( "se_")
+tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
 
 # parameters that change with each splice type (3)
 # 1. fromGTF
@@ -1269,7 +1275,6 @@ splice_list  <- c( "se_")
 # for (tissue_index in 1:length(tissue_list)) {
 ```
 ```{r}
-    tissue_list         <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
     # a3ss
     splice_type = "a3ss_"
     res = splice_list %in% splice_type
@@ -1373,6 +1378,8 @@ splice_list  <- c( "se_")
     # se
     splice_type = "se_"
     res = splice_list %in% splice_type
+    tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
@@ -1380,27 +1387,54 @@ splice_list  <- c( "se_")
         fromGTF    <- eliminateChrYfromGTF (fromGTF)
         ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.se.jc.ijc.txt.gz")
         ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
-
-#        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-#        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.sjc.txt.gz")
-#        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-#        print_exploratory_plots (plot, 
-#                              dup,
-#                              tissue_of_interest, 
-#                              splice_type, 
-#                              fromGTF, 
-#                              tissue_list, 
-#                              ijc, 
-#                              sjc, 
-#                              obj, 
-#                              metadata )
+        ijc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- ijc)
+        ijc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- ijc)
+        sjc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.se.jc.sjc.txt.gz")
+        sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
+        sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
+        sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
+        print_exploratory_plots (plot, 
+                                 dup, 
+                                 tissue_of_interest, 
+                                 splice_type, 
+                                 fromGTF, 
+                                 tissue_list, 
+                                 ijc, 
+                                 sjc)
+ 
     }
 #}
 ```
 
 ```{r}
-table(fromGTF$chr)
-dim(pData(obj))
+head(ijc)
+dim(exprs(ijc))
+```
+
+```{r}
+dim(tissue_reduction)
+head(tissue_reduction)
+
+```
+
+```{r}
+tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+tissue_of_interest
+s_ijc <- ijc
+s_sjc <- sjc
+ijc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
+sjc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- sjc)
+```
+
+```{r}
+dim(s_ijc)
+dim(ijc)
+dim(s_sjc)
+dim(sjc)
+table(pData(ijc)$SEX)
+    message("\nsex samples:\n",
+        paste(table(pData(ijc)$SEX)), collapse="\n")
+
 ```
 
 ## Metadata
