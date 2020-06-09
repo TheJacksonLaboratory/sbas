@@ -314,7 +314,7 @@ getSraRunData <- function ( destDir ) {
 
 }
 ```
-## 1.2.4 Renew GTEx expression object
+### 1.2.4 Renew GTEx expression object
 
 - `Genome Tissue Expression (GTEx)` Clinical Annotation - this is the expressionSet object that has the phenotype information
 In this analysis there will be 3 expressionSet objects.  This one contains the gene Expression Count Data and phenotypes  -- this is done in two parts, pull it from yarn, and then inspect and correct.
@@ -367,8 +367,7 @@ inspectAndCorrectExpressionSetObject <- function ( es ) {
 
 ```
 ```{r}
-
-getGTExExpressionSet <- function ( destDir ) {
+renewGTExExpressionSet <- function ( destDir ) {
   if (!("gtex.rds" %in% list.files(destDir))) {
       message("Downloading and loading obj with GTEx v8 with 'yarn::downloadGTExV8()'\n")
       es <- yarn::downloadGTExV8(type='genes',file='../data/gtex.rds')
@@ -429,97 +428,134 @@ getTissueReduction <- function ( filename ) {
     return(tissue_reduction)
 }
 ```
-### 1.2.7 read in and make Splicing Expression Set Object
+### 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
 
-Using the expressionSet object, we will make an expression set object for each of the count matrices for each of the alternative splicing matrices.
+Matching SraRunTable, Sequence Read Archive Sequence Run accession number, SRR to the sample, SAMPID, that will be used to match the SRR to the samples phenotype information to make the phenotype data portion of the expressionSet object.
 
+counts data supplies the SRR through the column
+Metadata from the SraRunTable.txt file matches the SRR to the SAMPID
+Phenotype data retrieved from the GTEx gene ExpressionSet data object for that SAMPID
+
+SRR -> SAMPID -> Phenotype Data
+
+This routine takes a while to run, could be improved by changing it to a lapply function.
+Luckily, this needs only to be run once for all 10 matrices since the ijc, sjc counts were done on the same samples and defined alternative splicing events.
 ```{r}
-gtexPhenoDataObj <- obj
-srr_metadata <- srr_metadata
-filename_gz <- "../data/rmats_final.se.jc.ijc.txt.gz"
-dim(pData(gtexPhenoDataObj))
-dim(srr_metadata)
+makePData <- function (counts_srr, gtexPhenoDataObj, srr_metadata) {
+    started = FALSE
+    srr_missing = FALSE
+    pd_missing = FALSE
+    for (i in 1:length(counts_srr)) {
+        #
+        # SraRunTable connects SRR to SAMPID
+        #
+        srr_metadata_match <- as.character(srr_metadata$Run) %in% as.character(counts_srr[i])
+        if (sum(srr_metadata_match) < 1){
+            srr_metadata_missing <- as.character(srr_metadata$Run) 
+            message("no match srr_metadata$Run! ERROR!")
+            if (!srr_missing) {
+                srr_metadata_missing_list <- srr_metadata_missing
+                srr_missing = TRUE
+            } else {
+                srr_metadata_missing_list <- rbind(srr_metadata_missing_list, srr_metadata_missing)
+            }
+        } else {
+            srr_metadata_sampid <- srr_metadata[srr_metadata_match==TRUE,]$SAMPID
+#            message("\nsrr_metadata_sampid\n",
+#               paste(srr_metadata_sampid), collapse=" ")
+            #
+            # SAMPID is used to match SRR to Phenotype Data for GTEx
+            #
+            pd_sampid_match <- as.character(pData(gtexPhenoDataObj)$SAMPID) %in% as.character(srr_metadata_sampid)
+#           message("\npd_sampid_match table\n",
+#               paste(table(pd_sampid_match)), collapse=" ")
+#           message("\nsum(pd_sampid_match)\n",
+#               paste(sum(pd_sampid_match)), collapse = " ")
+            if (sum(pd_sampid_match) < 1 ) {
+#               message("no pd_sampid match to srr_metadata_sampid!\n")
+                pd_sampid_missing <- as.character(srr_metadata_sampid)
+                if (!pd_missing) {
+                    pd_sampid_missing_list <- pd_sampid_missing
+                    pd_missing = TRUE
+                } else {
+                    pd_sampid_missing_list <- rbind(pd_sampid_missing_list, pd_sampid_missing)
+                }
+            }  else {
+                pd     <- pData(gtexPhenoDataObj)[pd_sampid_match,]
+                srr_metadata_srr <- srr_metadata[srr_metadata_match==TRUE,]$Run
+                pd$SRR <- srr_metadata_srr
+                if (started == TRUE) {
+                    pdfinal <- rbind(pdfinal, pd)
+                } else {
+                    pdfinal <- pd
+                    started = TRUE
+                }
+            } # end if pd_sampid_match
+        } # end if srr_metadata_match
+    }# end for loop
+
+    pdfinal_filename           <- paste0(paste0("../data/", counts_name), "pdata.csv")
+    if (srr_missing) {
+        metadata_missing_filename  <- paste0(paste0("../data/", counts_name), "srr_metadata_missing.csv")
+        write.csv(srr_metadata_missing_list, metadata_missing_filename , quote=FALSE, row.names=FALSE)
+    }
+    if (pd_missing) {
+        pd_sampid_missing_filename <- paste0(paste0("../data/", counts_name), "pd_sampid_missing.csv")
+        write.csv(pd_sampid_missing_list   , pd_sampid_missing_filename, quote=FALSE, row.names=FALSE)
+    }
+    write.csv(pdfinal                  , pdfinal_filename          , quote=FALSE, row.names=FALSE)
+    return(pdfinal)
+}
 ```
 
+### 1.2.8 get GTEx phenotype data for the SRR accessions
+Transitive closure permits the association of the sequence reads, SRR Accessions, through the SraRunTable.txt (obtained from selecting annotation from the dbGaP login) with the SAMPID used with the GTEx.  This SAMPID is the means by which we can get this phenotype data and associate it with the counts data.
+
+If the data has not yet been retrieved, we can pull it from the release, using piggyback.   Input to this function can be any one of the 10 count matrices, since all were produced on the same samples
+
 ```{r}
+getGTExPhenoDataForSRR <- function (destDir) {
+    if (!("srr_pdata.csv" %in% list.files(destDir))) {
+        piggyback::pb_download(
+               show_progress = TRUE,
+               repo = "TheJacksonLaboratory/sbas", 
+               file = "gtex.corrected.rds",
+               tag  = "GTExV8.v1.0", 
+               dest = destDir)
+        message("Loading srr_pdata\n")
+        srr_pdata <- read.csv(file = paste0(destDir, "srr_pdata.csv"), quote=FALSE)
+        message("done!\n")
+    } else {
+        message("Loading srr_pdata\n")
+        srr_pdata <- read.csv(file = paste0(destDir, "srr_pdata.csv"), quote=FALSE)
+        message("done!\n")
+    }
+    return(srr_pdata)
+}
+```
+### 1.2.9 makeCountsMatrix 
+
+Given the counts filename, make a data matrix.
+
+```{r}
+makeCountsMatrix <- function (filename_gz) {
     message("\nloading ", paste(filename_gz), collapse=" ")
     counts <- data.table::fread(filename_gz)
     message("done!")
     rownames(counts) <- counts$ID
     counts <- counts[,-1]
     counts <- data.matrix(counts)
-    metadata_for_counts = colnames(counts)%in% srr_metadata$Run
-    counts_for_metadata = srr_metadata$Run %in% colnames(counts)
-    message("\nmetadata runs matching counts\n",
-       paste(table(metadata_for_counts)), collapse = " ")
-    message("\ncounts matching metadata\n",
-       paste(table(counts_for_metadata)), collapse = " ")
-    count_srrs <- colnames(counts)
-    srr_metadata_match <- as.character(srr_metadata$Run) %in% as.character(count_srrs[1])
-    message("\n SraRunTable match to SRR counts\n",
-            paste(table(srr_metadata_match)), collapse = " ")
-    srr_metadata_sampid <- srr_metadata[srr_metadata_match==TRUE,]$SAMPID
+    return(counts)
+}
+### 1.2.10 makeSplicingExpressionSetObject 
 
-    write.csv(pData(gtexPhenoDataObj), "../data/pData_gtex_corrected_obj.csv", quote=FALSE, row.names=FALSE)
-
-    pData(gtexPhenoDataObj)$SAMPID <- gsub('-','\\.',pData(gtexPhenoDataObj)$SAMPID)
-    pd_sampid_match <- as.character(pData(gtexPhenoDataObj)$SAMPID) %in% as.character(srr_metadata_sampid)
-    message("\n counts SAMPID match to phenotype Data SAMPID\n",
-            paste(table(pd_sampid_match)), collapse = " ")
-    pd     <- pData(gtexPhenoDataObj)[pd_sampid_match,]
-    srr_metadata_srr <- srr_metadata[srr_metadata_match==TRUE,]$Run
-    pd$SRR <- srr_metadata_srr
-    pdfinal <- pd
-
-    for (i in 2:dim(counts)[2]) {
-        srr_metadata_match <- as.character(srr_metadata$Run) %in% as.character(count_srrs[i])
-        message("\n SraRunTable match to SRR counts\n",
-            paste(table(srr_metadata_match)), collapse = " ")
-        srr_metadata_sampid <- srr_metadata[srr_metadata_match==TRUE,]$SAMPID
-        pData(gtexPhenoDataObj)$SAMPID <- gsub('-','\\.',pData(gtexPhenoDataObj)$SAMPID)
-        pd_sampid_match <- as.character(pData(gtexPhenoDataObj)$SAMPID) %in% as.character(srr_metadata_sampid)
-        message("\n counts SAMPID match to phenotype Data SAMPID\n",
-            paste(table(pd_sampid_match)), collapse = " ")
-        pd     <- pData(gtexPhenoDataObj)[pd_sampid_match,]
-        srr_metadata_srr <- srr_metadata[srr_metadata_match==TRUE,]$Run
-        pd$SRR <- srr_metadata_srr
-        pdfinal <- rbind(pdfinal, pd)
-    }
-
-
-```
+Given the phenotype data object for each of the count matrices, create an expressionSet object for each to facilitate analysis.
 
 ```{r}
-i
-```
+makeSplicingExpressionSetObject <- function (srr_pdata, counts) {
 
-```{r}
-makeSplicingExpressionSetObject <- function (gtexPhenoDataObj, srr_metadata, filename_gz) {
-
-    message("\nloading ", paste(filename_gz), collapse=" ")
-    counts <- data.table::fread(filename_gz)
-    message("done!")
-    rownames(counts) <- counts$ID
-    counts <- counts[,-1]
-    counts <- data.matrix(counts)
-
-    # getting the SRR accession names for counts
-    count_srrs <- colnames(counts)
-    match = as.character(srr_metadata$Run) %in% as.character(count_srrs[1])
-    pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID== srr_metadata[match,"SAMPID"],])
-                    
-    pd$SRR <- srr_metadata$Run
-    pdfinal <- pd
-    for (i in 2:dim(counts)[2]) {
-        sample_match = srr_metadata[colnames(counts[,i]) == srr_metadata$Run,]
-        pd     <- pData(gtexPhenoDataObj[gtexPhenoDataObj$SAMPID== srr_metadata$SAMPID,])
-        pd$SRR <- srr_metadata$Run
-        pdfinal <- rbind(pdfinal, pd)
-    }
-
-    # because we have multiple SRR per Sample, 
     es  <- ExpressionSet(as.matrix(counts))
-    pData(es) <- pdfinal
+    pData(es) <- srr_pdata
 
     return(es)
 }
@@ -1161,22 +1197,51 @@ getReleasedGTFAnnotations (destDir <- "../data")
 #
 srr_metadata <- getSraRunData (destDir <- "../data/")
 ```
+#
+# OPTIONAL and TIME CONSUMING
+# 1.2.4 Renew GTEx expression object
+#
 ```{r}
+renewGTExPhenoDataObj = FALSE
+if (renewGTExPhenoDataObj) {
+  gtexPhenoObj <- renewGTExExpressionSet(destDir <- "../data/")
+} 
+```
 #
 # 1.2.5 get corrected GTEx expression Set Data
 #
-obj <- getGTExCorrectedRDS (destDir <- "../data/")
-
+```{r}
+if (!renewGTExPhenoDataObj) {
+   gtexPhenoDataObj <- getGTExCorrectedRDS (destDir <- "../data/")
+}
 ```
 ```{r}
 #
-# 1.2.5 get reduced Tissue data
+# 1.2.6 get reduced Tissue data
 #
 tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
 ```
+#
+# OPTIONAL AND TIME CONSUMING - better to grab from release!
+# 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
+# any counts matrix will do...
+#
+grabFromRelease = TRUE
+if (!grabFromRelease) {
+    filename_gz <- "../data/rmats_final.se.jc.ijc.txt.gz")
+    counts_srr <- makeCountsMatrix (filename_gz)
+    srr_pdata <- getGTExPhenoDataForSRR (counts_srr, gtexPhenoDataObj, srr_metadata)
+}
+#
+# 1.2.8 get GTEx Phenotype Data accessions SRR from releaase
+#
+```{r}
+if (grabFromRelease) {
+    srr_pdata <- getGTExPhenoDataForSRR ("../data/")
+}
 ```{r}
 #
-# Useful for debugging to play with these parameters
+# Now the meat of our work
 # and to reduce to a subset of entire splice_list
 # splice_list <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 #
@@ -1184,6 +1249,7 @@ plot         <- TRUE
 dup          <- FALSE
 splice_list  <- c( "se_")
 ```
+
 ```{r}
 # parameters that change with each splice type (3)
 # 1. fromGTF
@@ -1304,9 +1370,11 @@ splice_list  <- c( "se_")
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF  <- read.table("../data/fromGTF.SE.txt", header=TRUE)
-        fromGTF  <- eliminateChrYfromGTF (fromGTF)
-        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.ijc.txt.gz")
+        fromGTF    <- read.table("../data/fromGTF.SE.txt", header=TRUE)
+        fromGTF    <- eliminateChrYfromGTF (fromGTF)
+        ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.se.jc.ijc.txt.gz")
+	ijc        <- makeSplicingExpressionSetObj (srr_pdata <- srr_pdata, counts <- ijc_counts)
+	
 #        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
 #        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.se.jc.sjc.txt.gz")
 #        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
