@@ -72,7 +72,7 @@ library(snakecase)
 Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
 ```{r}
 # parameters for nextflow execution of notebook
-tissue_index = 21
+tissue_index = 1
 ```
 
 ## 1.2 Retrieve Released data
@@ -1261,7 +1261,7 @@ getDGEResults("../data/")
 #
 plot         <- TRUE
 dup          <- FALSE
-splice_list  <- c( "se_")
+splice_list  <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
 
 # parameters that change with each splice type (3)
@@ -1279,99 +1279,122 @@ tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SM
     splice_type = "a3ss_"
     res = splice_list %in% splice_type
     tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+
     if (sum(res) == 1) {
-        fromGTF  <- read.table("../data/fromGTF.A3SS.txt", header=TRUE)
-        fromGTF  <- eliminateChrYfromGTF (fromGTF)
-        
-        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a3ss.jc.ijc.txt.gz")
-        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a3ss.jc.sjc.txt.gz")
-        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        message ("splice_list does contain\n",
+             paste(splice_type), " continuing with processing\n")
+        fromGTF    <- read.table("../data/fromGTF.A3SS.txt", header=TRUE)
+        fromGTF    <- eliminateChrYfromGTF (fromGTF)
+        ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a3ss.jc.ijc.txt.gz")
+        ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
+        ijc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- ijc)
+        ijc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- ijc)
+        sjc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a3ss.jc.sjc.txt.gz")
+        sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
+        sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
+        sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
         print_exploratory_plots (plot, 
-                             dup,
-                             tissue_of_interest, 
-                             splice_type, 
-                             fromGTF, 
-                             tissue_list, 
-                             ijc, 
-                             sjc, 
-                             obj, 
-                             metadata )
+                                 dup, 
+                                 tissue_of_interest, 
+                                 splice_type, 
+                                 fromGTF, 
+                                 tissue_list, 
+                                 ijc, 
+                                 sjc)
+ 
     }
+
 ```
 ```{r}
     # a5ss
     splice_type = "a5ss_"
     res = splice_list %in% splice_type
+    tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF  <- read.table("../data/fromGTF.A5SS.txt", header=TRUE)
-        fromGTF  <- eliminateChrYfromGTF (fromGTF)
-        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a5ss.jc.ijc.txt.gz")
-        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.a5ss.jc.sjc.txt.gz")
-        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        fromGTF    <- read.table("../data/fromGTF.A5SS.txt", header=TRUE)
+        fromGTF    <- eliminateChrYfromGTF (fromGTF)
+        ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a5ss.jc.ijc.txt.gz")
+        ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
+        ijc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- ijc)
+        ijc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- ijc)
+        sjc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a5ss.jc.sjc.txt.gz")
+        sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
+        sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
+        sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
         print_exploratory_plots (plot, 
-                             dup,
-                             tissue_of_interest, 
-                             splice_type, 
-                             fromGTF, 
-                             tissue_list, 
-                             ijc, 
-                             sjc, 
-                             obj, 
-                             metadata )
+                                 dup, 
+                                 tissue_of_interest, 
+                                 splice_type, 
+                                 fromGTF, 
+                                 tissue_list, 
+                                 ijc, 
+                                 sjc)
+ 
     }
+
 ```
 ```{r}
     # mxe
     splice_type = "mxe_"
     res = splice_list %in% splice_type
+    tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF  <- read.table("../data/fromGTF.MXE.txt", header=TRUE)
-        fromGTF  <- eliminateChrYfromGTF (fromGTF)
-        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.mxe.jc.ijc.txt.gz")
-        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.mxe.jc.sjc.txt.gz")
-        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        fromGTF    <- read.table("../data/fromGTF.MXE.txt", header=TRUE)
+        fromGTF    <- eliminateChrYfromGTF (fromGTF)
+        ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.mxe.jc.ijc.txt.gz")
+        ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
+        ijc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- ijc)
+        ijc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- ijc)
+        sjc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.mxe.jc.sjc.txt.gz")
+        sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
+        sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
+        sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
         print_exploratory_plots (plot, 
-                             dup,
-                             tissue_of_interest, 
-                             splice_type, 
-                             fromGTF, 
-                             tissue_list, 
-                             ijc, 
-                             sjc, 
-                             obj, 
-                             metadata )
+                                 dup, 
+                                 tissue_of_interest, 
+                                 splice_type, 
+                                 fromGTF, 
+                                 tissue_list, 
+                                 ijc, 
+                                 sjc)
+ 
     }
+
 ```
 ```{r}
     # ri
     splice_type = "ri_"
     res = splice_list %in% splice_type
+    tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+
     if (sum(res) == 1) {
         message ("splice_list does contain\n",
              paste(splice_type), " continuing with processing\n")
-        fromGTF  <- read.table("../data/fromGTF.RI.txt", header=TRUE)
-        fromGTF  <- eliminateChrYfromGTF (fromGTF)
-        ijc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.ri.jc.ijc.txt.gz")
-        ijc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
-        sjc      <- makeSplicingExpressionSetObject(obj, srr_metadata, "../data/rmats_final.ri.jc.sjc.txt.gz")
-        sjc      <- eliminateChrYfromExpressionSet (fromGTF, obj)
+        fromGTF    <- read.table("../data/fromGTF.RI.txt", header=TRUE)
+        fromGTF    <- eliminateChrYfromGTF (fromGTF)
+        ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.ri.jc.ijc.txt.gz")
+        ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
+        ijc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- ijc)
+        ijc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- ijc)
+        sjc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.ri.jc.sjc.txt.gz")
+        sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
+        sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
+        sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
         print_exploratory_plots (plot, 
-                             dup,
-                             tissue_of_interest, 
-                             splice_type, 
-                             fromGTF, 
-                             tissue_list, 
-                             ijc, 
-                             sjc, 
-                             obj, 
-                             metadata )
+                                 dup, 
+                                 tissue_of_interest, 
+                                 splice_type, 
+                                 fromGTF, 
+                                 tissue_list, 
+                                 ijc, 
+                                 sjc)
+ 
     }
 ```
 ```{r}
@@ -1404,37 +1427,6 @@ tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SM
  
     }
 #}
-```
-
-```{r}
-head(ijc)
-dim(exprs(ijc))
-```
-
-```{r}
-dim(tissue_reduction)
-head(tissue_reduction)
-
-```
-
-```{r}
-tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
-tissue_of_interest
-s_ijc <- ijc
-s_sjc <- sjc
-ijc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
-sjc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- sjc)
-```
-
-```{r}
-dim(s_ijc)
-dim(ijc)
-dim(s_sjc)
-dim(sjc)
-table(pData(ijc)$SEX)
-    message("\nsex samples:\n",
-        paste(table(pData(ijc)$SEX)), collapse="\n")
-
 ```
 
 ## Metadata
