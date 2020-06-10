@@ -280,9 +280,6 @@ getReleasedGTFAnnotations <- function ( destDir ) {
        message("Decompressing fromGTF.tar.gz into ../data")
        system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
        message("Done!\n")
-       message("Decompressing fromGTF.*.txt.gz into ../data")
-       system("gunzip  ../data/fromGTF*.txt.gz ", intern = TRUE)
-       message("Done!\n")
    }
    return (0)
 }
@@ -613,9 +610,6 @@ getDGEResults <- function ( destDir ) {
        message("Done!\n")
        message("Decompressing DGE_gene_csv.tar.gz into ../data")
        system("mkdir -p ../data && tar xvfz ../data/DGE_gene_csv.tar.gz -C ../data", intern = TRUE)
-       message("Done!\n")
-       message("Decompressing DGE_gene_csv.tar.gz into ../data")
-       system("gunzip  ../data/DGE_gene_csv.tar.gz", intern = TRUE)
        message("Done!\n")
    }
    return (0)
