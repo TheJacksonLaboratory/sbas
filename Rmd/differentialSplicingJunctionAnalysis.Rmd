@@ -279,6 +279,16 @@ getReleasedGTFAnnotations <- function ( destDir ) {
        message("Decompressing fromGTF.tar.gz into ../data")
        system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
        message("Done!\n")
+       message("Gunzipping files into ../data")
+       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
+       message("Done!\n")
+   } else {
+       message("Decompressing fromGTF.tar.gz into ../data")
+       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+       message("Done!\n")
+       message("Gunzipping files into ../data")
+       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
+       message("Done!\n")
    }
    return (0)
 }
@@ -610,6 +620,11 @@ getDGEResults <- function ( destDir ) {
        message("Decompressing DGE_gene_csv.tar.gz into ../data")
        system("mkdir -p ../data && tar xvfz ../data/DGE_gene_csv.tar.gz -C ../data", intern = TRUE)
        message("Done!\n")
+   } else {
+       message("Decompressing DGE_gene_csv.tar.gz into ../data")
+       system("mkdir -p ../data && tar xvfz ../data/DGE_gene_csv.tar.gz -C ../data", intern = TRUE)
+       message("Done!\n")
+       
    }
    return (0)
 }
@@ -627,7 +642,7 @@ It is found in the `assets` subdirectory
 ```{r}
 reduceSampleSet <- function (tissue_reduction, es) {
 
-    message("\nsize tissue_reduction\n",
+   message("\nsize tissue_reduction\n",
         paste(dim(tissue_reduction), collapse=" "))
    message("\nsize es\n",
         paste(dim(es)), collapse=" ")
@@ -1183,7 +1198,8 @@ getReleasedRMATSData (destDir <- "../data/")
 #
 # 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
 #
-getReleasedGTFAnnotations (destDir <- "../data")
+getReleasedGTFAnnotations (destDir <- "../data/")
+
 ```
 ```{r}
 #
@@ -1255,7 +1271,9 @@ getDGEResults("../data/")
 plot         <- TRUE
 dup          <- FALSE
 splice_list  <- c("a3ss_","a5ss_","mxe_","ri_","se_")
+tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
+write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.names=TRUE, col.names=FALSE)
 
 # parameters that change with each splice type (3)
 # 1. fromGTF
