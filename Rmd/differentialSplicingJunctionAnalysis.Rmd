@@ -45,8 +45,10 @@ For our analysis here, we used just the jc count matrices.
 # 1.0 Loading dependencies
 
 ```{r}
+# If the user wishes to rebuild the GTEx rds they can, but needs to reinstall and call the library
+# gtex.corrected.rds is pulled from the release otherwise
 #devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0")
-#install.packages("gprofiler2")
+#library(yarn)
 library(gprofiler2)
 library(downloader)
 library(readr)
@@ -58,12 +60,9 @@ library(limma)
 library(piggyback)
 library(multtest)
 library(Biobase)
-library(yarn)
 library(edgeR)
 library(tibble)
-#install.packages('R.utils')
 library(R.utils)
-#install.packages("snakecase")
 library(snakecase)
 ```
 
@@ -300,7 +299,7 @@ getSraRunData <- function ( destDir ) {
         tag  = "GTExV8.v1.0", 
         dest = destDir)
   }
-  message("Loading metadata from SraRunTable.txt.gz ../data/gtex.rds ..\n")
+  message("Loading metadata from SraRunTable.txt.gz ../data/ ..\n")
   srr_metadata <- data.table::fread("../data/SraRunTable.txt.gz")
   message("done!\n")
   message("Replacing dashes with dots in sample name")
