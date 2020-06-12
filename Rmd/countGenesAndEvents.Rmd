@@ -19,18 +19,61 @@ Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
 library(dplyr)
 library(ggplot2)
 library(limma)
-library(piggyback)
 library(multtest)
 library(Biobase)
 library(edgeR)
 library(tibble)
-#install.packages('R.utils')
 library(R.utils)
+library(rtracklayer)
 ```
 
 ## Download all the rMATS results
 
 Each of the alternative splicing output files are downloaded here:
+### 1.2.2 get released rMATS GTF annotations
+
+For each splicing type, the junctions are defined, so we have 5 specific annotated splicing specific junction ID annotation files:
+fromGTF.A3SS.txt <- annotations for the alternative 3' splice site junctions
+fromGTF.A5SS.txt <- annotations for the alternative 5' splice site junctions
+fromGTF.MXE.txt <- annotations for the mutually exclusive exon junctions
+fromGTF.RI.txt <- annotations for the retained introns junctions
+fromGTF.SE.txt <- annotations for the skipped exon junctions
+
+```{r}
+getReleasedGTFAnnotations <- function ( destDir ) {
+
+   if (! (file.exists("../data/fromGTF.tar.gz"))) {
+       system("mkdir -p ../data", intern = TRUE)
+       message("Fetching fromGTF.tar.gz from GitHub ..")
+       # Download archive from GitHub release with tag "dge"
+       piggyback::pb_download(file = "fromGTF.tar.gz",
+                           dest = "../data",
+                           repo = "adeslatt/sbas_gtf",
+                           tag  = "rMATS.3.2.5.gencode.v30",
+                           show_progress = TRUE)
+       message("Done!\n")
+       message("Decompressing fromGTF.tar.gz into ../data")
+       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+       message("Done!\n")
+       message("Gunzipping files into ../data")
+       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
+       message("Done!\n")
+   } else {
+       message("Decompressing fromGTF.tar.gz into ../data")
+       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+       message("Done!\n")
+       message("Gunzipping files into ../data")
+       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
+       message("Done!\n")
+   }
+   return (0)
+}
+
+#
+# 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
+#
+getReleasedGTFAnnotations (destDir <- "../data/")
+```
 
 ```{r}
 #
@@ -148,60 +191,43 @@ write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 head(gene_as)
 ```
 
+## Tissue specific data frame
+
 ```{r}
-res <-   dplyr::group_by(gene_as, Tissue, GeneJunction, GeneSymbol)
-res2 <- res %>%
-        group_by(Tissue,ASE) %>%
-        count(Tissue,GeneSymbol) %>%
-        arrange(desc(n)) %>%
-        as.data.frame()
-
-res3 <- gene_as %>%
-        group_by(GeneJunction, ASE) %>%
-        count(GeneJunction, ASE) %>%
-        arrange(desc(n)) %>% 
-        as.data.frame()
-
-head(res3,50)
-#   count(Tissue, GeneSymbol) %>%
-#   arrange(desc(n)) %>%
-#dim(res2) 
-#genes <- as.character(unique(gene_as$GeneSymbol))
-#length(genes)
-#genes.o <- genes[order(genes)]
-#sum(length(unique_genes))
-#sum(res2[res2$GeneSymbol == "XIST",]$n)
+sum(Tissue == "NA")
+data <- data.frame(Tissue = Tissue, ASE = ASE, Counts = counts)
+data <- data[!(Tissue=="NA"),]
+head(data)
+tail(data)
+dim(data)
 ```
 
 ### Count splicing event by chromosome
 
 ```{r}
-res <- gene_as          %>% 
+res2 <- gene_as          %>% 
        group_by(chr)    %>% 
        count(chr)       %>% 
        arrange(desc(n)) %>% 
        as.data.frame()
-res$chr <- factor(res$chr, levels = res$chr)
-length(res$chr)
-res
-glimpse(res)
-write.table(res, file= "../data/Totals_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
+res2$chr <- factor(res2$chr, levels = res2$chr)
+length(res2$chr)
+res2
+glimpse(res2)
+write.table(res2, file= "../data/Totals_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
 ```
 
 ###  Count most frequent spliced genes 
 
 ```{r}
-res <- gene_as %>% 
+res3 <- gene_as %>% 
        group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
-res$GeneSymbol <- factor(res$GeneSymbol, levels = res$GeneSymbol)
-length(res$GeneSymbol)
-head(res)
-write.table(res, file = "../data/Totals_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
+res3$GeneSymbol <- factor(res3$GeneSymbol, levels = res3$GeneSymbol)
+length(res3$GeneSymbol)
+head(res3)
+write.table(res3, file = "../data/Totals_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
 ```
 
-```{r}
-
-```
 
 
 
@@ -209,15 +235,15 @@ write.table(res, file = "../data/Totals_by_geneSymbol.tsv", sep = "\t", quote=FA
 ### Count most frequent splicing by tissue
 
 ```{r}
-res <- gene_as %>% 
+res4 <- gene_as %>% 
        group_by(Tissue) %>% 
        count(Tissue) %>% 
        arrange(desc(n)) %>% 
        as.data.frame()
-res$Tissue <- factor(res$Tissue, levels = res$Tissue)
-length(res$Tissue)
-res
-write.table(res, file = "../data/Totals_by_tissue.tsv", sep = "\t", row.names = F)
+res4$Tissue <- factor(res4$Tissue, levels = res4$Tissue)
+length(res4$Tissue)
+res4
+write.table(res4, file = "../data/Totals_by_tissue.tsv", sep = "\t", row.names = F)
 ```
 
 ###  Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
@@ -226,10 +252,10 @@ Our starting values were the significant events, all meeting the criteria FC > 1
 
 
 ```{r}
-res <- gene_as %>% group_by(ASE) %>% count(ASE) %>% arrange(desc(n)) %>% as.data.frame()
-res$ASE <- factor(res$ASE, levels = res$ASE)
-head(res)
-write.table(res, file= "../data/Totals_by_splicingtype.tsv")
+res5 <- gene_as %>% group_by(ASE) %>% count(ASE) %>% arrange(desc(n)) %>% as.data.frame()
+res5$ASE <- factor(res5$ASE, levels = res5$ASE)
+head(res5)
+write.table(res5, file= "../data/Totals_by_splicingtype.tsv")
 ```
 
 ###  Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
@@ -237,23 +263,23 @@ write.table(res, file= "../data/Totals_by_splicingtype.tsv")
 ```{r}
 A3SS_keep <- as.character(gene_as$ASE) %in% "A3SS"
 table(A3SS_keep)
-A3SS.gene_as <- data.frame(A3SS.gene_as[A3SS_keep == TRUE,])
+A3SS.gene_as <- data.frame(gene_as[A3SS_keep == TRUE,])
 
 A5SS_keep <- as.character(gene_as$ASE) %in% "A5SS"
 table(A5SS_keep)
-A5SS.gene_as <- data.frame(A5SS.gene_as[A5SS_keep == TRUE,])
+A5SS.gene_as <- data.frame(gene_as[A5SS_keep == TRUE,])
 
 MXE_keep  <- as.character(gene_as$ASE) %in% "MXE"
 table(MXE_keep)
-MXE.gene_as <- data.frame(MXE.gene_as[MXE_keep == TRUE,])
+MXE.gene_as <- data.frame(gene_as[MXE_keep == TRUE,])
 
 SE_keep   <- as.character(gene_as$ASE) %in% "SE"
 table(SE_keep)
-SE.gene_as <- data.frame(SE.gene_as[SE_keep == TRUE,])
+SE.gene_as <- data.frame(gene_as[SE_keep == TRUE,])
 
 RI_keep   <- as.character(gene_as$ASE) %in% "RI"
 table(RI_keep)
-RI.gene_as <- data.frame(RI.gene_as[RI_keep == TRUE,])
+RI.gene_as <- data.frame(gene_as[RI_keep == TRUE,])
 
 dim(A3SS.gene_as)
 dim(A5SS.gene_as)
@@ -262,29 +288,50 @@ dim(SE.gene_as)
 dim(RI.gene_as)
 
 ```
+## Siginficant spliced by Gene for each splicing factor
 
 ```{r}
 A3SS.res <- A3SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
 A3SS.res$GeneSymbol <- factor(A3SS.res$GeneSymbol, levels = A3SS.res$GeneSymbol)
-length(res$GeneSymbol)
-head(res)
-
-#A3SS.res <- A3SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
-#A3SS.res$GeneSymbol <- factor(A3SS.res$GeneSymbol, levels = A3SS.res$GeneSymbol)
+message("Significant spliced genes for A3SS\n",
+        paste(length(A3SS.res$GeneSymbol)), collapse=" ")
 head(A3SS.res)
+
+A5SS.res <- A5SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+A5SS.res$GeneSymbol <- factor(A5SS.res$GeneSymbol, levels = A5SS.res$GeneSymbol)
+message("Significant spliced genes for A5SS\n",
+        paste(length(A5SS.res$GeneSymbol)), collapse=" ")
+head(A5SS.res)
+
+MXE.res <- MXE.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+MXE.res$GeneSymbol <- factor(MXE.res$GeneSymbol, levels = MXE.res$GeneSymbol)
+message("Significant spliced genes for MXE\n",
+        paste(length(MXE.res$GeneSymbol)), collapse=" ")
+head(MXE.res)
+
+RI.res <- RI.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+RI.res$GeneSymbol <- factor(RI.res$GeneSymbol, levels = RI.res$GeneSymbol)
+message("Significant spliced genes for RI\n",
+        paste(length(RI.res$GeneSymbol)), collapse=" ")
+head(RI.res)
+
+SE.res <- SE.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+SE.res$GeneSymbol <- factor(SE.res$GeneSymbol, levels = SE.res$GeneSymbol)
+message("Significant spliced genes for SE\n",
+        paste(length(SE.res$GeneSymbol)), collapse=" ")
+head(SE.res)
 ```
 
 ```{r}
-glimpse(data)
+# Count most frequent spliced genes
+res <- gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
+res$GeneSymbol <- factor(res$GeneSymbol, levels = res$GeneSymbol)
+length(res$GeneSymbol)
+res2 <- data %>% group_by(Tissue) %>% 
+    summarise(Total = sum(Counts)) %>%
+    arrange(desc(Total)) %>%
+    as.data.frame()
 
-res2 <- data             %>% 
-        group_by(Tissue) %>% 
-        summarise(Total = sum(Counts)) %>% 
-        arrange(desc(Total)) %>% as.data.frame()
-glimpse(res2)
-```
-
-```{r}
 #Add number of tissues
 nTissues <- rep(NA, length(res))
 for (i in 1:nrow(res)) {
@@ -313,6 +360,7 @@ ggplot(res[res$n > 10, ], aes(x = GeneSymbol, y = n)) +
                        limits = c(1, 30), breaks = c(10, 20, 30)) +
   ylab(paste("Number of sex-biased splicing events")) +
   xlab("Genes")
+
 ```
 
 Pie chart
@@ -362,74 +410,45 @@ get the annotation file, at this writing, gencode.v30.annotation.gtf
 The information as to the number of exons within the chromosome may be found there
 
 ```{r}
-message("getting the annotation file used in the analysis\n")
-setwd("../data")
-system("wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
-system("gunzip gencode.v30.annotation.gtf.gz")
-setwd("../jupyter")
-message("done\n")
+if (!("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct" %in% list.files("../data/"))) {
+    message("downloading gencode v30 annotation\n")
+    system("wget -O ../data/gencode.v30.annotation.gtf.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
+    message("Done!\n")
+    message("Unzipping compressed file gencode.v30.annotation.gtf.gz..")
+    system("gunzip ../data/gencode.v30.annotation.gtf.gz", intern = TRUE)
+    message("Done! gencode.v30.annotation.gtf can be found in ../data/")
+}
+gencode <- import("../data/gencode.v30.annotation.gtf")
 ```
 
-Import the gencode annotation file and extract the exon information
-
 ```{r}
-# Number of splicing events normalized per chromosome
-library(rtracklayer)
-gencode <- import.gff("../data/gencode.v30.annotation.gtf")
 exons <- gencode[ gencode$type == "exon", ]
 exons <- as.data.frame(exons)
-```
 
-Obtain chromosomes we have splicing information for (recall we did not use chr Y in our analysis
-
-```{r}
+#Obtain chromosomes we have splicing information for (recall we did not use chr Y in our analysis
 all_chr <- as.character(unique(gene_as$chr))
 chr_counts <- rep(0, length(all_chr))
-exon_counts <- data.frame(chr = all_chr, counts = chr_counts)
-```
 
 
-
-```{r}
 for (i in 1:length(all_chr)) {
   chr_counts[i] <- nrow(exons[exons$seqnames == all_chr[i], ])
 }
-glimpse (chr_counts)
-```
 
-```{r}
+exon_counts <- data.frame(chr = all_chr, counts = chr_counts)
+
+# Count most frequent spliced chromosomes
 res <- gene_as %>% group_by(chr) %>% count(chr) %>% arrange(desc(n)) %>% as.data.frame()
-glimpse(res)
 res$chr <- factor(res$chr, levels = res$chr)
+
 idx <- match(res$chr, exon_counts$chr)
+
 res$ExonCounts <- exon_counts$counts[idx]
-res$Index <- res$n / res$ExonCounts) * 1000
-res_sorted <- res %>% arrange(desc(Index))
-```
 
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-idx <- match(res$chr, exon_counts$chr)
-```
-
-```{r}
-res$ExonCounts <- exon_counts$counts[idx]
-```
-
-```{r}
 res$Index <- (res$n / res$ExonCounts) * 1000
-```
 
-```{r}
 res_sorted <- res %>% arrange(desc(Index))
 res_sorted$chr <- factor(res_sorted$chr, levels = res_sorted$chr)
+glimpse(res_sorted)
 ```
 
 ```{r}
