@@ -75,7 +75,62 @@ Refer to the documentation to go further with Christina’s gitbook.
 
 https://lifebit.gitbook.io/cloudos/web-interface/jupyter-lab#how-can-i-install-the-dependencies-i-need-in-the-notebook-session
 
-## 3 Content Details of files
+## 3 Opening your notebook and unpacking the data files.
+
+It is worthwhile that everyone run this notebook `countGenesAndEvents.ipynb` first as it will unpack the tarred files and show you the code that can read them in.  For any figure work you can use this as a template to create your work.
+
+Now to test that all is well start with this notebook.
+
+`countGenesAndEvents.ipynb`
+
+Running this notebook will give some of the required downstream files for the subsequent notebooks.
+
+### 3.1 Click Folder Icon
+
+Clicking the folder icon in the upper left of the workspace will show you the mounted and clone repository directories.
+
+![click folder icon](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickFolderIconWillShowYoutheMountedAndClonedRepository.png)
+
+### 3.2 Click sbas folder to start
+
+Clicking the `sbas` folder will show you the subdirectories, including the location of the jupyter notebooks.
+
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickingSBASWillShowSubDirectoriesAndJupyter.png)
+
+### 3.3 Click jupyter folder
+
+Clicking the `jupyter` folder will show you the jupyter notebooks we have.
+
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickingJupyterWIllShowTheNotebooks.png)
+
+### 3.4 Click countGenesAndEvents.ipynb to start
+
+Clicking the first notebook to run, `countGenesAndEvents.ipynb` will show you the unpacking of data files and how to upload them into your jupyter notebook to begin your analyses.
+
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickCountGenesAndEventsToStartAndUnloadAndUploadVariables.png)
+
+### 3.5 Restart Kernal and Clear All Outputs
+
+To have a clean start within this environment, click `kernal` and select `Interupt Kernal and clear all outputs` to have a clean and fresh start.
+
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/AGoodThingToDoToHaveACleanSlateIsRestartAndClearOutputs.png)
+
+### 3.6 Run the notebook
+
+Click through all the cells and run the notebook.
+
+### 3.7 Remember to hit the blue Save button
+
+If you hit the blue Save button it saves the machine image for you and you can stop your notebook and resume it when you are ready and your environment will be saved.
+
+Remember to use github to save your changes.  Work on a branch and ask for pull requests.
+Or be sure you are not working on a figure that someone else is working on so we don't have conflicts.  Ask if you have questions!
+
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/RemeberSaveJupyterSessionWithBlueSaveButtonAndSaveOnGithubYourChanges.png)
+
+As you click, the data files are unpacked
+### 
+## 4 Content Details of files
 
 You can get the data from the jupyternotebooks if you use piggyback or we have the in the following buckets, in the cloud environment.
 To access the results from differential gene expression analysis and differential splicing junction analysis.
