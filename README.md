@@ -4,5 +4,5 @@ This repository documents the interactive analysis for the results of running th
 
 ## Setting up Notebooks for Analysis
 
-[Setting up Robinson-Lab Notebooks on cloudOS](http://https://github.com/TheJacksonLaboratory/sbas/edit/master/SettingUpRobinsonLabNotebook.MD) 
+[Setting up Robinson-Lab Notebooks on cloudOS](https://github.com/TheJacksonLaboratory/sbas/blob/master/SettingUpRobinsonLabNotebook.MD) 
 
