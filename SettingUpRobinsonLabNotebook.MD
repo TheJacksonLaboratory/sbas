@@ -67,6 +67,7 @@ conda install -c conda-forge r-statmod -y
 conda install -c bioconda bioconductor-stan -y
 conda install -c bioconda bioconductor-rtracklayer -y
 conda install -c conda-forge r-reshape -y
+conda install -c conda-forge r-pheatmap -y
 ```
 
 ### 2.2 What do you do if there are more missing packages
