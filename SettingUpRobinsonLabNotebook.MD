@@ -36,14 +36,44 @@ From the Launcher Page select Terminal
 
 ![Launcher Page](https://github.com/TheJacksonLaboratory/sbas/blob/master/LauncherPage.png)
 
-### 2.1 git clone the Robinson Lab sbas repository
+### 2.1 Clone the repository
+
+Within the terminal window, git clone the Robinson Lab sbas repository
 
 ```bash
 git clone https://github.com/TheJacksonLaboratory/sbas.git
 ```
 
+![git clone sbas](https://github.com/TheJacksonLaboratory/sbas/blob/master/gitCloneRepository.png)
 
-# 3 Getting the files
+### 2.2. Get your files
+
+The specific hash will be different for each mount.  The filename completion by using tab will allow you to quickly get your files.
+
+Only `two` of the mounted files are really needed to get your work done.
+
+#### 2.2.1 data.tar.gz
+
+This command will unpack the data.tar.gz into your sbas/data directory
+
+```bash
+cd sbas
+tar xvzf ../mounted_data/{long hashed key}data.tar.gz{more hashed data} -C data
+```
+
+Which looks like this in my window on Peters notebook.
+
+![tar xvzf data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingDataTarAndContents.png)
+
+#### 2.2.2 DGE_splicing_data.tar.gz
+
+```bash
+tar xvzf ../mounted_data/{long hashed key}DGE_splicing_data.tar.gz{more hashed data} -C data
+```
+
+![tar xvzf DGE_splicing_data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingFilesFromMountedDirectory.png)
+
+# 3 Content Details of files
 
 You can get the data from the jupyternotebooks if you use piggyback or we have the in the following buckets, in the cloud environment.
 To access the results from differential gene expression analysis and differential splicing junction analysis.
