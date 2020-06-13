@@ -1,11 +1,61 @@
 ﻿# Getting set up fast on the Robinson-Lab Jupyter Lab notebook.
 
-## 1 Start your jupyter notebook
+## 1 Cloning the repository
+
+You should begin by git cloning the repository
+At the launcher page
+
+### 1.1 Start a terminal
+
+From the Launcher Page select Terminal
+
+![Launcher Page](https://github.com/TheJacksonLaboratory/sbas/blob/master/LauncherPage.png)
+
+### 1.1 Clone the repository
+
+Within the terminal window, git clone the Robinson Lab sbas repository
+
+```bash
+git clone https://github.com/TheJacksonLaboratory/sbas.git
+```
+
+![git clone sbas](https://github.com/TheJacksonLaboratory/sbas/blob/master/gitCloneRepository.png)
+
+### 1.2. Get your files
+
+The specific hash will be different for each mount.  The filename completion by using tab will allow you to quickly get your files.
+
+Only `two` of the mounted files are really needed to get your work done.
+
+#### 1.2.1 data.tar.gz
+
+This command will unpack the data.tar.gz into your sbas/data directory
+
+```bash
+cd sbas
+tar xvzf ../mounted_data/{long hashed key}data.tar.gz{more hashed data} -C data
+```
+
+Which looks like this in my window on Peters notebook.
+
+![tar xvzf data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingDataTarAndContents.png)
+
+#### 1.2.2 DGE_splicing_data.tar.gz
+
+```bash
+tar xvzf ../mounted_data/{long hashed key}DGE_splicing_data.tar.gz{more hashed data} -C data
+```
+
+![tar xvzf DGE_splicing_data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingFilesFromMountedDirectory.png)
+
+## 2 Start your jupyter notebook
 
 After getting your notebook started, do the following in a terminal window
 Conda install is your friend.   Saying yes at the end means you can fire and forget.
 
-### 1.1 These conda install commands below get you going to start. 
+Before opening your notebook - set up the minimal environment -- you may need more than this but this will get you started to run `countGenesAndEvents.ipynb` for example.
+
+### 2.1 These conda install commands below get you going to start. 
 
 ```bash
 conda install -c bioconda bioconductor-edger -y
@@ -19,61 +69,13 @@ conda install -c bioconda bioconductor-rtracklayer -y
 conda install -c conda-forge r-reshape -y
 ```
 
-### 1.2 What do you do if there are more missing packages
+### 2.2 What do you do if there are more missing packages
 
 Refer to the documentation to go further with Christina’s gitbook.
 
 https://lifebit.gitbook.io/cloudos/web-interface/jupyter-lab#how-can-i-install-the-dependencies-i-need-in-the-notebook-session
 
-## 2 Cloning the repository
-
-You should begin by git cloning the repository
-At the launcher page
-
-### 2.1 Start a terminal
-
-From the Launcher Page select Terminal
-
-![Launcher Page](https://github.com/TheJacksonLaboratory/sbas/blob/master/LauncherPage.png)
-
-### 2.1 Clone the repository
-
-Within the terminal window, git clone the Robinson Lab sbas repository
-
-```bash
-git clone https://github.com/TheJacksonLaboratory/sbas.git
-```
-
-![git clone sbas](https://github.com/TheJacksonLaboratory/sbas/blob/master/gitCloneRepository.png)
-
-### 2.2. Get your files
-
-The specific hash will be different for each mount.  The filename completion by using tab will allow you to quickly get your files.
-
-Only `two` of the mounted files are really needed to get your work done.
-
-#### 2.2.1 data.tar.gz
-
-This command will unpack the data.tar.gz into your sbas/data directory
-
-```bash
-cd sbas
-tar xvzf ../mounted_data/{long hashed key}data.tar.gz{more hashed data} -C data
-```
-
-Which looks like this in my window on Peters notebook.
-
-![tar xvzf data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingDataTarAndContents.png)
-
-#### 2.2.2 DGE_splicing_data.tar.gz
-
-```bash
-tar xvzf ../mounted_data/{long hashed key}DGE_splicing_data.tar.gz{more hashed data} -C data
-```
-
-![tar xvzf DGE_splicing_data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingFilesFromMountedDirectory.png)
-
-# 3 Content Details of files
+## 3 Content Details of files
 
 You can get the data from the jupyternotebooks if you use piggyback or we have the in the following buckets, in the cloud environment.
 To access the results from differential gene expression analysis and differential splicing junction analysis.
