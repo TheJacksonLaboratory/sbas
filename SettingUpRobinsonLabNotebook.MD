@@ -7,6 +7,7 @@ Conda install is your friend.   Saying yes at the end means you can fire and for
 
 ### 1.1 These conda install commands below get you going to start. 
 
+```bash
 conda install -c bioconda bioconductor-edger -y
 conda install -c conda-forge r-readr -y
 conda install -c bioconda bioconductor-multtest -y
@@ -16,6 +17,7 @@ conda install -c conda-forge r-statmod -y
 conda install -c bioconda bioconductor-stan -y
 conda install -c bioconda bioconductor-rtracklayer -y
 conda install -c conda-forge r-reshape -y
+```
 
 ## 1.2 What do you do if there are more missing packages
 
