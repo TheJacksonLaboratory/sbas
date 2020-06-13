@@ -19,17 +19,28 @@ conda install -c bioconda bioconductor-rtracklayer -y
 conda install -c conda-forge r-reshape -y
 ```
 
-## 1.2 What do you do if there are more missing packages
+### 1.2 What do you do if there are more missing packages
 
 Refer to the documentation to go further with Christina’s gitbook.
 
 https://lifebit.gitbook.io/cloudos/web-interface/jupyter-lab#how-can-i-install-the-dependencies-i-need-in-the-notebook-session
 
-# 2 Cloning the repository
+## 2 Cloning the repository
 
 You should begin by git cloning the repository
+At the launcher page
 
-## 2.1 git clone the Robinson Lab sbas repository
+### 2.1 Start a terminal
+
+From the Launcher Page select Terminal
+
+![Launcher Page](https://github.com/TheJacksonLaboratory/sbas/blob/master/LauncherPage.png)
+
+### 2.1 git clone the Robinson Lab sbas repository
+
+```bash
+git clone https://github.com/TheJacksonLaboratory/sbas.git
+```
 
 
 # 3 Getting the files
