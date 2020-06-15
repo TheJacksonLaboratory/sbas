@@ -1,21 +1,23 @@
-<!-- #region -->
-# Analysis Notebook - Count Genes and Events - `CountGenesAndEvents`
+# Analysis Notebook - Count Genes and Events
 
-As instructed by the software, we are using the raw counts as provided by rMATS.  The raw counts we are using in the model are `ijc` and `sjc`, the sample specific raw read counts as they align to the junctions of the `included exon (ijc)` and the junctions of the `excluded or skipped exon (sjc)` respectively.
+This notebook processes the raw counts as provided by rMATS and performs some descriptive statistical analysis. It is used to produce the following outputs. 
 
+## Data files created by this notebook
+Output text files are written to the ``data/`` directory (at the same level as the ``jupyter`` directory). 
 
-Be sure to set your GITHUB_TOKEN, prior to downloading files
-
-One suggestion is change it to your token and then run it then immediately change it back to this:
-
-Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
-<!-- #endregion -->
+1. **gene_AS.tsv**: Alternative splicing events per gene
+2. **genesWithCommonAS.tsv
+3. **Total_AS_by_chr.tsv**: Total alternative splicing events per chromosome
+4. **Total_AS_by_geneSymbol.tsv**: Count the number of tissues in which specific genes show significant alternative splicing
+5. **Total_AS_by_tissue.tsv**: Count the number of significant splicing events per tissue
+6. **Total_AS_by_splicingtype.tsv**: Count number of significant splicing events for each of the 5' alternative splicing categories
+7. **Significant_AS_events.tsv**: ?? Counts of significant events per slicing type per tissue
+8. **SplicingIndex_chr.tsv**: Splicing index by chr (number of sigificant AS events per 1000 exons)
 
 ```{r}
-# Sys.setenv(GITHUB_TOKEN="your-very-own-github-token")
-```
+defaultW <- getOption("warn")  # suppress warnings for this cell
+options(warn = -1) 
 
-```{r}
 library(dplyr)
 library(ggplot2)
 library(limma)
@@ -25,48 +27,69 @@ library(edgeR)
 library(tibble)
 library(R.utils)
 library(rtracklayer)
+
+options(warn = defaultW)
 ```
 
-## Download all the rMATS results
+## 1. Download all the rMATS results
 
 Each of the alternative splicing output files are downloaded here:
-### 1.2.2 get released rMATS GTF annotations
+
+
+### 1.1 get released rMATS GTF annotations
 
 For each splicing type, the junctions are defined, so we have 5 specific annotated splicing specific junction ID annotation files:
-fromGTF.A3SS.txt <- annotations for the alternative 3' splice site junctions
-fromGTF.A5SS.txt <- annotations for the alternative 5' splice site junctions
-fromGTF.MXE.txt <- annotations for the mutually exclusive exon junctions
-fromGTF.RI.txt <- annotations for the retained introns junctions
-fromGTF.SE.txt <- annotations for the skipped exon junctions
+
+1. **fromGTF.A3SS.txt**: annotations for the alternative 3' splice site junctions
+2. **fromGTF.A5SS.txt**: annotations for the alternative 5' splice site junctions
+3. **fromGTF.MXE.txt**: annotations for the mutually exclusive exon junctions
+4. **fromGTF.RI.txt**: annotations for the retained introns junctions
+5. **fromGTF.SE.txt**: annotations for the skipped exon junctions
+
+
+## 1.2 Unpacked the data.tar file if necessaty
+
+```{r}
+dge_splicing_file_dir <- list.files("../../mounted-data", pattern='DGE_splicing_data.tar.gz')
+dge_splicing_file <- paste("../../mounted-data", dge_splicing_file_dir, 'robinson-bucket/notebooks/DGE_splicing_data', sep='/')
+dge_splicing_file_tar_gz <- paste(dge_splicing_file, '.tar.gz', sep='')
+example_unpacked_file = '../data/ri_brain_cerebellum_DGE_sex.csv'
+if (! file.exists(example_unpacked_file)) {
+    mycommand = paste("tar xvfz ",dge_splicing_file_tar_gz, "-C ../data", sep=" ")
+    message(mycommand)
+    system(mycommand, intern = TRUE)
+    message("Done unpacking ", dge_splicing_file_tar_gz)
+} else {
+    message("Cowardly refusing to unpack ", dge_splicing_file_tar_gz, " since it was previously unapcked")
+}
+
+
+
+```
+
+```{r}
+data_file_dir <- list.files("../../mounted-data", pattern='-data.tar.gz')
+data_file_tar_gz <- paste("../../mounted-data", data_file_dir, 'robinson-bucket/notebooks/data.tar.gz', sep='/')
+example_unpacked_file = '../data/SraRunTable.txt.gz'
+if (! file.exists(example_unpacked_file)) {
+    mycommand = paste("tar xvfz ",data_file_tar_gz, "-C ../data", sep=" ")
+    message(mycommand)
+    system(mycommand, intern = TRUE)
+    message("Done unpacking ", data_file_tar_gz)
+} else {
+    message("Cowardly refusing to unpack ", data_file_tar_gz, " since it was previously unapcked")
+}
+
+```
 
 ```{r}
 getReleasedGTFAnnotations <- function ( destDir ) {
-
-   if (! (file.exists("../data/fromGTF.tar.gz"))) {
-       system("mkdir -p ../data", intern = TRUE)
-       message("Fetching fromGTF.tar.gz from GitHub ..")
-       # Download archive from GitHub release with tag "dge"
-       piggyback::pb_download(file = "fromGTF.tar.gz",
-                           dest = "../data",
-                           repo = "adeslatt/sbas_gtf",
-                           tag  = "rMATS.3.2.5.gencode.v30",
-                           show_progress = TRUE)
-       message("Done!\n")
-       message("Decompressing fromGTF.tar.gz into ../data")
-       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-       message("Done!\n")
-       message("Gunzipping files into ../data")
-       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
-       message("Done!\n")
-   } else {
-       message("Decompressing fromGTF.tar.gz into ../data")
-       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-       message("Done!\n")
-       message("Gunzipping files into ../data")
-       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
-       message("Done!\n")
-   }
-   return (0)
+    message("Decompressing fromGTF.tar.gz into ../data")
+    system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+    message("Done!\n")
+    message("Gunzipping files into ../data")
+    system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
+    message("Done!\n")
 }
 
 #
@@ -75,11 +98,27 @@ getReleasedGTFAnnotations <- function ( destDir ) {
 getReleasedGTFAnnotations (destDir <- "../data/")
 ```
 
+### 2  Refined results
+We define **refined results* as (FC > 1.5 and pVal < 0.05) for the sex\*as_event coefficient result for the linear model
+
+
+### 2.1 getTissueReduction
+
 ```{r}
-#
-# refined results (FC > 1.5 and pVal < 0.05)
-# for the sex*as_event coefficient result for the linear model
-#
+getTissueReduction <- function ( filename ) {
+
+    tissue_reduction <- read.table(filename, header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+    colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
+
+    return(tissue_reduction)
+}
+tissue_reduction <- getTissueReduction ("../assets/tissues.tsv")
+```
+
+### 2.2 Read in refined results and annotations
+
+```{r}
 significant_results_dir = "../data/"
 pattern = "DGE_sex_as_events_refined.csv"
 files <- list.files(path = significant_results_dir, pattern = pattern)
@@ -95,7 +134,6 @@ se_annot <- read.table(file = "../data/fromGTF.SE.txt", sep = "\t", quote = "\""
 ```
 
 ```{r}
-message ("\nReading significant events for each splicing factor\n")
 gene_as = data.frame()
 counts <- rep(NA, length(files))
 ASE <- rep("NA", length(files))
@@ -177,11 +215,24 @@ for (i in 1:length(files)) {
         
     } #if has sig. events
     
-} #for all files    
-message ("\nDone reading significant events!\n")
+} #for all files
 ```
 
-### Glimpse into what we have
+### 3 Data Structures for Figures
+
+
+### 3.1 gene_as.tsv
+
+This file contains (description)
+Here is a typical line
+<pre>
+        GeneJunction    ASE     ASE_IDX Tissue  GeneSymbol      chr
+1       MDM4-3553       SE      3553    adipovisceral_omentum   RNPEP   chr1
+2       WDR17-8668      SE      8668    adipovisceral_omentum   ANKMY1  chr2
+3       IL17RC-5032     SE      5032    adipovisceral_omentum   SNCAIP  chr5
+4       DDX3X-5712      A3SS    5712    adrenal_gland   DDX3X   chrX
+</pre>
+There are 2848 significant events in the file.
 
 ```{r}
 glimpse(gene_as)
@@ -191,18 +242,22 @@ write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 head(gene_as)
 ```
 
-## Tissue specific data frame
+### 3.2 Tissue specific data frame
 
 ```{r}
 sum(Tissue == "NA")
 data <- data.frame(Tissue = Tissue, ASE = ASE, Counts = counts)
 data <- data[!(Tissue=="NA"),]
-head(data)
-tail(data)
-dim(data)
+numberOfUniqueTissues <- length(summary(as.factor(data$Tissue),maxsum=500))
+numberOfASEmechanisms <- length(summary(as.factor(data$ASE),maxsum=500))
+message("data now has ",numberOfUniqueTissues, " tissues and ", numberOfASEmechanisms, " ASE categories")
+message("ASE:")
+summary(as.factor(data$ASE),maxsum=500)
 ```
 
-### Count splicing event by chromosome
+### 3.3 Count splicing event by chromosome
+
+Count the number of significant alternative splicing events per chromosome and write to the file **Total_AS_by_chr.tsv**.
 
 ```{r}
 res2 <- gene_as          %>% 
@@ -214,10 +269,10 @@ res2$chr <- factor(res2$chr, levels = res2$chr)
 length(res2$chr)
 res2
 glimpse(res2)
-write.table(res2, file= "../data/Totals_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
+write.table(res2, file= "../data/Total_AS_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
 ```
 
-###  Count most frequent spliced genes 
+### 3.4 Count most frequent spliced genes 
 
 ```{r}
 res3 <- gene_as %>% 
@@ -225,14 +280,14 @@ res3 <- gene_as %>%
 res3$GeneSymbol <- factor(res3$GeneSymbol, levels = res3$GeneSymbol)
 length(res3$GeneSymbol)
 head(res3)
-write.table(res3, file = "../data/Totals_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
+write.table(res3, file = "../data/Total_AS_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
 ```
 
 
 
 
 
-### Count most frequent splicing by tissue
+### 3.5 Count most frequent splicing by tissue
 
 ```{r}
 res4 <- gene_as %>% 
@@ -243,10 +298,11 @@ res4 <- gene_as %>%
 res4$Tissue <- factor(res4$Tissue, levels = res4$Tissue)
 length(res4$Tissue)
 res4
-write.table(res4, file = "../data/Totals_by_tissue.tsv", sep = "\t", row.names = F)
+write.table(res4, file = "../data/Total_AS_by_tissue.tsv", sep = "\t", row.names = F)
 ```
 
-###  Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
+###  3.6 Significant Count by splicing type 
+We define **significant** to be FC > 1.5 and pVal < 0.05
 
 Our starting values were the significant events, all meeting the criteria FC > 1.5 and pVal < 0.05
 
@@ -255,10 +311,10 @@ Our starting values were the significant events, all meeting the criteria FC > 1
 res5 <- gene_as %>% group_by(ASE) %>% count(ASE) %>% arrange(desc(n)) %>% as.data.frame()
 res5$ASE <- factor(res5$ASE, levels = res5$ASE)
 head(res5)
-write.table(res5, file= "../data/Totals_by_splicingtype.tsv")
+write.table(res5, file= "../data/Total_AS_by_splicingtype.tsv")
 ```
 
-###  Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
+###  3.7 Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
 
 ```{r}
 A3SS_keep <- as.character(gene_as$ASE) %in% "A3SS"
@@ -288,7 +344,7 @@ dim(SE.gene_as)
 dim(RI.gene_as)
 
 ```
-## Siginficant spliced by Gene for each splicing factor
+### 3.8 Siginficant spliced by Gene for each splicing factor
 
 ```{r}
 A3SS.res <- A3SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
@@ -322,8 +378,9 @@ message("Significant spliced genes for SE\n",
 head(SE.res)
 ```
 
+### 3.9 Count most frequent spliced genes
+
 ```{r}
-# Count most frequent spliced genes
 res <- gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
 res$GeneSymbol <- factor(res$GeneSymbol, levels = res$GeneSymbol)
 length(res$GeneSymbol)
@@ -339,70 +396,11 @@ for (i in 1:nrow(res)) {
   nTissues[i] <- length(unique(df_gene$Tissue))
 }
 res$Tissues <- nTissues
+head(res)
+write.table(res, file = "../data/genesWithCommonAS.tsv", sep = "\t", quote = F, row.names = F)
 ```
 
-```{r}
-# Genes with more than 10 splicing events
-ggplot(res[res$n > 10, ], aes(x = GeneSymbol, y = n)) +
-  geom_point(size = 4, aes(fill = Tissues, color = Tissues)) +
-  theme_bw() +
-  theme(axis.text.x = element_text(size=10, angle = 270, hjust = 0.0, vjust = 0.5),
-        axis.text.y = element_text(size=16),
-        axis.title.x = element_text(face="plain", colour="black", 
-                                    size=14),
-        axis.title.y = element_text(face="plain", colour="black", 
-                                    size=14),
-        legend.title=element_blank(),
-        legend.text = element_text(face="plain", colour="black", 
-                                   size=12)) +
-  scale_fill_viridis_c(aesthetics = c("colour", "fill"),
-                       option = "plasma",
-                       limits = c(1, 30), breaks = c(10, 20, 30)) +
-  ylab(paste("Number of sex-biased splicing events")) +
-  xlab("Genes")
-
-```
-
-Pie chart
-
-
-Tissue specific 1 tissue
-Tissue group 2-5 tissues
-Recurrent > 5 tissues
-
-```{r}
-#Pie chart - Number of patients with 0, 1, >1 events
-counts <- c(res %>% filter(Tissues == 1) %>% count() %>% as.numeric(),
-            res %>% filter(Tissues > 1 & Tissues < 5) %>% count() %>% as.numeric(),
-            res %>% filter(Tissues > 5) %>% count() %>% as.numeric())
-```
-
-```{r}
-# Define some colors ideal for black & white print
-colors <- c("white","grey70","grey90","grey50","black")
-colors <- c("grey90","grey50", "black")
-```
-
-Calculate the percentage for each category
-
-```{r}
-counts_labels <- round(counts/sum(counts) * 100, 1)
-counts_labels <- paste(counts_labels, "%", sep="")
-counts_labels <- paste(counts_labels, counts, sep =" ")
-```
-
-
-```{r}
-# Create a pie chart with defined heading and custom colors
-# and labels
-pie(counts, main="", col=colors, labels=counts_labels,
-    cex=1.2)
-# Create a legend at the right   
-legend(1.5, 0.5, c("1 tissue","2-5 tissues","> 5 tissues"), cex=1.2, 
-       fill=colors)
-```
-
-### Count most frequent spliced chromosomes
+### 3.10 Count most frequent spliced chromosomes
 To get an indication of which chromosome has the most frequent slicing event (regardless of type)
 We create an index based upon the number of exons per chromosome.
 
@@ -425,7 +423,7 @@ gencode <- import("../data/gencode.v30.annotation.gtf")
 exons <- gencode[ gencode$type == "exon", ]
 exons <- as.data.frame(exons)
 
-#Obtain chromosomes we have splicing information for (recall we did not use chr Y in our analysis
+#Obtain chromosomes we have splicing information for (recall we did not use chr Y in our analysis)
 all_chr <- as.character(unique(gene_as$chr))
 chr_counts <- rep(0, length(all_chr))
 
@@ -452,32 +450,11 @@ glimpse(res_sorted)
 ```
 
 ```{r}
-ggplot(res_sorted, aes(x = chr, y = Index, size = n)) +
-  geom_point(color = "red") +
-  theme_bw() +
-  theme(axis.text.x = element_text(size=10, angle = 270, hjust = 0.0, vjust = 0.5),
-        axis.text.y = element_text(size=16),
-        axis.title.x = element_text(face="plain", colour="black", 
-                                    size=14),
-        axis.title.y = element_text(face="plain", colour="black", 
-                                    size=14),
-        legend.title=element_blank(),
-        legend.text = element_text(face="plain", colour="black", 
-                                   size=12)) +
-  scale_fill_viridis_c(aesthetics = c("colour", "fill"),
-                       option = "plasma",
-                       limits = c(1, 650)) +
-  ylab(paste("Normalized Number of sex-biased ASE")) +
-  xlab("Chromosomes") +
-  guides(size = guide_legend(title = "Number of ASE"))
-```
-
-```{r}
-write.table(data,       file = "../data/Significant_events.tsv", sep = "\t", row.names = F, quote = F)
+write.table(data,       file = "../data/Significant_AS_events.tsv", sep = "\t", row.names = F, quote = F)
 write.table(res_sorted, file = "../data/SplicingIndex_chr.tsv", sep = "\t", quote = F, row.names = F)
 ```
 
-## Metadata
+### Appendix - Metadata
 
 For replicability and reproducibility purposes, we also print the following metadata:
 
@@ -485,14 +462,14 @@ For replicability and reproducibility purposes, we also print the following meta
 2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
 
 
-### 1. Checksums with the sha256 algorithm
+### Appendix 1. Checksums with the sha256 algorithm
 
 ```{r}
 rm (notebookid)
 notebookid   = "countGenesAndEvents"
 notebookid
 
-message("Generating sha256 checksums of the file `../data/Totals_by_tissue.tsv` directory .. ")
+message("Generating sha256 checksums of the file `../data/Total_AS_by_tissue.tsv` directory .. ")
 system(paste0("cd ../data && find . -name SplicingIndex_chr.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
 message("Done!\n")
 
@@ -510,7 +487,7 @@ paste0("../metadata/", notebookid, "_sha256sums.txt")
 data.table::fread(paste0("../metadata/", notebookid, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
 ```
 
-### 2. Libraries metadata
+### Appendix 2. Libraries metadata
 
 ```{r}
 dev_session_info   <- devtools::session_info()

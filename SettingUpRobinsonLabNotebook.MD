@@ -9,7 +9,7 @@ At the launcher page
 
 From the Launcher Page select Terminal
 
-![Launcher Page](https://github.com/TheJacksonLaboratory/sbas/blob/master/LauncherPage.png)
+![Launcher Page](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/LauncherPage.png)
 
 ### 1.1 Clone the repository
 
@@ -19,7 +19,7 @@ Within the terminal window, git clone the Robinson Lab sbas repository
 git clone https://github.com/TheJacksonLaboratory/sbas.git
 ```
 
-![git clone sbas](https://github.com/TheJacksonLaboratory/sbas/blob/master/gitCloneRepository.png)
+![git clone sbas](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/gitCloneRepository.png)
 
 ### 1.2. Get your files
 
@@ -38,7 +38,7 @@ tar xvzf ../mounted_data/{long hashed key}data.tar.gz{more hashed data} -C data
 
 Which looks like this in my window on Peters notebook.
 
-![tar xvzf data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingDataTarAndContents.png)
+![tar xvzf data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/unpackingDataTarAndContents.png)
 
 #### 1.2.2 DGE_splicing_data.tar.gz
 
@@ -46,7 +46,7 @@ Which looks like this in my window on Peters notebook.
 tar xvzf ../mounted_data/{long hashed key}DGE_splicing_data.tar.gz{more hashed data} -C data
 ```
 
-![tar xvzf DGE_splicing_data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingFilesFromMountedDirectory.png)
+![tar xvzf DGE_splicing_data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/unpackingFilesFromMountedDirectory.png)
 
 ## 2 Preparing your jupyter notebook
 
@@ -90,31 +90,31 @@ Running this notebook will give some of the required downstream files for the su
 
 Clicking the folder icon in the upper left of the workspace will show you the mounted and clone repository directories.
 
-![click folder icon](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickFolderIconWillShowYoutheMountedAndClonedRepository.png)
+![click folder icon](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/ClickFolderIconWillShowYoutheMountedAndClonedRepository.png)
 
 ### 3.2 Click sbas folder to start
 
 Clicking the `sbas` folder will show you the subdirectories, including the location of the jupyter notebooks.
 
-![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickingSBASWillShowSubDirectoriesAndJupyter.png)
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/ClickingSBASWillShowSubDirectoriesAndJupyter.png)
 
 ### 3.3 Click jupyter folder
 
 Clicking the `jupyter` folder will show you the jupyter notebooks we have.
 
-![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickingJupyterWIllShowTheNotebooks.png)
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/ClickingJupyterWIllShowTheNotebooks.png)
 
 ### 3.4 Click countGenesAndEvents.ipynb to start
 
 Clicking the first notebook to run, `countGenesAndEvents.ipynb` will show you the unpacking of data files and how to upload them into your jupyter notebook to begin your analyses.
 
-![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/ClickCountGenesAndEventsToStartAndUnloadAndUploadVariables.png)
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/ClickCountGenesAndEventsToStartAndUnloadAndUploadVariables.png)
 
 ### 3.5 Restart Kernal and Clear All Outputs
 
 To have a clean start within this environment, click `kernal` and select `Interupt Kernal and clear all outputs` to have a clean and fresh start.
 
-![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/AGoodThingToDoToHaveACleanSlateIsRestartAndClearOutputs.png)
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/AGoodThingToDoToHaveACleanSlateIsRestartAndClearOutputs.png)
 
 ### 3.6 Run the notebook
 
@@ -127,7 +127,7 @@ If you hit the blue Save button it saves the machine image for you and you can s
 Remember to use github to save your changes.  Work on a branch and ask for pull requests.
 Or be sure you are not working on a figure that someone else is working on so we don't have conflicts.  Ask if you have questions!
 
-![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/RemeberSaveJupyterSessionWithBlueSaveButtonAndSaveOnGithubYourChanges.png)
+![click sbas folder](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/RememberSaveJupyterSessionWithBlueSaveButtonAndSaveOnGithubYourChanges.png)
 
 As you click, the data files are unpacked
 ### 
