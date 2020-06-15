@@ -19,9 +19,6 @@ To reRun
 - [ ] 9. Run the summary_per_splicing_junction.ipynb
 - [ ] 10. Run each of the figure generation notebooks.
 
-
-[Setting up Robinson-Lab Notebooks on cloudOS](https://github.com/TheJacksonLaboratory/sbas/blob/master/SettingUpRobinsonLabNotebook.MD) 
-
 ## 2. Setting up Notebooks for Analysis
 
 [Setting up Robinson-Lab Notebooks on cloudOS](https://github.com/TheJacksonLaboratory/sbas/blob/master/SettingUpRobinsonLabNotebook.MD) 
