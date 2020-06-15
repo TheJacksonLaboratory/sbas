@@ -48,10 +48,10 @@ tar xvzf ../mounted_data/{long hashed key}DGE_splicing_data.tar.gz{more hashed d
 
 ![tar xvzf DGE_splicing_data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/unpackingFilesFromMountedDirectory.png)
 
-## 2 Start your jupyter notebook
+## 2 Preparing your jupyter notebook
 
-After getting your notebook started, do the following in a terminal window
-Conda install is your friend.   Saying yes at the end means you can fire and forget.
+After getting your notebook started, you need to prepare for your notebooks expectations regarding librarys it is interested in using.  To do so, do the following in a terminal window.
+Conda install is your friend.   Saying yes at the end means you can fire and forget.   Ones says yes with "-y" at the end of the conda install command.
 
 Before opening your notebook - set up the minimal environment -- you may need more than this but this will get you started to run `countGenesAndEvents.ipynb` for example.
 
