@@ -114,6 +114,10 @@ getTissueReduction <- function ( filename ) {
     return(tissue_reduction)
 }
 tissue_reduction <- getTissueReduction ("../assets/tissues.tsv")
+tissue_reduction <- tissue_reduction[tissue_reduction$display_name != "n/a",]
+tissue_reduction$display_name <- factor(tissue_reduction$display_name)
+levels(tissue_reduction$display_name)
+length(levels(tissue_reduction$display_name))
 ```
 
 ### 2.2 Read in refined results and annotations
@@ -140,88 +144,100 @@ head(se_annot)
 
 ```{r}
 gene_as = data.frame()
+GeneJunction <- rep("NA", length(files))
 counts <- rep(NA, length(files))
 ASE <- rep("NA", length(files))
 Tissue <- rep("NA", length(files))
+Display <- rep("NA", length(files))
+GeneSymbol <- rep("NA", length(files))
+GeneID <- rep("NA", length(files))
+chr <- rep("NA", length(files))
 
 for (i in 1:length(files)) {
     lines <- read.csv(paste0(significant_results_dir, files[i]),header = TRUE)
     event     <- as.vector(as.character(rownames(lines)))
-    tissue <- gsub("_DGE_sex_as_events_refined.csv","", files[i], fixed = TRUE)
-
+    tissue1 <- gsub("_DGE_sex_as_events_refined.csv","", files[i], fixed = TRUE)
     counts[i] <- dim(lines)[1]
-    
-    if (dim(lines)[1] > 0) { #has significant events
-        # rownames of the significant results file are a combination of gene-symbol and junction name
-        # using a regular expression - extract the last numbers that then are the index to the annotation table
+    if (counts[i] > 0) {
         event_idx <- substring(event, regexpr("[0-9]+$", event))
-        
-        if (grepl("a3ss_", files[i])) {
-            tissue <- gsub("a3ss_","", tissue, fixed = TRUE)
+        event_idx
+        if (grepl("^a3ss_", files[i])) {
+            # remove the first 5 letters of the string 
+            tissue2 <- substring(tissue1,6)
             ASE[i] <- "A3SS"
-            Tissue[i] <- tissue
+            Tissue[i] <- tissue2
             idx <- match(event_idx, a3ss_annot$ID)
             res <- data.frame(GeneJunction = event,
                               ASE = "A3SS", 
                               ASE_IDX = idx,
-                              Tissue = tissue, 
+                              Tissue = tissue2,
+                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = a3ss_annot$geneSymbol[idx],
                               GeneID     = a3ss_annot$GeneID[idx],
                               chr = a3ss_annot$chr[idx])
-        }
-        if (grepl("a5ss_", files[i])) {
-            tissue <- gsub("a5ss_","", tissue, fixed = TRUE)
+            gene_as <- rbind(gene_as,res)
+
+        } else if (grepl("^a5ss_", files[i])) {
+            # remove the first 5 letters of the string 
+            tissue2 <- substring(tissue1,6)
             ASE[i] <- "A5SS"
-            Tissue[i] <- tissue
+            Tissue[i] <- tissue2
             idx <- match(event_idx, a5ss_annot$ID)
             res <- data.frame(GeneJunction = event,
                               ASE = "A5SS", 
                               ASE_IDX = idx,
-                              Tissue = tissue, 
+                              Tissue = tissue2,
+                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = a5ss_annot$geneSymbol[idx],
                               GeneID     = a5ss_annot$GeneID[idx],
                               chr = a5ss_annot$chr[idx])
-        }
-        if (grepl("mxe_", files[i])) {
+            gene_as <- rbind(gene_as,res)
+        } else if (grepl("^mxe_", files[i])) {
             ASE[i] <- "MXE"
-            tissue <- gsub("mxe_","", tissue, fixed = TRUE)
-            Tissue[i] <- tissue
+            # remove the first 4 letters of the string 
+            tissue2 <- substring(tissue1,5)
+            Tissue[i] <- tissue2
             idx <- match(event_idx, a3ss_annot$ID)
             res <- data.frame(GeneJunction = event,
                               ASE = "MXE", 
                               ASE_IDX = idx,
-                              Tissue = tissue, 
+                              Tissue = tissue2, 
+                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = mxe_annot$geneSymbol[idx],
                               GeneID     = mxe_annot$GeneID[idx],
                               chr = mxe_annot$chr[idx])
-        }
-        if (grepl("se_", files[i])) {
+            gene_as <- rbind(gene_as,res)
+        } else if (grepl("^se_", files[i])) {
             ASE[i] <- "SE"
-            tissue <- gsub("se_","", tissue, fixed = TRUE)
-            Tissue[i] <- tissue
+            # remove the first 3 letters of the string 
+            tissue2 <- substring(tissue1,4)
+            Tissue[i] <- tissue2
             idx <- match(event_idx, se_annot$ID)
             res <- data.frame(GeneJunction = event,
                               ASE = "SE", 
                               ASE_IDX = idx,
-                              Tissue = tissue, 
+                              Tissue = tissue2, 
+                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = se_annot$geneSymbol[idx],
                               GeneID     = se_annot$GeneID[idx],
                               chr = se_annot$chr[idx])
-        }
-        if (grepl("ri_", files[i])){
+            gene_as <- rbind(gene_as,res)
+        } else if (grepl("^ri_", files[i])){
             ASE[i] <- "RI"
-            tissue <- gsub("ri_","", tissue, fixed = TRUE)
-            Tissue[i] <- tissue
+            # remove the first 3 letters of the string 
+            tissue2 <- substring(tissue1,4)
+            Tissue[i] <- tissue2
             idx <- match(event_idx, ri_annot$ID)
             res <- data.frame(GeneJunction = event,
                               ASE = "RI", 
                               ASE_IDX = idx,
-                              Tissue = tissue, 
+                              Tissue = tissue2, 
+                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = ri_annot$geneSymbol[idx],
                               GeneID     = ri_annot$GeneID[idx],
                               chr = ri_annot$chr[idx])
+            gene_as <- rbind(gene_as,res)
         }
-        gene_as <- rbind(gene_as, res)
         
     } #if has sig. events
     
@@ -246,12 +262,13 @@ There are 2848 significant events in the file.
 
 ```{r}
 glimpse(gene_as)
-table(is.na(gene_as$Tissue))
-table(gene_as$Tissue)
-length(levels(gene_as$Tissue))
+table(is.na(gene_as$Display))
+table(gene_as$Display)
 colnames(gene_as)
 write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 head(gene_as)
+tissue_reduction <- factor(tissue_reduction$display_name)
+
 ```
 
 ```{r}
@@ -307,12 +324,12 @@ write.table(res3, file = "../data/Total_AS_by_geneSymbol.tsv", sep = "\t", quote
 
 ```{r}
 res4 <- gene_as %>% 
-       group_by(Tissue) %>% 
-       count(Tissue) %>% 
+       group_by(Display) %>% 
+       count(Display) %>% 
        arrange(desc(n)) %>% 
        as.data.frame()
-res4$Tissue <- factor(res4$Tissue, levels = res4$Tissue)
-length(res4$Tissue)
+res4$Display <- factor(res4$Display, levels = res4$Display)
+length(res4$Display)
 res4
 write.table(res4, file = "../data/Total_AS_by_tissue.tsv", sep = "\t", row.names = F)
 ```
