@@ -171,6 +171,7 @@ for (i in 1:length(files)) {
                               ASE = "A3SS", 
                               ASE_IDX = idx,
                               Tissue = tissue2,
+                              counts = counts[i],
                               Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = a3ss_annot$geneSymbol[idx],
                               GeneID     = a3ss_annot$GeneID[idx],
@@ -187,6 +188,7 @@ for (i in 1:length(files)) {
                               ASE = "A5SS", 
                               ASE_IDX = idx,
                               Tissue = tissue2,
+                              counts = counts[i],
                               Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = a5ss_annot$geneSymbol[idx],
                               GeneID     = a5ss_annot$GeneID[idx],
@@ -202,6 +204,7 @@ for (i in 1:length(files)) {
                               ASE = "MXE", 
                               ASE_IDX = idx,
                               Tissue = tissue2, 
+                              counts = counts[i],
                               Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = mxe_annot$geneSymbol[idx],
                               GeneID     = mxe_annot$GeneID[idx],
@@ -216,7 +219,8 @@ for (i in 1:length(files)) {
             res <- data.frame(GeneJunction = event,
                               ASE = "SE", 
                               ASE_IDX = idx,
-                              Tissue = tissue2, 
+                              Tissue = tissue2,
+                              counts = counts[i],
                               Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = se_annot$geneSymbol[idx],
                               GeneID     = se_annot$GeneID[idx],
@@ -231,7 +235,8 @@ for (i in 1:length(files)) {
             res <- data.frame(GeneJunction = event,
                               ASE = "RI", 
                               ASE_IDX = idx,
-                              Tissue = tissue2, 
+                              Tissue = tissue2,
+                              counts = counts[i],
                               Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
                               GeneSymbol = ri_annot$geneSymbol[idx],
                               GeneID     = ri_annot$GeneID[idx],
@@ -262,6 +267,8 @@ There are 2848 significant events in the file.
 
 ```{r}
 glimpse(gene_as)
+gene_as$Tissue <- factor(gene_as$Tissue)
+length(levels(gene_as$Tissue))
 table(is.na(gene_as$Display))
 table(gene_as$Display)
 colnames(gene_as)
@@ -279,10 +286,11 @@ head(gene_as[gene_as$chr=="chrX",])
 ### 3.2 Tissue specific data frame
 
 ```{r}
-data <- data.frame(Tissue = Tissue, ASE = ASE, Counts = counts)
-data <- data[!(Tissue=="NA"),]
+data <- data.frame(Tissue=gene_as$Tissue, ASE=gene_as$ASE, Counts=gene_as$counts)
+
 numberOfUniqueTissues <- length(summary(as.factor(data$Tissue),maxsum=500))
 numberOfASEmechanisms <- length(summary(as.factor(data$ASE),maxsum=500))
+
 message("data now has ",numberOfUniqueTissues, " tissues and ", numberOfASEmechanisms, " ASE categories")
 message("ASE:")
 summary(as.factor(data$ASE),maxsum=500)
@@ -441,7 +449,7 @@ get the annotation file, at this writing, gencode.v30.annotation.gtf
 The information as to the number of exons within the chromosome may be found there
 
 ```{r}
-if (!("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct" %in% list.files("../data/"))) {
+if (!("gencode.v30.annotation.gtf.gz" %in% list.files("../data/"))) {
     message("downloading gencode v30 annotation\n")
     system("wget -O ../data/gencode.v30.annotation.gtf.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
     message("Done!\n")
