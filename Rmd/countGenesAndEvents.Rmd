@@ -123,6 +123,7 @@ significant_results_dir = "../data/"
 pattern = "DGE_sex_as_events_refined.csv"
 files <- list.files(path = significant_results_dir, pattern = pattern)
 as_types <- c("a3ss", "a5ss", "mxe", "ri", "se")
+length(files)
 ```
 
 ```{r}
@@ -131,6 +132,10 @@ a5ss_annot <- read.table(file = "../data/fromGTF.A5SS.txt", sep = "\t", quote = 
 mxe_annot <- read.table(file = "../data/fromGTF.MXE.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
 ri_annot <- read.table(file = "../data/fromGTF.RI.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
 se_annot <- read.table(file = "../data/fromGTF.SE.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
+```
+
+```{r}
+head(se_annot)
 ```
 
 ```{r}
@@ -161,6 +166,7 @@ for (i in 1:length(files)) {
                               ASE_IDX = idx,
                               Tissue = tissue, 
                               GeneSymbol = a3ss_annot$geneSymbol[idx],
+                              GeneID     = a3ss_annot$GeneID[idx],
                               chr = a3ss_annot$chr[idx])
         }
         if (grepl("a5ss_", files[i])) {
@@ -173,6 +179,7 @@ for (i in 1:length(files)) {
                               ASE_IDX = idx,
                               Tissue = tissue, 
                               GeneSymbol = a5ss_annot$geneSymbol[idx],
+                              GeneID     = a5ss_annot$GeneID[idx],
                               chr = a5ss_annot$chr[idx])
         }
         if (grepl("mxe_", files[i])) {
@@ -185,6 +192,7 @@ for (i in 1:length(files)) {
                               ASE_IDX = idx,
                               Tissue = tissue, 
                               GeneSymbol = mxe_annot$geneSymbol[idx],
+                              GeneID     = mxe_annot$GeneID[idx],
                               chr = mxe_annot$chr[idx])
         }
         if (grepl("se_", files[i])) {
@@ -197,6 +205,7 @@ for (i in 1:length(files)) {
                               ASE_IDX = idx,
                               Tissue = tissue, 
                               GeneSymbol = se_annot$geneSymbol[idx],
+                              GeneID     = se_annot$GeneID[idx],
                               chr = se_annot$chr[idx])
         }
         if (grepl("ri_", files[i])){
@@ -209,7 +218,8 @@ for (i in 1:length(files)) {
                               ASE_IDX = idx,
                               Tissue = tissue, 
                               GeneSymbol = ri_annot$geneSymbol[idx],
-                              chr = a3ss_annot$chr[idx])
+                              GeneID     = ri_annot$GeneID[idx],
+                              chr = ri_annot$chr[idx])
         }
         gene_as <- rbind(gene_as, res)
         
@@ -237,15 +247,21 @@ There are 2848 significant events in the file.
 ```{r}
 glimpse(gene_as)
 table(is.na(gene_as$Tissue))
+table(gene_as$Tissue)
+length(levels(gene_as$Tissue))
 colnames(gene_as)
 write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 head(gene_as)
 ```
 
+```{r}
+head(gene_as[gene_as$chr=="chrX",])
+
+```
+
 ### 3.2 Tissue specific data frame
 
 ```{r}
-sum(Tissue == "NA")
 data <- data.frame(Tissue = Tissue, ASE = ASE, Counts = counts)
 data <- data[!(Tissue=="NA"),]
 numberOfUniqueTissues <- length(summary(as.factor(data$Tissue),maxsum=500))
