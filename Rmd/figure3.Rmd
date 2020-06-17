@@ -5,34 +5,68 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.3.3
+      jupytext_version: 1.4.1
   kernelspec:
     display_name: R
     language: R
     name: ir
 ---
 
-# Figure 3 Hierarchical Bayesian Modelling.
+# Analysis Notebook - Hierarchical Bayesian Modelling
 
 
 ## **NOTE**:
 
 We assume that you have cloned the analysis repository and have `cd` into the parent directory. Before starting with the analysis make sure you have first completed the dependencies set up by following the instructions described in the **`dependencies/README.md`** document. All paths defined in this Notebook are relative to the parent directory (repository). Please close this Notebook and start again by following the above guidelines if you have not completed the aforementioned steps.
 
+<!-- #region -->
+## Prerequisite input files
 
+Before starting the execution of the following code, make sure you have available in the folders `sbas/data` and `sbas/assets` the files listed below as prerequisites.
+
+###  **`sbas/data`**.
+The present analysis requires the following files to be present in the folder **`sbas/data`**.
+
+
+- [x] The contents of `data.tar.gz` after unpacking them into the `sbas/data` folder with `tar xvzf data.tar.gz -C sbas/data `
+- [x] `SraRunTable.noCram.noExome.noWGS.totalRNA.txt`
+- [x] `rmats_final.se.jc.ijc.txt`
+- [x] `rmats_final.se.jc.sjc.txt`
+- [x] `SraRunTable.noCram.noExome.noWGS.totalRNA.txt`
+
+
+Additionally, the file `GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct` which is retrieved in the script from [`https://storage.googleapis.com/gtex_analysis_v7/rna_seq_data/`](https://storage.googleapis.com/gtex_analysis_v7/rna_seq_data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz) and stored into the folder 
+`sbas/data` as well.
+
+
+### **`sbas/assets`**
+The present analysis requires the following files to be present in the folder **`sbas/assets`**.
+
+- [x] `tissues.tsv`: metadata file with information on which tissues will be used for analysis
+- [x] `splice-relevant-genes.txt`: list of RNA binding proteins that are annotated to splicing relevant functions from GO.
+<!-- #endregion -->
+
+<!-- #region -->
 ## Loading dependencies
 
-```{r}
-Sys.setenv(TAR = "/bin/tar") 
+If `conda` is available on your environment you can install the required dependencies by running the following commands:
 
+
+```bash
+time conda install -y r-base==3.6.2 &&
+conda install -y r-ggplot2 r-ggsci r-coda r-rstan r-rjags r-compute.es &&
+Rscript -e 'install.packages("runjags", repos = "https://cloud.r-project.org/")'
+```
+
+
+<!-- #endregion -->
+
+```{r}
 # dataviz dependencies
 library(ggplot2)
-library(visdat)
-library(patchwork)
 library(ggsci)
 library(grid)
 library(gridExtra)
-library(report)
 
 # BDA2E-utilities dependencies
 library(parallel)
@@ -41,109 +75,349 @@ library(runjags)
 library(compute.es)
 ```
 
-##  Figure 3a
-
-This figure is not a plot generated from code, but a diagram to explain the modeling.
+Download GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct from Google Cloud
 
 
-##  Figure - DBDA2Eprograms plots
+```{r}
+if (!("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct" %in% list.files("../data/"))) {
+    message("Downloading GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct \nfrom https://console.cloud.google.com/storage/browser/_details/gtex_analysis_v7/rna_seq_data/ ..")
+    system("wget -O ../data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz https://storage.googleapis.com/gtex_analysis_v7/rna_seq_data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz", intern = TRUE)
+    message("Done!\n\n")
+    message("Unzipping compressed file GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz..")
+    system("gunzip ../data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz", intern = TRUE)
+    message("Done! \n\nThe file GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct can be found in ../data/")
+}
+```
 
-code from: [dimorphAS/figures/oldFigureDrafts/figure3b.R](https://github.com/TheJacksonLaboratory/sbas/blob/master/dimorphAS/figures/oldFigureDrafts/figure3b.R)
+<!-- #region -->
+Previously used list of tissues to use for the Hierarchical Bayesian modelling:
+
+
+
+```R
+tissue.list<-c("Heart - Left Ventricle",
+               "Breast - Mammary Tissue",
+               "Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)",
+               "Adrenal Gland",
+               "Adipose - Subcutaneous",
+               "Muscle - Skeletal",
+               "Thyroid",
+               "Cells - Transformed fibroblasts",
+               "Artery - Aorta",
+               "Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)")
+```
+<!-- #endregion -->
+
+```{r}
+tissues_df <- readr::read_delim("../assets/tissues.tsv", delim = "\t")
+```
+
+```{r}
+tissue.list <- tissues_df$name[ tissues_df$include ==1]
+```
+
+```{r}
+cat(tissue.list, sep = ", ")
+```
+
+```{r}
+tissue <- tissue.list[1]  #can be replaced with a loop or argument to choose a different tissue
+```
+
+```{r}
+tissue
+```
+
+```{r}
+dataDir <- "../data/"
+assetsDir <- "../assets/"
+```
+
+```{r}
+ensg_map_path  <- paste0(dataDir, tissue, "_DGE_ensg_map.csv" ) 
+DGE_file_path  <- paste0(dataDir, tissue, "_DGE.csv" ) 
+
+ensg_map <- read.csv(ensg_map_path)
+dge_file <- read.csv(DGE_file_path)
+
+# Trim gene version after dot
+dge_file[["ensg_names"]] <- gsub("\\..*","",rownames(dge_file))
+events.table  <- dplyr::left_join(dge_file, ensg_map , by = "ensg_names")
+rownames(events.table) <- events.table[["ensg_names"]]
+```
+
+```{r}
+head(ensg_map, 2)
+head(dge_file, 2)
+head(events.table, 2)
+```
+
+```{r}
+events.table.name     <- paste0(dataDir, "fromGTF.SE.txt")
+```
+
+```{r}
+inc.counts.file.name  <- paste0(dataDir, "rmats_final.se.jc.ijc.txt")
+```
+
+```{r}
+skip.counts.file.name <- paste0(dataDir, "rmats_final.se.jc.sjc.txt")
+```
+
+```{r}
+rbp.table.name        <- paste0(assetsDir, "splice-relevant-genes.txt")
+```
+
+```{r}
+metadata.file.name    <- paste0(dataDir, "SraRunTable.noCram.noExome.noWGS.totalRNA.txt")
+```
+
+```{r}
+expression.file.name  <- paste0(dataDir, "GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct")
+```
+
+Load the skip and inclusion count matrices, and the list of RNA binding proteins that are annotated to either:
+- mRNA splicing, via spliceosome `(GO:0000398)`,
+- regulation of mRNA splicing, via spliceosome `(GO:0048024)`, or 
+- both. 
+
+The table has the:
+- Gene Symbol
+- the Uniprot ID (`uprot.id`)
+- the NCBI Gene ID (`gene.id`) and 
+- boolean columns for being 
+  - `S`=mRNA splicing, via spliceosome `(GO:0000398)` and 
+  - `R`=regulation of mRNA splicing, via spliceosome `(GO:0048024)`.
+
+```{r}
+events.table <- events.table[abs(events.table$logFC)>=log2(1.5) & events.table$adj.P.Val<=0.05,]
+```
+
+```{r}
+annot.table  <- read.table(events.table.name,header=T)
+```
+
+```{r}
+rownames(annot.table) <- annot.table$ID
+```
+
+```{r}
+merged.table <- merge(events.table,annot.table,by="row.names")
+```
+
+```{r}
+rbp.table    <- read.table(rbp.table.name,sep="\t",header=TRUE)  
+```
+
+```{r}
+inc.counts   <- read.csv(inc.counts.file.name)
+```
+
+```{r}
+skip.counts  <- read.csv(skip.counts.file.name)
+```
+
+## Check `dim()` of loaded objects
+
+```{r}
+message("Discrepancy in current with previous format, `ID` column not present")
+```
+
+```{r}
+dim(events.table)
+dim(annot.table)
+dim(merged.table)
+dim(rbp.table)
+dim(inc.counts)
+dim(skip.counts)
+```
+
+## Read sample info
+
+```{r}
+meta.data    <- read.csv(metadata.file.name,header=TRUE)
+meta.data    <- meta.data[meta.data$body_site==tissue,]
+inc.counts   <- inc.counts[,colnames(inc.counts) %in% meta.data$Run]
+skip.counts  <- skip.counts[,colnames(skip.counts) %in% meta.data$Run]
+sd.threshold <- quantile(apply(inc.counts,1,sd)+apply(skip.counts,1,sd),0.95)
+skip.counts  <- skip.counts[rownames(skip.counts) %in% merged.table$Row.names,]
+inc.counts   <- inc.counts[rownames(inc.counts) %in% merged.table$Row.names,]
+
+if (nrow(skip.counts)>100)
+{
+  select.events<-apply(inc.counts,1,sd)+apply(skip.counts,1,sd)>sd.threshold
+  inc.counts<-inc.counts[select.events,]
+  skip.counts<-skip.counts[select.events,]
+  merged.table<-merged.table[select.events,]
+}
+```
+
+## Read expression data:
+
+```{r}
+expression.mat          <- read.table(expression.file.name, nrows=1,sep="\t",header=T,skip=2)
+colnames.expression.mat <- colnames(expression.mat)
+total.samples           <- length(colnames.expression.mat)
+meta.data$Sample.Name   <- gsub("-","\\.",meta.data$Sample.Name)
+meta.data               <- meta.data[meta.data$Sample.Name %in% colnames(expression.mat),]
+meta.data               <- meta.data[!duplicated(meta.data$Sample.Name),]
+inc.counts              <- inc.counts[,colnames(inc.counts) %in% meta.data$Run]
+skip.counts             <- skip.counts[,colnames(skip.counts) %in% meta.data$Run]
+meta.data               <- meta.data[meta.data$Run %in% colnames(inc.counts),]
+col.in.tissue           <- c()
+
+for (col in colnames.expression.mat)
+  col.in.tissue<-c(col.in.tissue, (col %in% meta.data$Sample.Name) && (meta.data$body_site[which(meta.data$Sample.Name==col)] %in% tissue) && (meta.data$submitted_subject_id[which(meta.data$Sample.Name==col)]!="GTEX-11ILO"))
+expression.mat<-read.table(expression.file.name, colClasses = ifelse(col.in.tissue,"numeric","NULL"),sep="\t",header=T,skip=2)
+```
+
+## Read gene names:
+
+```{r}
+expression.mat <- expression.mat[,order(match(colnames(expression.mat),meta.data$Sample.Name))]
+inc.counts     <- inc.counts[,order(match(colnames(inc.counts),meta.data$Run))]
+skip.counts    <- skip.counts[,order(match(colnames(skip.counts),meta.data$Run))]
+all.genes      <- read.table(expression.file.name,sep="\t",header=T,skip=2,colClasses = c(rep("character", 2), rep("NULL", total.samples-2)))
+expression.mat <- expression.mat[!duplicated(all.genes$Description),]
+all.genes      <- all.genes[!duplicated(all.genes$Description),]
+skip.counts    <- skip.counts[merged.table$geneSymbol %in% all.genes$Description,]
+inc.counts     <- inc.counts[merged.table$geneSymbol %in% all.genes$Description,]
+merged.table   <- merged.table[merged.table$geneSymbol %in% all.genes$Description,]
+gene.names     <- unique(merged.table$geneSymbol)
+expression.mat <- expression.mat[all.genes$Description %in% c(as.character(rbp.table$Gene),as.character(gene.names)),]
+rownames.expression.mat <-all.genes$Description[all.genes$Description %in% c(as.character(rbp.table$Gene),as.character(gene.names))]
+expression.mat <-expression.mat[!duplicated(rownames.expression.mat),]
+rownames.expression.mat <-rownames.expression.mat[!duplicated(rownames.expression.mat)]
+```
+
+## Prepare expression of genes and RBPS:
+
+```{r}
+num.events     <- nrow(merged.table)
+event.to.gene  <- c()
+gexp           <- expression.mat[rownames.expression.mat %in% gene.names,]
+rownames(gexp) <- rownames.expression.mat[rownames.expression.mat %in% gene.names]
+gexp           <- gexp[order(match(rownames(gexp),gene.names)),]
+gexp           <- log2(gexp+0.5)
+gexp           <- gexp-rowMeans(gexp)
+
+gexp[apply(gexp,1,sd)>0,] <- gexp[apply(gexp,1,sd)>0,]/apply(gexp[apply(gexp,1,sd)>0,],1,sd)
+rexp           <- expression.mat[rownames.expression.mat %in% rbp.table$Gene,]
+rownames(rexp) <- rownames.expression.mat[rownames.expression.mat %in% rbp.table$Gene]
+rexp           <- rexp[order(match(rownames(rexp),rbp.table$Gene)),]
+rexp           <- log2(rexp+0.5)
+rexp           <- rexp-rowMeans(rexp)
+rexp           <- rexp/apply(rexp,1,function(v){ifelse(sum(v==v[1])<length(v),sd(v),1)})
+
+for (i in (1:num.events))
+  event.to.gene<-c(event.to.gene,which(unique(merged.table$geneSymbol)==merged.table[i,"geneSymbol"]))
+sex<-ifelse(meta.data$sex=="male",1,0)
+
+```
+
+## Run stan:
+
+```{r}
+dataList = list(
+  as = round(skip.counts) ,   #skip event counts across experiments
+  c = round(skip.counts+inc.counts)    , #total counts for event, i.e. skip+inclusion, across experiments
+  gexp = gexp, #read counts for genes (from gtex, take the raw counts) across experiments
+  rexp = rexp, #read counts for RBPs (from gtex, take the raw counts)
+  event_to_gene = event.to.gene,  #the gene index for each event (1 to the number of distinct genes) 
+  Nrbp = nrow(rexp), #number of RBPs
+  Nevents = nrow(merged.table),  #most varying AS events in 
+  Nexp = ncol(expression.mat),#number of experiments such that we measured each event, gene and RBP in each experiment
+  Ngenes = nrow(gexp),
+  sex=sex
+)
+
+
+modelString = "
+data {
+int<lower=0> Nevents;
+int<lower=0> Nexp;
+int<lower=0> Nrbp;
+int<lower=0> Ngenes;
+int<lower=0> as[Nevents,Nexp] ;
+int<lower=0> c[Nevents,Nexp] ;
+matrix[Ngenes,Nexp] gexp ; 
+matrix[Nrbp,Nexp] rexp ; 
+int<lower=0> event_to_gene[Nevents];
+int<lower=0,upper=1> sex[Nexp];
+
+}
+
+
+parameters {
+real beta0[Nevents] ;
+real beta1[Nevents] ;
+matrix[Nevents,Nrbp] beta2 ;
+real beta3[Nevents];
+real beta4[Nrbp];
+
+}
+model {
+
+for ( i in 1:Nexp ) {  
+
+
+    for ( j in 1:Nevents ) if (c[j,i]>0) { 
+
+      as[j,i] ~ binomial(c[j,i], inv_logit(beta0[j]+beta1[j]*sex[i]+dot_product(beta2[j,],rexp[,i])+beta3[j]*gexp[event_to_gene[j],i] ) );
+
+  }
+}
+
+for (k in 1:Nrbp){
+
+  for ( j in 1:Nevents ) { 
+
+        beta2[j,k] ~normal(beta4[k],1);
+  }
+
+  beta4[k]~normal(0,1);
+
+}
+
+
+for ( j in 1:Nevents ) { 
+
+    beta1[j] ~ normal(0,1);
+    beta0[j] ~ normal(0,1);
+    beta3[j] ~ normal(0,1);
+  }
+
+}
+"
+
+stanDso <- stan_model( model_code=modelString ) 
+stanFit <- sampling( object=stanDso , data = dataList , chains = 3 ,iter = 8000,warmup=6000   , thin = 1,init=0, cores=3 )
+mcmcCoda = mcmc.list( lapply( 1:ncol(stanFit) , function(x) { mcmc(as.array(stanFit)[,x,]) } ) )
+```
+
+# > Inspect from here onwards
+
+- What files are needed from here to be saved?
+- Is the diagnostic plotting helpful for keeping in this notebook?
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
 
 ```{r}
 source("../dimorphAS/DBDA2Eprograms/DBDA2E-utilities.R")
-```
-
-## Retrieving the required data
-
-```{r}
-# Download GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct from Google Cloud 
-if (!("GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct" %in% list.files("../data/"))) {
-    message("Downloading GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz \nfrom https://console.cloud.google.com/storage/browser/_details/gtex_analysis_v7/rna_seq_data/ ..")
-    system("wget -O ../data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz https://storage.googleapis.com/gtex_analysis_v7/rna_seq_data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz", intern = TRUE)
-    message("Done!\n\n")
-    message("Unzipping compressed file GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz..")
-    system("gunzip ../data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct.gz", intern = TRUE)
-    message("Done! \n\nThe file GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct can be found in ../data/")
-}
-```
-
-```{r}
-tissue.list<-c('Heart - Left Ventricle',
-               'Breast - Mammary Tissue',
-               'Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)',
-               'Adrenal Gland',
-               'Adipose - Subcutaneous',
-               'Muscle - Skeletal',
-               'Thyroid',
-               'Cells - Transformed fibroblasts',
-               'Artery - Aorta',
-               'Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)')
-```
-
-```{r}
-all.genes<-data.table::fread('../data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct',
-                              sep='\t',
-                              header=TRUE,
-                              skip=2,
-                              colClasses = c(rep("character", 2), rep("NULL", 11688)))
-```
-
-```{r}
-dim(all.genes)
-head(all.genes)
-```
-
-## Filtering out duplicate transcripts ids
-
-```{r}
-all.genes <- all.genes[!duplicated(all.genes$Description),]
-```
-
-```{r}
-dim(all.genes)
-```
-
-## Accessing Position Specific Scoring Matrices (in `dimorphAS/RBP/RBP_PSSMs.zip`)
-
-```{r}
-# Download GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct from Google Cloud 
-if (!("RBP_PSSMs" %in% list.files("../data/"))) {
-    message("Unzipping ../dimorphAS/RBP/RBP_PSSMs.zip INTO ../data ..\n")
-    system("cd ../data/ && unzip ../dimorphAS/RBP/RBP_PSSMs.zip", intern = TRUE)
-    message("Done! \n\nThe files can be found in ../data/RBP_PSSMs/")
-}
-```
-
-```{r}
-rbp.names <- unique(gsub('_.*','',list.files('../data/RBP_PSSMs/')))
-```
-
-```{r}
-length(rbp.names)
-```
-
-```{r}
-summary.tab<-matrix(ncol=7,
-                    nrow=0)
-```
-
-```{r}
-colnames(summary.tab)<-c('Event',
-                         'Gene', 
-                         'Sig. RBPs',
-                         'Sig. Gene Expression',
-                         'Sig. Sex',
-                         'Tissue',
-                         'Dimorphic')
-```
-
-```{r}
-top.rbps<-rbp.names
-```
-
-```{r}
-length(top.rbps)
 ```
 
 ## Initialising dataframe with columns `coef,rbp,tissue`
@@ -152,35 +426,16 @@ length(top.rbps)
 df <-data.frame(coef=NULL,rbp=NULL,tissue=NULL)
 ```
 
-```{r}
-# Refactoring needed to not rely on hard coded by position id of tissue
-tissue <- tissue.list[[1]]
+Before running the following, use the Session menu to set working directory to source file location
+```R
+setwd(dir = "../dimorphAS/DBDA2Eprograms/")
 ```
 
 ```{r}
-head(tissue)
+load("../dimorphAS/figures/oldFigureDrafts/figure3b.RData")
 ```
 
-## `{Missing files!}`  Dimorph/McmcMostVaryingMoreSigs_'
-
-```{r active="", eval=FALSE}
-load(paste('/Users/karleg/Dimorph/McmcMostVaryingMoreSigs_',tissue,'.Rdata',sep=''))
-  
-mcmcCoda<-mcmcCoda[,which(grepl('beta2\\[101,87\\]',varnames(mcmcCoda))),drop=FALSE]
-
-diagMCMC( mcmcCoda , parName=c("beta2[101,87]") )  
-
-```
-
-## Using cached `.Rdata` until the files Dimorph/McmcMostVaryingMoreSigs_* are located
-
-```{r}
-#Before running the following, use the Session menu to set working directory to source file location
-#setwd(dir = "../dimorphAS/DBDA2Eprograms/")
-load('../dimorphAS/figures/oldFigureDrafts/figure3b.RData')
-```
-
-### This invokes X11 which is not available for all systems, and won't work in a NextFlow pipeline
+### This invokes X11 which is not available for all systems, and won"t work in a NextFlow pipeline
 
 ```
 diagMCMC(mcmcCoda , parName=c("beta2[101,87]"))
@@ -249,214 +504,63 @@ options(repr.plot.width=6, repr.plot.height=4)
 
 ```
 
-## Figure 3b 
+```{r}
+##Collect coefficients for RBPs whose 95% HDI does not contain 0:
+```
 
-code from: [dimorphAS/figures/figure3/figure3e.R](https://github.com/TheJacksonLaboratory/sbas/blob/master/dimorphAS/figures/figure3e/figure3e.R)
-
-```{r active="", eval=FALSE}
-tissue.list<-c('Heart - Left Ventricle',
-               'Breast - Mammary Tissue',
-               'Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)',
-               'Adrenal Gland',
-               'Adipose - Subcutaneous',
-               'Muscle - Skeletal','Thyroid','Cells - Transformed fibroblasts',
-               'Artery - Aorta',
-               'Skin - Sun Exposed (Lower leg).Skin - Not Sun Exposed (Suprapubic)')
-
-
-all.genes<-read.table('../data/GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_tpm.gct',
-                      sep='\t',
-                      header=T,
-                      skip=2,
-                      colClasses = c(rep("character", 2), 
-                                     rep("NULL", 11688)))
-
-all.genes<-all.genes[!duplicated(all.genes$Description),]
-
-rbp.names<-unique(gsub('_.*','',list.files('/Users/karleg/Dimorph/RBP_PSSMs/')))
-
-rbp.names<-rbp.names[rbp.names %in% all.genes$Description]
-
-summary.tab<-matrix(ncol=7,nrow=0)
-
-colnames(summary.tab)<-c('Event','Gene', 'Sig. RBPs','Sig. Gene Expression','Sig. Sex','Tissue','Dimorphic')
-
-top.rbps<-rbp.names
+```{r}
+rbp.names<-rownames(rexp)
 
 df<-data.frame(coef=NULL,rbp=NULL,tissue=NULL)
 
-for (tissue in c('Heart - Left Ventricle',
-                 'Breast - Mammary Tissue',
-                 'Brain - Cortex.Brain - Frontal Cortex (BA9).Brain - Anterior cingulate cortex (BA24)',
-                 'Thyroid',
-                 'Artery - Aorta'))
-{
+hdi<-HPDinterval(mcmcCoda)  
+
+s <- summary(mcmcCoda)
+
+m <- s$statistics[,"Mean"]
+
+beta2.mat<-matrix(nrow=nrow(merged.table),ncol=length(rbp.names))
+
+for (rbp in (1:length(rbp.names)))
   
-  load(paste('/Users/karleg/Dimorph/McmcMostVaryingMoreSigs_',tissue,'.Rdata',sep=''))
-  
-  hdi<-HPDinterval(mcmcCoda)  
-  
-  #diagMCMC( mcmcCoda , parName=c("beta3[101]") )  
-  
-  s <- summary(mcmcCoda)
-  
-  m <- s$statistics[,"Mean"]
-  
-  #hist(m[grepl('beta3',names(m))])
-  
-  #names(m)[grepl('beta2',names(m))][abs(m[grepl('beta2',names(m))])>1]
-  events.tab<-read.table(paste('/Users/karleg/Dimorph/EventsTable_',tissue,'.txt',sep=''),header = T)
-  
-  beta2.mat<-matrix(nrow=nrow(events.tab),ncol=length(rbp.names))
-  
-  for (rbp in (1:length(rbp.names)))
-    
-    for (event in (1:nrow(events.tab)))
-    {
-      
-      var.name<-paste0('beta2[',event,',',rbp,']')
-      
-      low<-hdi[[1]][rownames(hdi[[1]])==var.name][1]
-      
-      high<-hdi[[1]][rownames(hdi[[1]])==var.name][2]
-      
-      beta2.mat[event,rbp]<-m[grepl(paste0('beta2\\[',event,',',rbp,'\\]'),names(m))]
-      
-      if (low<0 && high>0)
-        
-        beta2.mat[event,rbp]<-0
-      
-    }
-  colnames(beta2.mat)=rbp.names
-  
-  
-  for (rbp in top.rbps)
-    
-    df<-rbind(df,cbind(beta2.mat[events.tab$adj.P.Val<=0.05,colnames(beta2.mat)==rbp],rep(rbp,nrow(beta2.mat)),rep(tissue,nrow(beta2.mat)))  )
-  
-  
-  beta3.vec=matrix(nrow=nrow(events.tab),ncol=1)
-  
-  for (event in (1:nrow(events.tab)))
+  for (event in (1:nrow(merged.table)))
   {
-    var.name<-paste0('beta3[',event,']')
+    
+    var.name<-paste0("beta2[",event,",",rbp,"]")
     
     low<-hdi[[1]][rownames(hdi[[1]])==var.name][1]
     
     high<-hdi[[1]][rownames(hdi[[1]])==var.name][2]
     
-    beta3.vec[event]<-m[grepl(paste0('beta3\\[',event,'\\]'),names(m))]
+    beta2.mat[event,rbp]<-m[grepl(paste0("beta2\\[",event,",",rbp,"\\]"),names(m))]
     
     if (low<0 && high>0)
       
-      beta3.vec[event]<-0
-  }
-  
-  #par(mfrow=c(1,2))
-  
-  #hist(beta3.vec[events.tab$adj.P.Val<=0.05],main=paste('Expression in Dimorphic',tissue),xlab='Posterior Mean')
-  
-  #hist(beta3.vec[events.tab$adj.P.Val>0.05],main=paste('Expression in Other',tissue),xlab='Posterior Mean')
-  
-  write.table(beta3.vec[events.tab$adj.P.Val<=0.05],paste0('/Users/karleg/Dimorph/',tissue,'_Expression_comparison_sig.txt'),quote = F)
-  
-  write.table(beta3.vec[events.tab$adj.P.Val>0.05],paste0('/Users/karleg/Dimorph/',tissue,'_Expression_comparison_other.txt'),quote = F)
-  
-  
-  beta1.vec=matrix(nrow=nrow(events.tab),ncol=1)
-  
-  for (event in (1:nrow(events.tab)))
-  {
-    
-    var.name<-paste0('beta1[',event,']')
-    
-    low<-hdi[[1]][rownames(hdi[[1]])==var.name][1]
-    
-    high<-hdi[[1]][rownames(hdi[[1]])==var.name][2]
-    
-    beta1.vec[event]<-m[grepl(paste0('beta1\\[',event,'\\]'),names(m))]
-    
-    if (low<0 && high>0)
-      
-      beta1.vec[event]<-0
-  }
-  
-  #par(mfrow=c(1,2))
-  
-  #hist(beta1.vec[events.tab$adj.P.Val<=0.05],main=paste('Sex in Dimorphic',tissue),xlab='Posterior Mean')
-  
-  #hist(beta1.vec[events.tab$adj.P.Val>0.05],main=paste('Sex in Other',tissue),xlab='Posterior Mean')
-  
-  write.table(beta1.vec[events.tab$adj.P.Val<=0.05],paste0('/Users/karleg/Dimorph/',tissue,'_Sex_comparison_sig.txt'),quote = F)
-  
-  write.table(beta1.vec[events.tab$adj.P.Val>0.05],paste0('/Users/karleg/Dimorph/',tissue,'_Sex_comparison_other.txt'),quote = F)
-  
-  
-  #read events table and compare dimorphic and non-dimorphic for each RBP
-  
-  if (sum(events.tab$adj.P.Val<=0.05)>1)
-  {
-    out.tab<-rbind(colMeans(beta2.mat[events.tab$adj.P.Val<=0.05,]),colMeans(beta2.mat[events.tab$adj.P.Val>0.05,]))
-  }else{
-    out.tab<-rbind(beta2.mat[events.tab$adj.P.Val<=0.05,],colMeans(beta2.mat[events.tab$adj.P.Val>0.05,]))
-  }
-  rownames(out.tab)<-c('Dimorphic','Other')
-  
-  write.table(out.tab,paste0('/Users/karleg/Dimorph/',tissue,'_RBP_comparison.txt'),quote = F)
-  
-  for (i in (1:nrow(events.tab)))
-  {
-    
-    next.row<-rep('',6)
-    #Event, Gene, Sig. RBBs,Gene Expression,Sex,Tissue,dimorphic
-    
-    next.row[1]<-as.character(events.tab$geneSymbol)[i]
-    
-    sig.rbps=''
-    
-    for (j in (1:length(rbp.names)))
-    {
-      if (beta2.mat[i,j]!=0)
-      {
-        
-        if (next.row[2]!='')
-          
-          next.row[2]<-paste0(next.row[2],',')
-        
-        next.row[2]<-paste0(next.row[2],rbp.names[j],'(',round(beta2.mat[i,j],2),')')
-      }
-    }
-    
-    #if (beta3.vec[i]!=0)
-    
-    next.row[3]<-round(beta3.vec[i],2)
-    
-    # if (beta1.vec[i]!=0)
-    
-    next.row[4]<-round(beta1.vec[i],2)
-    
-    next.row[5]<-tissue
-    
-    next.row[6]<-ifelse(events.tab$adj.P.Val[i]<=0.05,'Yes','No')
-    
-    next.row=c(events.tab$Row.names[i],next.row)
-    
-    summary.tab<-rbind(summary.tab,next.row)
+      beta2.mat[event,rbp]<-0
     
   }
-  
-  
-}
-#diagMCMC( mcmcCoda , parName=c("beta4[12,2]") ) 
-write.table(summary.tab,'/Users/karleg/Dimorph/summary_hbm.txt',sep='\t',quote = F,row.names = F,col.names = T)
 
-summary.tab<-summary.tab[summary.tab[,'Dimorphic']=='Yes',]
 
-colnames(df)<-c('Coef','RBP','Tissue')
 
+colnames(beta2.mat)=rbp.names
+
+for (rbp in rbp.names)
+  
+  df<-rbind(df,cbind(beta2.mat[,colnames(beta2.mat)==rbp],rep(rbp,nrow(beta2.mat)),rep(tissue,nrow(beta2.mat)))  )
+
+
+colnames(df)<-c("Coef","RBP","Tissue")
+    
 df$Coef<-as.numeric(as.character(df$Coef))
 
-labels<-read.table('/Users/karleg/Dimorph/labels.tsv',sep='\t',header=T)
+```
+
+```{r}
+##Display a violin plot for some selected RBPs:
+```
+
+```{r}
+labels<-read.table("labels.tsv",sep="\t",header=T)
 
 df$Tissue<-as.character(df$Tissue)
 
@@ -466,258 +570,83 @@ for (i in 1:nrow(df))
     
     df$Tissue[i]<-as.character(labels$X[which(as.character(labels$tissue)==as.character(df$Tissue[i]))])
 
-#df$Tissue[which(df$Tissue %in% labels$tissue)]<-labels$X[]
-#df.plot<-df.plot[df.plot$Tissue %in% c('Heart (LV)','Cortex','Breast','Thyroid','Aorta'),]
-library("ggsci")
-library("ggplot2")
-library("gridExtra")
-library(grid)
-
 
 df<-df[df$Coef!=0,]
 
-#top.rbps<-names(sort(unlist(lapply(lapply(split(df$Coef[df$Coef!=0],df$RBP[df$Coef!=0]),abs),mean)),decreasing = T))[1:10]
-
-sum.pos<-sort(unlist(lapply(lapply(split(df$Coef,df$RBP),'>',0),sum)),decreasing = T)
-
-sum.neg<-sort(unlist(lapply(lapply(split(df$Coef,df$RBP),'<',0),sum)),decreasing = T)
-
-hnrnp<-c("HNRNPA1",   "HNRNPA1L2", "HNRNPA2B1" ,"HNRNPC","HNRNPCL1" ,"HNRNPF","HNRNPH1","HNRNPH2","HNRNPK", 
-         "HNRNPL","HNRNPM", "HNRNPU")
-
-srsf<-c("SRSF1","SRSF10","SRSF2","SRSF7","SRSF9")
-
-sum.pos<-sum.pos[order(names(sum.pos))]
-
-sum.neg<-sum.neg[order(names(sum.neg))]
-
-pos.rbps<-names(which(sum.pos/(sum.pos+sum.neg)>=0.75 & (sum.pos+sum.neg>quantile(sum.pos+sum.neg,0.2))))
-
-neg.rbps<-names(which(sum.pos/(sum.pos+sum.neg)<=0.25 & (sum.pos+sum.neg>quantile(sum.pos+sum.neg,0.2))))
-
-cs.rbps<-names(which(sum.pos/(sum.pos+sum.neg)>0.25 & sum.pos/(sum.pos+sum.neg)<0.75 & (sum.pos+sum.neg>quantile(sum.pos+sum.neg,0.2))))
-
-df.counts<-data.frame(type=c('Skip','Inc','CS'),counts=c(length(pos.rbps),length(neg.rbps),length(cs.rbps)))
 
 df$RBP<-as.character(df$RBP)
 
-sort(sum.pos,decreasing = T)
+df1<-df[df$RBP %in% c("BUD13", "GTF2F1","CTNNBL1"),]
 
-pos.rbps
+pn1<-ggplot(df1,aes(factor(RBP),Coef)) + geom_violin(aes(fill="red")) + scale_fill_manual(values = "#4DBBD5FF") 
 
-df1<-df[df$RBP %in% c("HNRNPH2", "HNRNPU","U2AF2"),]
-
-pn1<-ggplot(df1,aes(factor(RBP),Coef)) + geom_violin(aes(fill='red')) + scale_fill_manual(values = '#4DBBD5FF') 
 pn1 <- pn1 + theme_minimal() +  theme(text = element_text(size=20),
                                       axis.text = element_text(size=20, hjust=0.5),
                                       axis.title.x=element_blank(),
                                       axis.title.y = element_text(size=24),
                                       plot.title = element_text(hjust = 0.5),
                                       legend.position = "none") + ylab("") + labs(title="")+ylim(-2,2)+ geom_hline(yintercept=0)
-#pn <- pn +  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5)
 
 
-sort(sum.neg,decreasing = T)
+```
 
-neg.rbps
+```{r}
+##Create barplot of the number of RBPs that tend to promote skipping, the number of RBPs that tend to promote
+#inclusion and the number of RBPs whose effect is context-specific, for the two RBP groups
+```
 
-sort(unlist(lapply(lapply(split(df$Coef,df$RBP),abs),sum)),decreasing = T)
+```{r}
+spliceosome_genes = as.character(rbp.table$Gene[rbp.table$S=="TRUE"])
 
-df2<-df[df$RBP %in% c("YBX1", "SRSF9","MATR3"),]
+splice_regulation_genes = as.character(rbp.table$Gene[rbp.table$R=="TRUE"])
 
-pn2<-ggplot(df2,aes(factor(RBP),Coef)) +geom_violin(aes(fill='blue'))+ scale_fill_manual(values = '#00A087FF')
-pn2 <- pn2 + theme_minimal() +  theme(text = element_text(size=20),
-                                      axis.text = element_text(size=20, hjust=0.5),
-                                      axis.title.x=element_blank(),
-                                      axis.title.y = element_text(size=24),
-                                      plot.title = element_text(hjust = 0.5),
-                                      legend.position = "none") + ylab("") + labs(title="")+ylim(-1,1)+ geom_hline(yintercept=0)
-#pn <- pn +  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5)
-
-
-df3<-df[df$RBP %in% c("HNRNPK", "HNRNPA1L2","SRSF7"),]
-
-pn3<-ggplot(df3,aes(factor(RBP),Coef)) +geom_violin(aes(fill='green')) + scale_fill_manual(values = '#E64B35FF') 
-pn3 <- pn3 + theme_minimal() +  theme(text = element_text(size=20),
-                                      axis.text = element_text(size=20, hjust=0.5),
-                                      axis.title.x=element_blank(),
-                                      axis.title.y = element_text(size=24),
-                                      plot.title = element_text(hjust = 0.5),
-                                      legend.position = "none") + ylab("") + labs(title="")+ylim(-2,2)+ geom_hline(yintercept=0)
-#pn <- pn +  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5)
-
-
-pn4<-ggplot(df.counts, aes(type, counts)) +  geom_bar(aes(fill = type), position = "dodge", stat="identity") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ scale_fill_npg() + guides(fill=FALSE)+theme(axis.title.x=element_blank(),axis.title=element_text(size=18))
-
-
-
-grid.arrange(pn1,pn2,pn3,pn4, nrow = 4,
-             left = textGrob('Coefficient',gp = gpar(fontsize = 20), rot = 90,vjust=1))
-
-
-rbp.tab<-matrix(ncol=3,nrow=0)
-
-colnames(rbp.tab)<-c('RBP','Total','Mean')
-
-rbp.coefs<-split(df$Coef,df$RBP)
-
-for (rbp in names(sum.pos)[which(sum.pos+sum.neg>quantile(sum.pos+sum.neg,0.2))])
+for (RBP_set in list(spliceosome=spliceosome_genes,splice_regulation=splice_regulation_genes))
 {
+  sum.pos<-sort(unlist(lapply(lapply(split(df$Coef[df$RBP %in% RBP_set],df$RBP[df$RBP %in% RBP_set]),">",0),sum)),decreasing = T)
   
-  dist.mean<-mean(unlist(rbp.coefs[rbp]))
+  sum.neg<-sort(unlist(lapply(lapply(split(df$Coef[df$RBP %in% RBP_set],df$RBP[df$RBP %in% RBP_set]),"<",0),sum)),decreasing = T)
   
-  tot.int<-length(unlist(rbp.coefs[rbp]))
+  sum.pos<-sum.pos[order(names(sum.pos))]
   
-  rbp.tab<-rbind(rbp.tab,c(rbp,tot.int,dist.mean))
+  sum.neg<-sum.neg[order(names(sum.neg))]
   
+  pos.rbps<-names(which(sum.pos/(sum.pos+sum.neg)>=0.75 & (sum.pos+sum.neg>quantile(sum.pos+sum.neg,0.2))))
+  
+  neg.rbps<-names(which(sum.pos/(sum.pos+sum.neg)<=0.25 & (sum.pos+sum.neg>quantile(sum.pos+sum.neg,0.2))))
+  
+  cs.rbps<-names(which(sum.pos/(sum.pos+sum.neg)>0.25 & sum.pos/(sum.pos+sum.neg)<0.75 & (sum.pos+sum.neg>quantile(sum.pos+sum.neg,0.2))))
+  
+  df.counts<-data.frame(type=c("Skip","Inc","CS"),counts=c(length(pos.rbps),length(neg.rbps),length(cs.rbps)))
+  
+  pn4_new <- ggplot(df.counts, aes(type, counts)) +  
+    geom_bar(fill = "#00008B",color="black", position = "dodge", stat="identity") + 
+    geom_text(aes(x = type, y = counts + 10, label = paste(100 * round(counts/sum(counts), 3), "%", sep = "")), size = 3) +
+    guides(fill=FALSE) +
+    xlab("") + scale_y_continuous(breaks = c(0, 20, 40), limits = c(0, 60))+
+    theme_minimal() +
+    theme(
+      axis.text = element_text(size = 8), 
+      axis.text.x = element_text(angle = 90, hjust = 1), 
+      axis.title = element_text(size = 10),
+      axis.title.y = element_text(vjust = 5)
+    )
+  show(pn4_new  )
 }
 
-write.table(rbp.tab,'RBP_summary.txt',sep='\t',quote = F,row.names = F)
-
-save.image('/Users/karleg/Dimorph/RDATA/figure3e.RData')
-
-```
-
-### NOTE:
-
-Because the files  `'/Users/karleg/Dimorph/', tissue,'_Expression_comparison_other.txt')` are missing we will reproduce using the stored Rdata
 
 
-### Loading relevant .Rdata for figure 3b
-
-```{r}
-load("../dimorphAS/figures/figure3/figure3e.Rdata")
-```
-
-```{r}
-options(repr.plot.width=5, repr.plot.height=12)
-
-pn1<-ggplot(df1,aes(factor(RBP),Coef)) + 
-        geom_violin(aes(fill='red')) + 
-        scale_fill_manual(values = '#4DBBD5FF')+
-        theme_minimal() + 
-        theme(text = element_text(size=20),
-              axis.text = element_text(size=20, hjust=0.5),
-              axis.title.x=element_blank(),
-              axis.title.y = element_text(size=24),
-              plot.title = element_text(hjust = 0.5),
-              legend.position = "none") + ylab("") + 
-        labs(title="")+
-        ylim(-2,2)+ 
-        geom_hline(yintercept=0)
-
-#pn <- pn +  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5)
-
-
-sort(sum.neg,decreasing = T)
-
-neg.rbps
-
-sort(unlist(lapply(lapply(split(df$Coef,df$RBP),abs),sum)),decreasing = T)
-
-df2<-df[df$RBP %in% c("YBX1", "SRSF9","MATR3"),]
-
-pn2<-ggplot(df2,aes(factor(RBP),Coef)) +geom_violin(aes(fill='blue'))+ scale_fill_manual(values = '#00A087FF')
-pn2 <- pn2 + theme_minimal() +  theme(text = element_text(size=20),
-                                      axis.text = element_text(size=20, hjust=0.5),
-                                      axis.title.x=element_blank(),
-                                      axis.title.y = element_text(size=24),
-                                      plot.title = element_text(hjust = 0.5),
-                                      legend.position = "none") + ylab("") + labs(title="")+ylim(-1,1)+ geom_hline(yintercept=0)
-#pn <- pn +  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5)
-
-
-df3<-df[df$RBP %in% c("HNRNPK", "HNRNPA1L2","SRSF7"),]
-
-pn3<-ggplot(df3,aes(factor(RBP),Coef)) +geom_violin(aes(fill='green')) + scale_fill_manual(values = '#E64B35FF') 
-pn3 <- pn3 + theme_minimal() +  theme(text = element_text(size=20),
-                                      axis.text = element_text(size=20, hjust=0.5),
-                                      axis.title.x=element_blank(),
-                                      axis.title.y = element_text(size=24),
-                                      plot.title = element_text(hjust = 0.5),
-                                      legend.position = "none") + ylab("") + labs(title="")+ylim(-2,2)+ geom_hline(yintercept=0)
-#pn <- pn +  geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5)
-
-
-pn4<-ggplot(df.counts, aes(type, counts)) +  geom_bar(aes(fill = type), position = "dodge", stat="identity") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))+ scale_fill_npg() + guides(fill=FALSE)+theme(axis.title.x=element_blank(),axis.title=element_text(size=18))
-
-
-
-grid.arrange(pn1,pn2,pn3,pn4, nrow = 4,
-             left = textGrob('Coefficient',gp = gpar(fontsize = 20), rot = 90,vjust=1))
-
-df1$facet = 1
-df2$facet = 2
-df3$facet = 3
-df_c <- rbind(df1, df2, df3)
-p <- ggplot(df_c,aes(x = factor(RBP), y = Coef, fill = factor(RBP))) + 
-  geom_violin() + facet_wrap(~facet, nrow = 3, scales = "free") + 
-  xlab("") + ylab("") + ylim(-2,2)+ geom_hline(yintercept=0) + scale_fill_npg() +
-  theme_minimal() +  theme(text = element_text(size=20),
-                                      axis.text = element_text(size=8, hjust=0.5),
-                                      axis.title.x=element_blank(),
-                                      axis.title.y = element_text(size=8),
-                                      plot.title = element_text(hjust = 0.5),
-                                      legend.position = "none", 
-                           strip.text = element_blank())
-  
-pn4_new <- ggplot(df.counts, aes(type, counts)) +  
-  geom_bar(fill = "#00008B",color="black", position = "dodge", stat="identity") + 
-  geom_text(aes(x = type, y = counts + 10, label = paste(100 * round(counts/sum(counts), 3), "%", sep = "")), size = 3) +
-  guides(fill=FALSE) +
-  xlab("") + scale_y_continuous(breaks = c(0, 20, 40), limits = c(0, 60))+
-  theme_minimal() +
-  theme(
-        axis.text = element_text(size = 8), 
-        axis.text.x = element_text(angle = 90, hjust = 1), 
-        axis.title = element_text(size = 10),
-        axis.title.y = element_text(vjust = 5)
-        )
-pn4_new  
-p_grid <- arrangeGrob(p,pn4_new, nrow = 2, heights = c(3, 1), 
-             left = textGrob('Coefficient',gp = gpar(fontsize = 10), rot = 90,vjust=1, hjust = -0.2))
-
-ggsave(file = "fig3e_test.pdf", plot = p_grid, height = 4, width = 3)
-ggsave(file = "fig3e_test.png", plot = p_grid, height = 4, width = 3)
-
-```
-
-##  Figure 3c
-**EDIT**: 
-This code comes from `dimorphAS/notebook/figure4a` but corresponds to the figure **`Figure 3c`** of the publication.
-
-
-This script creates figure 4a. Please run the following command first:
-
-`perl` [`parseMT.pl`](https://github.com/TheJacksonLaboratory/sbas/blob/master/dimorphAS/notebook/parseMT.pl)
-
-This creates the files needed for figure `4a` and `4b`, namely `lv.txt` and `mt.txt`.
-The input file for  [`parseMT.pl`](https://github.com/TheJacksonLaboratory/sbas/blob/master/dimorphAS/notebook/parseMT.pl) is a `.tsv` file name `summary_hbm.txt`. Here is a preview of this file:
-
-
-```{r}
-summary_hbm   <- utils::read.table(file      = "../dimorphAS//notebook/summary_hbm.txt", 
-                                   header    = TRUE, 
-                                   sep       = "\t")
-```
-
-```{r}
-dim(summary_hbm)
-head(summary_hbm, 2)
 ```
 
 ```{r}
 if ( ("lv.txt" %in% list.files("../data/")) && ("mt.txt" %in% list.files("../data/"))) {
         message("The files lv.txt or mt.txt are available in the folder ../data/! \n")
-        message("The 'perl parseMT.pl' command will not be re-run \n")
+        message("The "perl parseMT.pl" command will not be re-run \n")
 }
 
 
 if ( (!("lv.txt" %in% list.files("../data/"))) | (!("mt.txt" %in% list.files("../data/")))) {
         message("The files lv.txt or mt.txt not found in the folder ../data/ \n")
-        message("Generating lv.txt and mt.txt with 'perl parseMT.pl' using 'summary_hbm.txt' as input .. \n")
+        message("Generating lv.txt and mt.txt with "perl parseMT.pl" using "summary_hbm.txt" as input .. \n")
         system(paste0("cd ../dimorphAS/notebook/ && ",
                       "perl parseMT.pl > parseMT_output.txt && ", 
                       "mv lv.txt ../../data/ && ",
@@ -730,161 +659,11 @@ if ( (!("lv.txt" %in% list.files("../data/"))) | (!("mt.txt" %in% list.files("..
 
 ```
 
-# Left ventricle data from `lv.txt`
-
-```{r}
-dat           <- utils::read.table("../data/lv.txt", header=FALSE, sep = "\t", col.names = c("RBP", "Expression"))
-```
-
-```{r}
-dim(dat)
-summary(dat)
-```
-
-## Remove rows where expression values are equal to 0
-
-```{r}
-d2<-dat[dat$Expression!=0,]
-d2<-d2[order(d2$Expression),]
-```
-
-```{r}
-dim(d2)
-summary(d2)
-```
-
-```{r}
-options(repr.plot.width=8, repr.plot.height=3)
-
-dat        <- dat[order(dat$Expression),]
-with_zeros <- visdat::vis_expect(dat, ~dat$Expression != 0,  show_perc = TRUE)
-no_zeros   <- visdat::vis_expect(d2, ~d2$Expression != 0, show_perc = TRUE)
-both       <- with_zeros + no_zeros
-
-message(paste0("\n", round((nrow(d2)/nrow(dat)), 2),"% ","of rows in the dataframe were filtered out because they contained 0 values\n"))
-
-both + labs(title = "Comparison of data before and after removing expression rows with 0 values") + theme(plot.title    = element_text(size = 10, face = "bold" , hjust = 1.2))
-```
-
-We are checking above if our expectation of having none 0 Expression values is true. We can also verify this by the initial and final row count of the dataframe that contains the `RBP` and `Expression` values.
-
-
-## Fit a linear model (`expression ~ rbm`)
-
-```{r}
-lm_fit   <- lm(d2$Expression ~ d2$RBP, data=d2)
-LM       <-summary(lm_fit)
-rsquared <-round(LM$r.squared,digits=2)
-```
-
-```{r}
-lm <- report(lm_fit)
-lm$tables$table_long
-```
-
-## Save predictions of the model 
-Save predictions of the model in a new data frame named `predicted_df` along with the variable we want to plot against.
-
-```{r}
-predicted_df <- data.frame(expr_pred = predict(lm_fit, d2), RBP=d2$RBP)
-```
-
-```{r}
-options(repr.plot.width=3.5, repr.plot.height=5)
-mypal <- ggsci::pal_npg("nrc", alpha = 0.7)(9)
-
-
-p<-ggplot(dat, aes(x=RBP, y=Expression)) + geom_point(shape=21,fill = mypal[3],size=3) +  theme_bw()
-#+ scale_fill_npg() 
-p <- p + theme(axis.text = element_text(size=12, 
-                                        hjust=0.5),
-               axis.title.x=element_text(size=12),
-               axis.title.y = element_text(size=12),
-               axis.text.y = element_text(size=12),
-               panel.grid.major = element_blank(), 
-               panel.grid.minor = element_blank()) 
-p <- p +  geom_hline(yintercept=0, linetype="dashed", color = mypal[4])
-p <- p +xlab('\U27F6 \n Sum of RBP effect magnitude')+ylab('Expression\ninclusion \U27F5 effect \U27F6 skipping')
-p <- p+ geom_line(color='red',data = predicted_df, aes(y=expr_pred, x=RBP))
-mylabel<-paste(italic(r)^2~"="~rsquared) 
-p1 <- p+ geom_text(x = 5, 
-                   y = 0.45, 
-                   label = as.character(paste( "r^2==",rsquared)), 
-                   size=6, 
-                   parse = TRUE)
-p1
-```
-
-### (3c) Predicted effects of gene expression vs. RBP levels on exon inclusion in 100 sex-biased SE events in the left ventricle. 
-
-The Y axis shows the mean of the posterior of the coefficient that determines the effects of gene expression on exon inclusion. 
-Negative values favour skipping and positive values favour inclusion. 
-The X axis shows the sum of the absolute values of the posterior of the coefficients of the 87 RBPs. 
-The higher the value, the more the predicted effect on exon skipping. 
-In the left frame it can be seen that for 61 out of 100 sex-biased events in left ventricle, 
-no effect of gene expression was predicted (flat line at y=0.0). 
-
-For the remaining genes there was a correlation with **`R2=0.35 (p=7.98x10-5).`**
-
-
-##  Figure 3d
-
-
-
-This should be run after the `figure4a.R` script corrsponding to the figure 3b in the manuscript (see above code chunks) 
-
-```{r}
-dat <- read.table("../data/mt.txt", header=FALSE, sep = "\t", col.names = c("RBP", "Expression"))
-```
-
-```{r}
-options(repr.plot.width=3.5, repr.plot.height=5)
-mypal = pal_npg("nrc", alpha = 0.7)(9)
-d2<-dat[dat$Expression!=0,]
-lm_fit <- lm(d2$Expression ~ d2$RBP, data=d2)
-LM<-summary(lm_fit)
-rsquared<-round(LM$r.squared,digits=2)  
-
-# save predictions of the model in the new data frame 
-# together with variable you want to plot against
-predicted_df <- data.frame(expr_pred = predict(lm_fit, d2), RBP=d2$RBP)
-
-
-p<-ggplot(dat, aes(x=RBP, y=Expression)) + geom_point(shape=21,fill = mypal[3],size=3) +  theme_bw()
- #+ scale_fill_npg() 
-p <- p + theme(axis.text = element_text(size=12, 
-                                        hjust=0.5),
-               axis.title.x=element_text(size=12),
-               axis.title.y = element_text(size=12),
-               axis.text.y = element_text(size=12),
-               panel.grid.major = element_blank(), 
-               panel.grid.minor = element_blank()) 
-p <- p +  geom_hline(yintercept=0, linetype="dashed", color = mypal[4])
-p <- p +xlab('\U27F6 \n Sum of RBP effect magnitude')+ ylab('')
-p <- p+ geom_line(color='red',data = predicted_df, aes(y=expr_pred, x=RBP))
-mylabel<-paste(italic(r)^2~"="~rsquared) 
-p2 <- p+ geom_text(x = 15, 
-                   y = 3.2, 
-                   label = as.character(paste( "r^2==",rsquared)), 
-                   size=6, 
-                   parse = TRUE)
-p2
-```
-
-#### (3d) A similar correlation was found in mammary tissue, with R2=0.33 (p=3.6x10-12).
-
-
-```{r}
-options(repr.plot.width=7.5, repr.plot.height=4)
-
-p1 + p2
-```
-
 ## Metadata
 
 For replicability and reproducibility purposes, we also print the following metadata:
 
-1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+1. Checksums of **"artefacts"**, files generated during the analysis and stored in the folder directory **`data`**
 2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
 
 
