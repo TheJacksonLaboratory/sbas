@@ -156,7 +156,7 @@ Also available through github using wget or piggyback within R - location noted 
 
 | filename | Description  |
 | ------------ | ------------- |
-| DGE_gene_csv.tar.gz | Results from jupyter/differentialGeneExpression.ipynb |
+| DGE_gene_csv.2020-06-17.tar.gz | Results from jupyter/differentialGeneExpressionAnalysis.ipynb |
 | fromGTF.tar.gz | Annotation files from rMATS 3.2.5 on the gencode v.30 GTF file |
 | gtex.corrected.rds | Corrected Yarn generated expressionSet object on the gene expression data from GTEx v8 with the phenotype data available - |
 | rmats_final.a3ss.jc.ijc.txt.gz | Inclusion junction counts for the a3ss |
