@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.3.3
+      jupytext_version: 1.4.1
   kernelspec:
     display_name: R
     language: R
@@ -42,25 +42,14 @@ For our analysis here, we used just the jc count matrices.
   * inclusion length (inclen)
   * skipped length (skiplen)
 
-# 1.0 Loading dependencies
+## 1. Loading dependencies
 
 ```{r}
-# If the user wishes to rebuild the GTEx rds they can, but needs to reinstall and call the library
-# gtex.corrected.rds is pulled from the release otherwise
-#devtools::install_github("TheJacksonLaboratory/yarn@3ff72c0")
-#library(yarn)
-library(gprofiler2)
-library(downloader)
 library(readr)
 library(edgeR)
-library(biomaRt)
-library(DBI) # v >= 1.1.0 required for biomaRt
-library(devtools)
 library(limma)
-library(piggyback)
 library(multtest)
 library(Biobase)
-library(edgeR)
 library(tibble)
 library(R.utils)
 library(snakecase)
@@ -71,190 +60,10 @@ library(snakecase)
 Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
 ```{r}
 # parameters for nextflow execution of notebook
-tissue_index = 1
+tissue_index = 17
 ```
 
-## 1.2 Retrieve Released data
-
-Be sure to set your GITHUB_TOKEN, prior to downloading files
-
-One suggestion is change it to your token and then run it then immediately change it back to this:
-
-Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
-
-```{r}
-Sys.setenv(GITHUB_TOKEN = "your-very-own-github-token")
-```
-### Did you remember?
-
-Did you remember to delete your private github token?  Now is a good time to do so, before you save your work and checkit in inadvertantly....
-
-### 1.2.1 rmats_final matrices
-
-```{r}
-getReleasedRMATSData <- function ( destDir ) {
-
-  if (!("rmats_final.se.jc.ijc.txt.gz" %in% list.files(destDir))) {    
-    # SE
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.se.jc.ijc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.se.jc.sjc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.se.jc.inc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.se.jc.inclen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.se.jc.skiplen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    # RI
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.ri.jc.ijc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.ri.jc.sjc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.ri.jc.inc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.ri.jc.inclen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.ri.jc.skiplen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    # MXE
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.mxe.jc.ijc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.mxe.jc.sjc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.mxe.jc.inc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.mxe.jc.inclen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.mxe.jc.skiplen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    # A3SS
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a3ss.jc.ijc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a3ss.jc.sjc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a3ss.jc.inc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a3ss.jc.inclen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a3ss.jc.skiplen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-     # A5SS
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a5ss.jc.ijc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a5ss.jc.sjc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a5ss.jc.inc.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a5ss.jc.inclen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "adeslatt/sbas_test", 
-        file = "rmats_final.a5ss.jc.skiplen.txt.gz",
-        tag  = "rMATS.3.2.5.GTEx.V8.final_matrices", 
-        dest = destDir)
-   }
-   return (0)
-}
-```
-### 1.2.2 get released rMATS GTF annotations
+### 1.2 get rMATS GTF annotations
 
 For each splicing type, the junctions are defined, so we have 5 specific annotated splicing specific junction ID annotation files:
 fromGTF.A3SS.txt <- annotations for the alternative 3' splice site junctions
@@ -266,30 +75,12 @@ fromGTF.SE.txt <- annotations for the skipped exon junctions
 ```{r}
 getReleasedGTFAnnotations <- function ( destDir ) {
 
-   if (! (file.exists("../data/fromGTF.tar.gz"))) {
-       system("mkdir -p ../data", intern = TRUE)
-       message("Fetching fromGTF.tar.gz from GitHub ..")
-       # Download archive from GitHub release with tag "dge"
-       piggyback::pb_download(file = "fromGTF.tar.gz",
-                           dest = "../data",
-                           repo = "adeslatt/sbas_gtf",
-                           tag  = "rMATS.3.2.5.gencode.v30",
-                           show_progress = TRUE)
-       message("Done!\n")
-       message("Decompressing fromGTF.tar.gz into ../data")
-       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-       message("Done!\n")
-       message("Gunzipping files into ../data")
-       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
-       message("Done!\n")
-   } else {
-       message("Decompressing fromGTF.tar.gz into ../data")
-       system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-       message("Done!\n")
-       message("Gunzipping files into ../data")
-       system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
-       message("Done!\n")
-   }
+    message("Decompressing fromGTF.tar.gz into ../data")
+    system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+    message("Done!\n")
+    message("Gunzipping files into ../data")
+    system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
+    message("Done!\n")
    return (0)
 }
 
@@ -301,14 +92,6 @@ getReleasedGTFAnnotations <- function ( destDir ) {
 ```{r}
 getSraRunData <- function ( destDir ) {
 
-  if (!("SraRunTable.txt.gz" %in% list.files(destDir))) {
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "TheJacksonLaboratory/sbas", 
-        file = "SraRunTable.txt.gz",
-        tag  = "GTExV8.v1.0", 
-        dest = destDir)
-  }
   message("Loading metadata from SraRunTable.txt.gz ../data/ ..\n")
   srr_metadata <- data.table::fread("../data/SraRunTable.txt.gz")
   message("done!\n")
@@ -403,14 +186,6 @@ renewGTExExpressionSet <- function ( destDir ) {
 ```{r}
 getGTExCorrectedRDS <- function ( destDir ) {
 
-  if (!("gtex.corrected.rds" %in% list.files(destDir))) {
-    piggyback::pb_download(
-        show_progress = TRUE,
-        repo = "TheJacksonLaboratory/sbas", 
-        file = "gtex.corrected.rds",
-        tag  = "GTExV8.v1.0", 
-        dest = destDir)
-  }
   message("Loading gtex.corrected.rds ..\n")
   es <- readRDS(file = "../data/gtex.corrected.rds")
   message("done!\n")
@@ -516,25 +291,13 @@ makePData <- function (counts_srr, gtexPhenoDataObj, srr_metadata) {
 ### 1.2.8 get GTEx phenotype data for the SRR accessions
 Transitive closure permits the association of the sequence reads, SRR Accessions, through the SraRunTable.txt (obtained from selecting annotation from the dbGaP login) with the SAMPID used with the GTEx.  This SAMPID is the means by which we can get this phenotype data and associate it with the counts data.
 
-If the data has not yet been retrieved, we can pull it from the release, using piggyback.   Input to this function can be any one of the 10 count matrices, since all were produced on the same samples
-
 ```{r}
 getGTExPhenoDataForSRR <- function (destDir) {
-    if (!("srr_pdata.csv" %in% list.files(destDir))) {
-        piggyback::pb_download(
-               show_progress = TRUE,
-               repo = "TheJacksonLaboratory/sbas", 
-               file = "srr_pdata.csv",
-               tag  = "GTExV8.v1.0", 
-               dest = destDir)
-        message("Loading srr_pdata\n")
-        srr_pdata <- readr::read_csv("../data/srr_pdata.csv")
-        message("done!\n")
-    } else {
-        message("Loading srr_pdata\n")
-        srr_pdata <- readr::read_csv("../data/srr_pdata.csv")
-        message("done!\n")
-    }
+
+    message("Loading srr_pdata\n")
+    srr_pdata <- readr::read_csv("../data/srr_pdata.csv")
+    message("done!\n")
+
     return(srr_pdata)
 }
 ```
@@ -607,25 +370,10 @@ Using the output of the differentialGeneExpression analysis, we will screen thos
 ```{r}
 getDGEResults <- function ( destDir ) {
 
-   if (! (file.exists("../data/DGE_gene_csv.tar.gz"))) {
-       system("mkdir -p ../data", intern = TRUE)
-       message("Fetching DGE_gene_csv.tar.gz from GitHub ..")
-       # Download archive from GitHub release 
-       piggyback::pb_download(file = "DGE_gene_csv.tar.gz",
-                           dest = "../data",
-                           repo = "TheJacksonLaboratory/sbas",
-                           tag  = "GTExV8.DGE.v1.1",
-                           show_progress = TRUE)
-       message("Done!\n")
-       message("Decompressing DGE_gene_csv.tar.gz into ../data")
-       system("mkdir -p ../data && tar xvfz ../data/DGE_gene_csv.tar.gz -C ../data", intern = TRUE)
-       message("Done!\n")
-   } else {
-       message("Decompressing DGE_gene_csv.tar.gz into ../data")
-       system("mkdir -p ../data && tar xvfz ../data/DGE_gene_csv.tar.gz -C ../data", intern = TRUE)
-       message("Done!\n")
-       
-   }
+   message("Decompressing DGE_gene_csv.2020-06-17.tar.gz into ../data")
+   system("mkdir -p ../data && tar xvfz ../data/DGE_gene_csv.2020-06-17.tar.gz -C ../data", intern = TRUE)
+   message("Done!\n")
+
    return (0)
 }
 
@@ -762,7 +510,7 @@ removeDGEGenes <- function ( tissue_of_interest, fromGTF, es ) {
 }
 ```
 
-## Exploratory and Differential analysis as_event:ijc, sjc 
+### 2 Exploratory and Differential analysis as_event:ijc, sjc 
 
 Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
 
@@ -771,7 +519,8 @@ Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transf
 
 where y is the included exon junction count expression; sex denotes the reported sex of the subject
 
-## Differential analysis as_event (combined ijc and sjc)
+
+### 2.1 Differential analysis as_event (combined ijc and sjc)
 
 Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
 
@@ -780,7 +529,8 @@ Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transf
 
 where y is the alternative splicing event expression; sex denotes the reported sex of the subject, as_event represents the specific alternative splicing event - either included exon junction counts or skipped exon junction counts and their interaction terms.   Donor is added to our model as a blocking variable used in both the calculation of duplicate correlation as well as in the linear fit.
 
-### Voom, limma's lmFit and eBayes
+
+### 2.2 Voom, limma's lmFit and eBayes
 
 Using sample as a blocking variable, we are able to model the effects of the donor on the results, which improves the power.  This topic is discussed in biostars https://www.biostars.org/p/54565/.  And Gordon Smyth answers the question here https://mailman.stat.ethz.ch/pipermail/bioconductor/2014-February/057887.html.  The method of modeling is a random effects approach in which the intra-donor correlation is incorporated into the covariance matrix instead of the linear predictor.   And though as Gordon Smyth states both are good method and the twoway anova approach makes fewer assumptions, the random effects approach is statistically more powerful.  
 
@@ -1163,11 +913,11 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
 }
 ```
 
-## Execution of All Tissues and All Splicing Variants
+### 3 Execution of All Tissues and All Splicing Variants
 
 Additional values set to enable this notebook to be executed as a nextflow workflow or to run in place with appropriate settings.
 
-### parameters Setting
+### 3.1 parameters Setting
 
 1. Setting `dup=TRUE` causes lengthy execution times.
 
@@ -1183,18 +933,14 @@ Additional values set to enable this notebook to be executed as a nextflow workf
    b. a subset (leaving out say `splice_type = "se_"` since it is the largest, for example)
     
     `splice_list       = c("a3ss_","a5ss_","mxe_","ri_")`
-    
+
+
+### 3.2 MAIN routine
 
 ```{r}
 #
 # Main routine
 #
-# 1.2.1 get the released rmats matrices (rows junction ids, columns accessions (SRR)
-# 
-getReleasedRMATSData (destDir <- "../data/")
-```
-
-```{r}
 #
 # 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
 #
@@ -1286,6 +1032,7 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
 # for (tissue_index in 1:length(tissue_list)) {
 ```
 ```{r}
+#for (tissue_index in (tissue_list)) {
     # a3ss
     splice_type = "a3ss_"
     res = splice_list %in% splice_type
@@ -1314,9 +1061,6 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
                                  sjc)
  
     }
-
-```
-```{r}
     # a5ss
     splice_type = "a5ss_"
     res = splice_list %in% splice_type
@@ -1345,9 +1089,6 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
                                  sjc)
  
     }
-
-```
-```{r}
     # mxe
     splice_type = "mxe_"
     res = splice_list %in% splice_type
@@ -1376,9 +1117,6 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
                                  sjc)
  
     }
-
-```
-```{r}
     # ri
     splice_type = "ri_"
     res = splice_list %in% splice_type
@@ -1407,8 +1145,6 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
                                  sjc)
  
     }
-```
-```{r}
     # se
     splice_type = "se_"
     res = splice_list %in% splice_type
@@ -1436,11 +1172,10 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
                                  ijc, 
                                  sjc)
  
-    }
-#}
+    } # for se
+#}  # for all tissues
 ```
-
-## Metadata
+### Appendix - Metadata
 
 For replicability and reproducibility purposes, we also print the following metadata:
 
@@ -1448,7 +1183,7 @@ For replicability and reproducibility purposes, we also print the following meta
 2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
 
 
-### 1. Checksums with the sha256 algorithm
+### Appendix - 1. Checksums with the sha256 algorithm
 
 ```{r}
 rm (notebookid)
@@ -1464,7 +1199,7 @@ paste0("../metadata/", notebookid, "_sha256sums.txt")
 data.table::fread(paste0("../metadata/", notebookid, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
 ```
 
-### 2. Libraries metadata
+### Appendix - 2. Libraries Metadata
 
 ```{r}
 dev_session_info   <- devtools::session_info()
