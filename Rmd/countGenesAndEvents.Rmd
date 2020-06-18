@@ -47,55 +47,40 @@ For each splicing type, the junctions are defined, so we have 5 specific annotat
 5. **fromGTF.SE.txt**: annotations for the skipped exon junctions
 
 
-## 1.2 Unpacked the data.tar file if necessaty
+## 1.2 Unpack the data.tar file if necessary
+To run this script, we need to import three compressed files and unpack them
+
+|File 
+1. DGE_splicing_data.tar.gz
+2. data.tar.gz                      b336c423027b71f74732644bc04b9af8df47d403cdf8f7cb08a400f4f9c2b7aa
+3. DGE_gene_csv.2020-06-17.tar.gz
 
 ```{r}
 dge_splicing_file_dir <- list.files("../../mounted-data", pattern='DGE_splicing_data.tar.gz')
 dge_splicing_file <- paste("../../mounted-data", dge_splicing_file_dir, 'robinson-bucket/notebooks/DGE_splicing_data', sep='/')
 dge_splicing_file_tar_gz <- paste(dge_splicing_file, '.tar.gz', sep='')
-example_unpacked_file = '../data/ri_brain_cerebellum_DGE_sex.csv'
-if (! file.exists(example_unpacked_file)) {
-    mycommand = paste("tar xvfz ",dge_splicing_file_tar_gz, "-C ../data", sep=" ")
-    message(mycommand)
-    system(mycommand, intern = TRUE)
-    message("Done unpacking ", dge_splicing_file_tar_gz)
-} else {
-    message("Cowardly refusing to unpack ", dge_splicing_file_tar_gz, " since it was previously unapcked")
-}
-
-
-
-```
-
-```{r}
+message("In order to unpack the necessary files, execute the following commands on the shell.")
+message("1. DGE_splicing_data.tar.gz")
+mycommand = paste("tar xvfz ",dge_splicing_file_tar_gz, "-C ../data", sep=" ")
+message(mycommand)
+message("2. data.tar.gz")
 data_file_dir <- list.files("../../mounted-data", pattern='-data.tar.gz')
 data_file_tar_gz <- paste("../../mounted-data", data_file_dir, 'robinson-bucket/notebooks/data.tar.gz', sep='/')
-example_unpacked_file = '../data/SraRunTable.txt.gz'
-if (! file.exists(example_unpacked_file)) {
-    mycommand = paste("tar xvfz ",data_file_tar_gz, "-C ../data", sep=" ")
-    message(mycommand)
-    system(mycommand, intern = TRUE)
-    message("Done unpacking ", data_file_tar_gz)
-} else {
-    message("Cowardly refusing to unpack ", data_file_tar_gz, " since it was previously unapcked")
-}
-
+mycommand = paste("tar xvfz ",data_file_tar_gz, "-C ../data", sep=" ")
+message(mycommand)
+message("3. DGE_gene_csv.2020-06-17.tar.gz")
+dge_file <- list.files("../../mounted-data", pattern='DGE_gene_csv')
+dge_file_tar_gz <- paste("../../mounted-data", dge_file, 'robinson-bucket/results-download/DGE_gene_csv.2020-06-17.tar.gz', sep='/')
+mycommand = paste("tar xvfz ",dge_file_tar_gz, "-C ../data", sep=" ")
+message(mycommand)
 ```
 
 ```{r}
-getReleasedGTFAnnotations <- function ( destDir ) {
-    message("Decompressing fromGTF.tar.gz into ../data")
-    system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-    message("Done!\n")
-    message("Gunzipping files into ../data")
-    system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
-    message("Done!\n")
-}
-
-#
-# 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
-#
-getReleasedGTFAnnotations (destDir <- "../data/")
+## get the rmats 3.2.5 discovered/annotated junction information in GTF format
+message("Decompressing fromGTF.tar.gz into ../data")
+system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
+system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
+message("Done!\n")
 ```
 
 ### 2  Refined results
@@ -105,19 +90,14 @@ We define **refined results* as (FC > 1.5 and pVal < 0.05) for the sex\*as_event
 ### 2.1 getTissueReduction
 
 ```{r}
-getTissueReduction <- function ( filename ) {
-
-    tissue_reduction <- read.table(filename, header=TRUE, sep="\t",
+tissue_reduction_filename <- "../assets/tissues.tsv"
+tissue_reduction <- read.table(tissue_reduction_filename, header=TRUE, sep="\t",
                                skipNul=FALSE, stringsAsFactors = FALSE)
-    colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
-
-    return(tissue_reduction)
-}
-tissue_reduction <- getTissueReduction ("../assets/tissues.tsv")
+colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
 tissue_reduction <- tissue_reduction[tissue_reduction$display_name != "n/a",]
 tissue_reduction$display_name <- factor(tissue_reduction$display_name)
 levels(tissue_reduction$display_name)
-length(levels(tissue_reduction$display_name))
+message("We extracted ", length(levels(tissue_reduction$display_name))," different tissues with at least 50 samples in both M & f")
 ```
 
 ### 2.2 Read in refined results and annotations
@@ -152,47 +132,73 @@ Display <- rep("NA", length(files))
 GeneSymbol <- rep("NA", length(files))
 GeneID <- rep("NA", length(files))
 chr <- rep("NA", length(files))
+logFC <- rep(NA, length(files))
+AveExpr <- rep("NA", length(files))
+t <- rep("NA", length(files))
+PValue <- rep("NA", length(files))
+AdjPVal <- rep("NA", length(files))
+length(files)
+```
 
+```{r}
 for (i in 1:length(files)) {
-    lines <- read.csv(paste0(significant_results_dir, files[i]),header = TRUE)
-    event     <- as.vector(as.character(rownames(lines)))
-    tissue1 <- gsub("_DGE_sex_as_events_refined.csv","", files[i], fixed = TRUE)
-    counts[i] <- dim(lines)[1]
-    if (counts[i] > 0) {
+    lines  <- read.table(file=paste0(significant_results_dir, files[i]), 
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+#    message(paste(dim(lines)[1] >0),collapse = "")
+    if (dim(lines)[1] > 0) {
+        event     <- as.vector(as.character(rownames(lines)))
+        tissue1   <- gsub("_DGE_sex_as_events_refined.csv","", files[i], fixed = TRUE)
+        counts[i] <- dim(lines)[1]
         event_idx <- substring(event, regexpr("[0-9]+$", event))
-        event_idx
+        res       <- data.frame()
         if (grepl("^a3ss_", files[i])) {
             # remove the first 5 letters of the string 
             tissue2 <- substring(tissue1,6)
             ASE[i] <- "A3SS"
             Tissue[i] <- tissue2
             idx <- match(event_idx, a3ss_annot$ID)
-            res <- data.frame(GeneJunction = event,
-                              ASE = "A3SS", 
-                              ASE_IDX = idx,
-                              Tissue = tissue2,
-                              counts = counts[i],
-                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
-                              GeneSymbol = a3ss_annot$geneSymbol[idx],
-                              GeneID     = a3ss_annot$GeneID[idx],
-                              chr = a3ss_annot$chr[idx])
+            res <- data.frame(GeneJunction <- event,
+                              ASE          <- "A3SS", 
+                              ASE_IDX      <- idx,
+                              Tissue       <- tissue2,
+                              counts       <- counts[i],
+                              Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
+                              GeneSymbol   <- a3ss_annot$geneSymbol[idx],
+                              GeneID       <- a3ss_annot$GeneID[idx],
+                              chr          <- a3ss_annot$chr[idx],
+                              logFC        <- lines$logFC,
+                              AveExpr      <- lines$AveExpr,
+                              t            <- lines$t,
+                              PValue       <- lines$P.Value,
+                              AdjPVal      <- lines$adj.P.Val,
+                              B            <- lines$B)
+            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
-
+            
         } else if (grepl("^a5ss_", files[i])) {
             # remove the first 5 letters of the string 
             tissue2 <- substring(tissue1,6)
             ASE[i] <- "A5SS"
             Tissue[i] <- tissue2
             idx <- match(event_idx, a5ss_annot$ID)
-            res <- data.frame(GeneJunction = event,
-                              ASE = "A5SS", 
-                              ASE_IDX = idx,
-                              Tissue = tissue2,
-                              counts = counts[i],
-                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
-                              GeneSymbol = a5ss_annot$geneSymbol[idx],
-                              GeneID     = a5ss_annot$GeneID[idx],
-                              chr = a5ss_annot$chr[idx])
+            res <- data.frame(GeneJunction <- event,
+                              ASE          <- "A5SS", 
+                              ASE_IDX      <- idx,
+                              Tissue       <- tissue2,
+                              counts       <- counts[i],
+                              Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
+                              GeneSymbol   <- a5ss_annot$geneSymbol[idx],
+                              GeneID       <- a5ss_annot$GeneID[idx],
+                              chr          <- a5ss_annot$chr[idx],
+                              logFC        <- lines$logFC,
+                              AveExpr      <- lines$AveExpr,
+                              t            <- lines$t,
+                              PValue       <- lines$P.Value,
+                              AdjPVal      <- lines$adj.P.Val,
+                              B            <- lines$B)
+            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
         } else if (grepl("^mxe_", files[i])) {
             ASE[i] <- "MXE"
@@ -200,15 +206,23 @@ for (i in 1:length(files)) {
             tissue2 <- substring(tissue1,5)
             Tissue[i] <- tissue2
             idx <- match(event_idx, a3ss_annot$ID)
-            res <- data.frame(GeneJunction = event,
-                              ASE = "MXE", 
-                              ASE_IDX = idx,
-                              Tissue = tissue2, 
-                              counts = counts[i],
-                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
-                              GeneSymbol = mxe_annot$geneSymbol[idx],
-                              GeneID     = mxe_annot$GeneID[idx],
-                              chr = mxe_annot$chr[idx])
+            res <- data.frame(GeneJunction <- event,
+                              ASE          <- "MXE", 
+                              ASE_IDX      <- idx,
+                              Tissue       <- tissue2,
+                              counts       <- counts[i],
+                              Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
+                              GeneSymbol   <- mxe_annot$geneSymbol[idx],
+                              GeneID       <- mxe_annot$GeneID[idx],
+                              chr          <- mxe_annot$chr[idx],
+                              logFC        <- lines$logFC,
+                              AveExpr      <- lines$AveExpr,
+                              t            <- lines$t,
+                              PValue       <- lines$P.Value,
+                              AdjPVal      <- lines$adj.P.Val,
+                              B            <- lines$B)
+            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
         } else if (grepl("^se_", files[i])) {
             ASE[i] <- "SE"
@@ -216,15 +230,23 @@ for (i in 1:length(files)) {
             tissue2 <- substring(tissue1,4)
             Tissue[i] <- tissue2
             idx <- match(event_idx, se_annot$ID)
-            res <- data.frame(GeneJunction = event,
-                              ASE = "SE", 
-                              ASE_IDX = idx,
-                              Tissue = tissue2,
-                              counts = counts[i],
-                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
-                              GeneSymbol = se_annot$geneSymbol[idx],
-                              GeneID     = se_annot$GeneID[idx],
-                              chr = se_annot$chr[idx])
+            res <- data.frame(GeneJunction <- event,
+                              ASE          <- "SE", 
+                              ASE_IDX      <- idx,
+                              Tissue       <- tissue2,
+                              counts       <- counts[i],
+                              Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
+                              GeneSymbol   <- se_annot$geneSymbol[idx],
+                              GeneID       <- se_annot$GeneID[idx],
+                              chr          <- se_annot$chr[idx],
+                              logFC        <- lines$logFC,
+                              AveExpr      <- lines$AveExpr,
+                              t            <- lines$t,
+                              PValue       <- lines$P.Value,
+                              AdjPVal      <- lines$adj.P.Val,
+                              B            <- lines$B)
+            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
         } else if (grepl("^ri_", files[i])){
             ASE[i] <- "RI"
@@ -232,21 +254,37 @@ for (i in 1:length(files)) {
             tissue2 <- substring(tissue1,4)
             Tissue[i] <- tissue2
             idx <- match(event_idx, ri_annot$ID)
-            res <- data.frame(GeneJunction = event,
-                              ASE = "RI", 
-                              ASE_IDX = idx,
-                              Tissue = tissue2,
-                              counts = counts[i],
-                              Display = tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
-                              GeneSymbol = ri_annot$geneSymbol[idx],
-                              GeneID     = ri_annot$GeneID[idx],
-                              chr = ri_annot$chr[idx])
+            res <- data.frame(GeneJunction <- event,
+                              ASE          <- "RI", 
+                              ASE_IDX      <- idx,
+                              Tissue       <- tissue2,
+                              counts       <- counts[i],
+                              Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue2, "display_name"],
+                              GeneSymbol   <- ri_annot$geneSymbol[idx],
+                              GeneID       <- ri_annot$GeneID[idx],
+                              chr          <- ri_annot$chr[idx],
+                              logFC        <- lines$logFC,
+                              AveExpr      <- lines$AveExpr,
+                              t            <- lines$t,
+                              PValue       <- lines$P.Value,
+                              AdjPVal      <- lines$adj.P.Val,
+                              B            <- lines$B)
+            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
         }
         
     } #if has sig. events
     
 } #for all files
+colnames(gene_as) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display","GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
+n_unique_genes <- length(summary(as.factor(gene_as$GeneSymbol),maxsum=50000))
+message("We extracted a total of ",nrow(gene_as)," significant alternative splicing events (gene_as)")
+message("This includes ", n_unique_genes, " total genes")
+```
+
+```{r}
+head(gene_as)
 ```
 
 ### 3 Data Structures for Figures
@@ -274,19 +312,21 @@ table(gene_as$Display)
 colnames(gene_as)
 write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 head(gene_as)
-tissue_reduction <- factor(tissue_reduction$display_name)
-
+tissue_reduction$display_name <- factor(tissue_reduction$display_name)
 ```
 
 ```{r}
 head(gene_as[gene_as$chr=="chrX",])
-
+x_as_events <- gene_as[gene_as$chr=="chrX",]
+message("There were ",nrow(gene_as)," total significant alternative splicing events (gene_as)")
+message("There were ",nrow(x_as_events)," total significant alternative splicing events on the X chromosome (gene_as)")
+message("i.e., ", (100*nrow(x_as_events)/nrow(gene_as)), "% of all significant AS events were on the X chromosome")
 ```
 
 ### 3.2 Tissue specific data frame
 
 ```{r}
-data <- data.frame(Tissue=gene_as$Tissue, ASE=gene_as$ASE, Counts=gene_as$counts)
+data <- data.frame(Tissue=gene_as$Display, ASE=gene_as$ASE, Counts=gene_as$counts)
 
 numberOfUniqueTissues <- length(summary(as.factor(data$Tissue),maxsum=500))
 numberOfASEmechanisms <- length(summary(as.factor(data$ASE),maxsum=500))
@@ -323,11 +363,6 @@ length(res3$GeneSymbol)
 head(res3)
 write.table(res3, file = "../data/Total_AS_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
 ```
-
-
-
-
-
 ### 3.5 Count most frequent splicing by tissue
 
 ```{r}
@@ -493,6 +528,77 @@ glimpse(res_sorted)
 ```{r}
 write.table(data,       file = "../data/Significant_AS_events.tsv", sep = "\t", row.names = F, quote = F)
 write.table(res_sorted, file = "../data/SplicingIndex_chr.tsv", sep = "\t", quote = F, row.names = F)
+```
+
+# Count gene expression analysis results
+The files called (tissue)\_DGE\_refined.csv contain lists of genes found to have statistically significant differential expression.
+The mapping files contain the ENSG id to gene symbol maps.
+
+```{r}
+significant_results_dir = "../data/"
+pattern = "_DGE_refined.csv"
+files <- list.files(path = significant_results_dir, pattern = pattern)
+map_pattern <- "_DGE_ensg_map.csv"
+map_files <- list.files(path = significant_results_dir, pattern = map_pattern)
+message("We got ", length(files), " files with significant DGEs and ", length(map_files), " mapping files")
+head(files)
+head(map_files)
+```
+
+```{r}
+gene_dge = data.frame()
+GeneJunction <- rep("NA", length(files))
+counts <- rep(NA, length(files))
+ASE <- rep("NA", length(files))
+Tissue <- rep("NA", length(files))
+Display <- rep("NA", length(files))
+GeneSymbol <- rep("NA", length(files))
+GeneID <- rep("NA", length(files))
+chr <- rep("NA", length(files))
+logFC <- rep(NA, length(files))
+AveExpr <- rep("NA", length(files))
+t <- rep("NA", length(files))
+PValue <- rep("NA", length(files))
+AdjPVal <- rep("NA", length(files))
+```
+
+```{r}
+for (i in 1:length(files)) {
+    lines  <- read.table(file=paste0(significant_results_dir, files[i]), 
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+#    message(paste(dim(lines)[1] >0),collapse = "")
+    if (dim(lines)[1] > 0) {
+         ensgid     <- as.vector(as.character(rownames(lines)))
+         tissue1 <- gsub("_DGE_refined.csv","", files[i], fixed = TRUE)
+         Tissue[i] <- tissue1
+         Display[i] <- as.character(tissue_reduction[tissue_reduction$SMTSD == tissue1,"display_name"])
+         counts[i] <- dim(lines)[1]    
+         res <- data.frame(Tissue       <- tissue1,
+                           ENSG         <- ensgid,
+                           counts       <- counts[i],
+                           Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue1, "display_name"],
+                           logFC        <- lines$logFC,
+                           AveExpr      <- lines$AveExpr,
+                           t            <- lines$t,
+                           PValue       <- lines$P.Value,
+                           AdjPVal      <- lines$adj.P.Val,
+                           B            <- lines$B)
+            colnames(res) <- c("Tissue","ENSG","counts","Display",
+                               "logFC","AveExpr","t","PValue","AdjPVal","B")
+            gene_dge <- rbind(gene_dge,res)
+    }
+    
+} #for all files
+colnames(res) <- c("Tissue","counts","Display",
+                  "logFC","AveExpr","t","PValue","AdjPVal","B")
+
+n_unique_genes <- length(summary(as.factor(gene_dge$ENSG),maxsum=50000))
+message("We extracted a total of ",nrow(gene_dge)," significant alternative splicing events (gene)")
+message("This includes ", n_unique_genes, " total genes")
+```
+
+```{r}
+write.table(gene_dge, "../data/gene_dge.tsv", quote=FALSE, sep="\t")
 ```
 
 ### Appendix - Metadata
