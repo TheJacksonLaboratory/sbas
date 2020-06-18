@@ -17,7 +17,6 @@ Output text files are written to the ``data/`` directory (at the same level as t
 ```{r}
 defaultW <- getOption("warn")  # suppress warnings for this cell
 options(warn = -1) 
-
 library(dplyr)
 library(ggplot2)
 library(limma)
@@ -530,7 +529,10 @@ write.table(data,       file = "../data/Significant_AS_events.tsv", sep = "\t", 
 write.table(res_sorted, file = "../data/SplicingIndex_chr.tsv", sep = "\t", quote = F, row.names = F)
 ```
 
-# Count gene expression analysis results
+### 3.11 gene_dge.tsv
+
+Single data structure for all the DGE results
+
 The files called (tissue)\_DGE\_refined.csv contain lists of genes found to have statistically significant differential expression.
 The mapping files contain the ENSG id to gene symbol maps.
 
@@ -541,40 +543,33 @@ files <- list.files(path = significant_results_dir, pattern = pattern)
 map_pattern <- "_DGE_ensg_map.csv"
 map_files <- list.files(path = significant_results_dir, pattern = map_pattern)
 message("We got ", length(files), " files with significant DGEs and ", length(map_files), " mapping files")
-head(files)
-head(map_files)
 ```
 
 ```{r}
 gene_dge = data.frame()
-GeneJunction <- rep("NA", length(files))
 counts <- rep(NA, length(files))
-ASE <- rep("NA", length(files))
-Tissue <- rep("NA", length(files))
-Display <- rep("NA", length(files))
-GeneSymbol <- rep("NA", length(files))
-GeneID <- rep("NA", length(files))
-chr <- rep("NA", length(files))
-logFC <- rep(NA, length(files))
-AveExpr <- rep("NA", length(files))
-t <- rep("NA", length(files))
-PValue <- rep("NA", length(files))
-AdjPVal <- rep("NA", length(files))
 ```
 
 ```{r}
 for (i in 1:length(files)) {
-    lines  <- read.table(file=paste0(significant_results_dir, files[i]), 
+   lines  <- read.table(file=paste0(significant_results_dir, files[i]), 
                                      header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
-#    message(paste(dim(lines)[1] >0),collapse = "")
     if (dim(lines)[1] > 0) {
-         ensgid     <- as.vector(as.character(rownames(lines)))
-         tissue1 <- gsub("_DGE_refined.csv","", files[i], fixed = TRUE)
-         Tissue[i] <- tissue1
-         Display[i] <- as.character(tissue_reduction[tissue_reduction$SMTSD == tissue1,"display_name"])
-         counts[i] <- dim(lines)[1]    
+         tissue1    <- gsub(pattern,"", files[i], fixed = TRUE)
+         map_lines  <- read.table(file=paste0(paste0(significant_results_dir, tissue1),map_pattern),
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+         counts[i]  <- dim(lines)[1]    
+         tissue1    <- gsub(pattern,"", files[i], fixed = TRUE)
+         map_lines  <- read.table(file=paste0(paste0(significant_results_dir, tissue1),map_pattern),
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+         ensg_ver   <- as.vector(as.character(rownames(lines)))
+         ensg_no_ver<- as.vector(as.character(map_lines$ensg_names))
+         ensg_genes <- as.vector(as.character(map_lines$ensg_genes))
+         counts[i]  <- dim(lines)[1]  
          res <- data.frame(Tissue       <- tissue1,
-                           ENSG         <- ensgid,
+                           ENSG_ver     <- ensg_ver,
+                           ENSG_no_ver  <- ensg_no_ver,
+                           GeneSymbol   <- ensg_genes,
                            counts       <- counts[i],
                            Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue1, "display_name"],
                            logFC        <- lines$logFC,
@@ -583,17 +578,15 @@ for (i in 1:length(files)) {
                            PValue       <- lines$P.Value,
                            AdjPVal      <- lines$adj.P.Val,
                            B            <- lines$B)
-            colnames(res) <- c("Tissue","ENSG","counts","Display",
-                               "logFC","AveExpr","t","PValue","AdjPVal","B")
-            gene_dge <- rbind(gene_dge,res)
-    }
-    
+         colnames(res) <- c("Tissue","ENSG_ver","ENSG_no_ver","GeneSymbol","counts","Display",
+                            "logFC","AveExpr","t","PValue","AdjPVal","B")
+         gene_dge <- rbind(gene_dge, res)
+    } #if has sig. events
 } #for all files
-colnames(res) <- c("Tissue","counts","Display",
-                  "logFC","AveExpr","t","PValue","AdjPVal","B")
-
-n_unique_genes <- length(summary(as.factor(gene_dge$ENSG),maxsum=50000))
-message("We extracted a total of ",nrow(gene_dge)," significant alternative splicing events (gene)")
+colnames(gene_dge) <- c("Tissue","ENSG_ver","ENSG_no_ver","GeneSymbol","counts","Display",
+                        "logFC","AveExpr","t","PValue","AdjPVal","B")
+n_unique_genes <- length(summary(as.factor(gene_dge$GeneSymbol),maxsum=50000))
+message("We extracted a total of ",nrow(gene_dge)," significant differential gene events (gene_dge)")
 message("This includes ", n_unique_genes, " total genes")
 ```
 
