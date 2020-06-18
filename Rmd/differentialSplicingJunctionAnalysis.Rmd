@@ -514,7 +514,8 @@ removeDGEGenes <- function ( tissue_of_interest, fromGTF, es ) {
 
 Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
 
-           y = B0 + B1 sex + epsilon (error)
+           y = B0 + B1 sex + epsilon (error) * model A *
+           
            
 
 where y is the included exon junction count expression; sex denotes the reported sex of the subject
@@ -524,7 +525,7 @@ where y is the included exon junction count expression; sex denotes the reported
 
 Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
 
-           y = B0 + B1 sex + B2 as_event + B3 sex*as_event + epsilon (error)
+           y = B0 + B1 sex + B2 as_event + B3 sex*as_event + epsilon (error)  * model B * 
            
 
 where y is the alternative splicing event expression; sex denotes the reported sex of the subject, as_event represents the specific alternative splicing event - either included exon junction counts or skipped exon junction counts and their interaction terms.   Donor is added to our model as a blocking variable used in both the calculation of duplicate correlation as well as in the linear fit.
@@ -547,8 +548,95 @@ The ijc and sjc are expressionSet objects:
  operations at the main object level will ripple to the phenotype and expression set information.
  so filtering occurs on the expressionSet object ijc and sjc
 
+
+### 2.3 Model A
+
 ```{r}
-print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc) {
+#
+# Model A with DGE genes
+# 
+# count_desc == of the form like _ijc_ to describe the counts
+#
+execute_model_A <- function ( counts_expr_set, pData_expr_set, tissue_of_interest, fromGTF, pdf_sub_directory, csv_sub_directory, count_desc) {
+    
+    design    <- model.matrix ( ~ pData(pData_expr_set)$SEX)
+    colnames(design) <- c("intercept","sex")
+
+    y <- DGEList(counts=exprs(counts_expr_set), group = pData(pData_expr_set)$SEX)
+    y <- calcNormFactors(y, method="RLE")
+    y_voom <- voom (y, design=design, plot=plot)
+
+    Gender <- ifelse(pData(pData_expr_set)$SEX==1,"m","f")
+    
+    filename <- paste0(paste0(paste0(paste0(pdf_sub_directory, splice_type),
+                                     snakecase::to_snake_case(tissue_of_interest)),count_desc),
+                                     "MDSplot-100.pdf")
+    pdf (filename)
+        plotMDS(y, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+                gene.selection="common")
+    dev.off()
+    filename <- paste0(paste0(paste0(paste0(pdf_sub_directory, splice_type),
+                                     snakecase::to_snake_case(tissue_of_interest)),count_desc),
+                                     "-voom-MDSplot-100.pdf")
+    pdf (filename)    
+        plotMDS(y_voom, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
+                gene.selection="common")
+    dev.off()
+ 
+    fit <- lmFit(y_voom, design)
+    fit <- eBayes(fit)
+
+    sex_results                    <- topTable(fit, coef='sex', number=nrow(y_voom))
+    sex_results_refined            <- sex_results$adj.P.Val <= 0.05 & abs(sex_results$logFC) >= abs(log2(1.5))
+    sex_rnResults                  <- rownames(sex_results)
+    sex_resultsAnnotations         <- fromGTF[sex_rnResults,]
+
+    sex_results_refinedAnnotations <- sex_resultsAnnotations[sex_results_refined ==TRUE,]
+    message("\ndimensions of the sex_results_refined_annotations \n", 
+        paste(dim (sex_results_refinedAnnotations), collapse = " ") )
+
+    # geneSymbols are in the annotations 
+    sex_geneSymbols               <- sex_resultsAnnotations$geneSymbol
+    sex_refined_geneSymbols       <- sex_results_refinedAnnotations$geneSymbol
+    message("\nlength sex_results_refined_geneSymbols\n", 
+        paste(length(sex_refined_geneSymbols), collapse = " ") )
+
+    # adjust the rownames to be the geneSymbols rather than junction IDs
+    sex_results_rn         <- paste(sex_geneSymbols, sex_rnResults, sep="-")
+    rownames(sex_results)  <- sex_results_rn    
+
+    sex_filename               = paste0(paste0(paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_A_')),
+                                                   count_desc,'sex.csv')
+    sex_refined_filename       = paste0(paste0(paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_A_')),
+                                                   count_desc,'sex_refined.csv')
+    sex_genesFilename          = paste0(paste0(paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_A_')),
+                                                   count_desc,'sex_universe.txt')
+    sex_refined_genesFilename  = paste0(paste0(paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_A_')),
+                                                   count_desc,'sex_gene_set.txt')
+    write.table(sex_results, 
+                file = sex_filename        , row.names = T, col.names = T, quote = F, sep = ",")
+    write.table(sex_results [sex_results_refined      ,], 
+                file = sex_refined_filename, row.names = T, col.names = T, quote = F, sep = ",")
+    write.table(sex_geneSymbols,        
+                file = sex_genesFilename        , row.names = F, col.names = F, quote = F, sep = ",")
+    write.table(sex_refined_geneSymbols,
+                file = sex_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
+   
+    return (0)
+}
+```
+
+### 2.4 Model A and Model B execution
+
+```{r}
+execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc) {
+
+    pdf_sub_directory = '../pdf/'
+    csv_sub_directory = '../data/'
 
     fromGTF           <- fromGTF
     tissue_true       <- tissue_list == tissue_of_interest
@@ -558,6 +646,7 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     keep = pData(ijc)$SMTSD== tissue_of_interest
     message("\nkeep\n",
            paste(table(keep)),collapse=" ")
+       
     ijc <- ijc[,keep==TRUE]
     sjc <- sjc[,keep==TRUE]
 
@@ -587,141 +676,49 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
         paste(dim(ijc), collapse = " ") )                    
     message("\ndim(sjc)\n", 
         paste(dim(sjc), collapse = " ") )
+
+    message("removing DGE Genes prior to making one of the y linear model")
+    ijc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
+    sjc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- sjc)
+
+    # use ijc expressionSet  for the phenotype data
+    count_desc = "ijc_wo_DGE_"
+    execute_model_A(counts_expr_set    = ijc_wo_DGE, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
+
+    count_desc = "ijc_"
+    execute_model_A(counts_expr_set    = ijc, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
     
-    message("\nsex samples:\n",
-        paste(table(pData(ijc)$SEX)), collapse="\n")
+    count_desc = "sjc_wo_DGE_"
+    execute_model_A(counts_expr_set    = sjc_wo_DGE, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
 
-    design    <- model.matrix ( ~ pData(ijc)$SEX)
-    message("\ndesign matrix ijc, alone:\n",
-        paste0(head(design), collapse="\n"))
-
-    colnames(design) <- c("intercept","sex")
-
-    y_ijc <- DGEList(counts=exprs(ijc), group = pData(ijc)$SEX)
-    y_ijc <- calcNormFactors(y_ijc, method="RLE")
-    y_ijc_voom <- voom (y_ijc, design=design, plot=plot)
-
-    Gender <- ifelse(pData(ijc)$SEX==1,"m","f")
-    pdf_sub_directory = '../pdf/'
-    csv_sub_directory = '../data/'
+    count_desc = "sjc_"
+    execute_model_A(counts_expr_set    = sjc, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
     
-    filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
-                                     snakecase::to_snake_case(tissue_of_interest)),"-ijc-MDSplot-100.pdf")
-    pdf (filename)
-        plotMDS(y_ijc, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-                gene.selection="common")
-    dev.off()
-    filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
-                                     snakecase::to_snake_case(tissue_of_interest)),"-ijc-voom-MDSplot-100.pdf")
-    pdf (filename)    
-        plotMDS(y_ijc_voom, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-                gene.selection="common")
-    dev.off()
- 
-    fit_ijc <- lmFit(y_ijc_voom, design)
-    fit_ijc <- eBayes(fit_ijc)
-
-    ijc_sex_results                    <- topTable(fit_ijc, coef='sex', number=nrow(y_ijc_voom))
-    ijc_sex_results_refined            <- ijc_sex_results$adj.P.Val <= 0.05 & abs(ijc_sex_results$logFC) >= abs(log2(1.5))
-    ijc_sex_rnResults                  <- rownames(ijc_sex_results)
-    ijc_sex_resultsAnnotations         <- fromGTF[ijc_sex_rnResults,]
-
-    ijc_sex_results_refinedAnnotations <- ijc_sex_resultsAnnotations[ijc_sex_results_refined ==TRUE,]
-    message("\ndimensions of the ijc_sex_results_refined_annotations \n", 
-        paste(dim (ijc_sex_results_refinedAnnotations), collapse = " ") )
-
-    # geneSymbols are in the annotations 
-    ijc_sex_geneSymbols               <- ijc_sex_resultsAnnotations$geneSymbol
-    ijc_sex_refined_geneSymbols       <- ijc_sex_results_refinedAnnotations$geneSymbol
-    message("\nlength ijc_sex_results_refined_geneSymbols\n", 
-        paste(length(ijc_sex_refined_geneSymbols), collapse = " ") )
-
-    # adjust the rownames to be the geneSymbols rather than junction IDs
-    ijc_sex_results_rn         <- paste(ijc_sex_geneSymbols,       ijc_sex_rnResults, sep="-")
-    rownames(ijc_sex_results)  <- ijc_sex_results_rn    
-
-    ijc_sex_filename               = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_ijc_sex.csv',sep='')
-    ijc_sex_refined_filename       = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_ijc_sex_refined.csv',sep='')
-    ijc_sex_genesFilename          = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_ijc_sex_universe.txt',sep='')
-    ijc_sex_refined_genesFilename  = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_ijc_sex_gene_set.txt',sep='')
-    write.table(ijc_sex_results, 
-                file = ijc_sex_filename        , row.names = T, col.names = T, quote = F, sep = ",")
-    write.table(ijc_sex_results [ijc_sex_results_refined      ,], 
-                file = ijc_sex_refined_filename, row.names = T, col.names = T, quote = F, sep = ",")
-    write.table(ijc_sex_geneSymbols,        
-                file = ijc_sex_genesFilename        , row.names = F, col.names = F, quote = F, sep = ",")
-    write.table(ijc_sex_refined_geneSymbols,
-                file = ijc_sex_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
-   
-    message("\nstarting sjc\n")
-
-    # the pData object for ijc was used for the annotation - they are the same for ijc and sjc
-    y_sjc <- DGEList(counts=exprs(sjc), group = pData(ijc)$SEX)
-    y_sjc <- calcNormFactors(y_sjc, method="RLE")
-    y_sjc_voom <- voom (y_sjc, design=design, plot=plot)
-
-    Gender <- ifelse(pData(ijc)$SEX==1,"m","f")
-    filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
-                                     snakecase::to_snake_case(tissue_of_interest)),"-sjc-MDSplot-100.pdf")
-    pdf (filename)
-        plotMDS(y_sjc, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-                gene.selection="common")
-    dev.off()
-    filename <- paste0(paste0(paste0(pdf_sub_directory, splice_type),
-                                     snakecase::to_snake_case(tissue_of_interest)),"-sjc-voom-MDSplot-100.pdf")
-    pdf (filename)    
-        plotMDS(y_sjc_voom, labels=Gender, top=100, col=ifelse(Gender=="m","blue","red"), 
-                gene.selection="common")
-    dev.off()
- 
-    fit_sjc <- lmFit(y_sjc_voom, design)
-    fit_sjc <- eBayes(fit_sjc)
-
-    sjc_sex_results                    <- topTable(fit_sjc, coef='sex', number=nrow(y_sjc_voom))
-    sjc_sex_results_refined            <- sjc_sex_results$adj.P.Val <= 0.05 & abs(sjc_sex_results$logFC) >= abs(log2(1.5))
-    sjc_sex_rnResults                  <- rownames(sjc_sex_results)
-    sjc_sex_resultsAnnotations         <- fromGTF[sjc_sex_rnResults,]
-
-    sjc_sex_results_refinedAnnotations <- sjc_sex_resultsAnnotations[sjc_sex_results_refined      ==TRUE,]
-    message("\ndimensions of the sjc_sex_results_refined_annotations \n", 
-        paste(dim (sjc_sex_results_refinedAnnotations), collapse = " ") )
-
-    # geneSymbols are in the annotations 
-    sjc_sex_geneSymbols               <- sjc_sex_resultsAnnotations$geneSymbol
-    sjc_sex_refined_geneSymbols       <- sjc_sex_results_refinedAnnotations$geneSymbol
-    message("\nlength sjc_sex_results_refined_geneSymbols\n", 
-        paste(length(sjc_sex_refined_geneSymbols), collapse = " ") )
-
-    # adjust the rownames to be the geneSymbols rather than junction IDs
-    sjc_sex_results_rn         <- paste(sjc_sex_geneSymbols, sjc_sex_rnResults, sep="-")
-    rownames(sjc_sex_results)  <- sjc_sex_results_rn    
-
-    sjc_sex_filename               = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_sjc_sex.csv',sep='')
-    sjc_sex_refined_filename       = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_sjc_sex_refined.csv',sep='')
-    sjc_sex_genesFilename          = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_sjc_sex_universe.txt',sep='')
-    sjc_sex_refined_genesFilename  = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_sjc_sex_gene_set.txt',sep='')
-    write.table(sjc_sex_results, 
-                file = sjc_sex_filename        , row.names = T, col.names = T, quote = F, sep = ",")
-    write.table(sjc_sex_results [sjc_sex_results_refined      ,], 
-                file = sjc_sex_refined_filename, row.names = T, col.names = T, quote = F, sep = ",")
-    write.table(sjc_sex_geneSymbols,        
-                file = sjc_sex_genesFilename        , row.names = F, col.names = F, quote = F, sep = ",")
-    write.table(sjc_sex_refined_geneSymbols,
-                file = sjc_sex_refined_genesFilename, row.names = F, col.names = F, quote = F, sep = ",")
-    
-    message("removing DGE Genes prior to making y linear model")
-    ijc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
-    sjc <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- sjc)
-    
-    message("starting the y prediction\n")
+    message("Executing model B \n")
     sample_names <- as.character(pData(ijc)$SAMPID)
     # we will add donor as a blocking parameter
     # rather than sample name -- we should use donor for real
@@ -829,68 +826,51 @@ print_exploratory_plots <- function (plot, dup, tissue_of_interest, splice_type,
     sex_as_events_rnResults <- rownames(sex_as_events_results)
     sex_rnResults           <- rownames(sex_results)
     head(sex_as_events_rnResults)
-    head(ijc_sex_rnResults)
     head(sex_rnResults)
     head(fromGTF[sex_as_events_rnResults,])
 
     # use the junctionIDs to get the annotations
     sex_as_events_resultsAnnotations      <- fromGTF[sex_as_events_rnResults,]
     sex_resultsAnnotations                <- fromGTF[sex_rnResults,]
-    ijc_sex_resultsAnnotations            <- fromGTF[ijc_sex_rnResults,]
     head(sex_as_events_resultsAnnotations)
     head(sex_resultsAnnotations)
-    head(ijc_sex_resultsAnnotations)
     
     sex_as_events_results_refinedAnnotations<- sex_as_events_resultsAnnotations[sex_as_events_results_refined==TRUE,]
     sex_results_refinedAnnotations          <- sex_resultsAnnotations          [sex_results_refined          ==TRUE,]
-    sjc_sex_results_refinedAnnotations       <- sjc_sex_resultsAnnotations      [sjc_sex_results_refined      ==TRUE,]
     head(sex_as_events_results_refinedAnnotations)
     head(sex_results_refinedAnnotations)
-    head(sjc_sex_results_refinedAnnotations)
 
     # geneSymbols are in the annotations 
     sex_as_events_geneSymbols         <- sex_as_events_resultsAnnotations$geneSymbol
     sex_as_events_refined_geneSymbols <- sex_as_events_results_refinedAnnotations$geneSymbol
     sex_geneSymbols                   <- sex_resultsAnnotations$geneSymbol
     sex_refined_geneSymbols           <- sex_results_refinedAnnotations$geneSymbol
-    ijc_sex_geneSymbols               <- ijc_sex_resultsAnnotations$geneSymbol
-    ijc_sex_refined_geneSymbols       <- ijc_sex_results_refinedAnnotations$geneSymbol
-    sjc_sex_geneSymbols               <- sjc_sex_resultsAnnotations$geneSymbol
-    sjc_sex_refined_geneSymbols       <- sjc_sex_results_refinedAnnotations$geneSymbol
 
 
     # adjust the rownames to be the geneSymbols rather than junction IDs
     sex_as_events_results_rn   <- paste(sex_as_events_geneSymbols, sex_as_events_rnResults, sep="-")
     sex_results_rn             <- paste(sex_geneSymbols,           sex_rnResults, sep="-")
-    ijc_sex_results_rn         <- paste(ijc_sex_geneSymbols,       ijc_sex_rnResults, sep="-")
-    sjc_sex_results_rn         <- paste(sjc_sex_geneSymbols,       sjc_sex_rnResults, sep="-")
     message("\n sex_as_events\n", 
         paste(head(sex_as_events_results_rn), collapse = " ") )
-    message("\n ijc_sex_results\n", 
-        paste(head(ijc_sex_results_rn), collapse = " ") )
-    message("\n sjc_sex_results\n", 
-        paste(head(sjc_sex_results_rn), collapse = " ") )
     rownames(sex_as_events_results) <- sex_as_events_results_rn
     rownames(sex_results)           <- sex_results_rn
-    rownames(ijc_sex_results)       <- ijc_sex_results_rn
-    rownames(sjc_sex_results)       <- sjc_sex_results_rn
 
     sex_as_events_filename         = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex_as_events.csv')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_as_events.csv')
     sex_as_events_refined_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex_as_events_refined.csv',sep='')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_as_events_refined.csv',sep='')
     sex_filename                   = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex.csv',sep='')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex.csv',sep='')
     sex_refined_filename           = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_DGE_sex_refined.csv',sep='')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_refined.csv',sep='')
     sex_as_events_genesFilename    = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_sex_as_events_universe.txt',sep='')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_as_events_universe.txt',sep='')
     sex_as_events_refined_genesFilename = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_sex_as_events_gene_set.txt',sep='')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_as_events_gene_set.txt',sep='')
     sex_genesFilename              = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_sex_universe.txt',sep='')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_universe.txt',sep='')
     sex_refined_genesFilename      = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_sex_gene_set.txt',sep='')
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_gene_set.txt',sep='')
 
     write.table(sex_as_events_results, file = sex_as_events_filename, 
                 row.names = T, col.names = T, quote = F, sep = ",")
@@ -1051,7 +1031,7 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
         sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
         sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
         sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
-        print_exploratory_plots (plot, 
+        execute_models_A_and_B  (plot, 
                                  dup, 
                                  tissue_of_interest, 
                                  splice_type, 
@@ -1079,7 +1059,7 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
         sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
         sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
         sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
-        print_exploratory_plots (plot, 
+        execute_models_A_and_B  (plot, 
                                  dup, 
                                  tissue_of_interest, 
                                  splice_type, 
@@ -1107,7 +1087,7 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
         sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
         sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
         sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
-        print_exploratory_plots (plot, 
+        execute_models_A_and_B  (plot, 
                                  dup, 
                                  tissue_of_interest, 
                                  splice_type, 
@@ -1135,7 +1115,7 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
         sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
         sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
         sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
-        print_exploratory_plots (plot, 
+        execute_models_A_and_B  (plot, 
                                  dup, 
                                  tissue_of_interest, 
                                  splice_type, 
@@ -1163,7 +1143,7 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
         sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
         sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
         sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
-        print_exploratory_plots (plot, 
+        execute_models_A_and_B  (plot, 
                                  dup, 
                                  tissue_of_interest, 
                                  splice_type, 
