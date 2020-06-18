@@ -47,30 +47,41 @@ For each splicing type, the junctions are defined, so we have 5 specific annotat
 
 
 ## 1.2 Unpack the data.tar file if necessary
-To run this script, we need to import three compressed files and unpack them
+To run this script, we need to import three compressed files and unpack them.
 
-|File 
-1. DGE_splicing_data.tar.gz
-2. data.tar.gz                      b336c423027b71f74732644bc04b9af8df47d403cdf8f7cb08a400f4f9c2b7aa
-3. DGE_gene_csv.2020-06-17.tar.gz
+| file | sha256 | filename  |
+|------|------  |-----------|
+|  1   | b0c4bb23b96d77aba7e731fa2a15dc74a34daf490312478aca94443f9a6d4e90 | results/data_as_dge.tar.gz |
+|  2   | a0c2c5a7d7cfa0a89c8a39e2f7a4c6c3ac8c6a860f721077c087614505d869cf | rmats_and_annotation.tar.gz |
+
 
 ```{r}
-dge_splicing_file_dir <- list.files("../../mounted-data", pattern='DGE_splicing_data.tar.gz')
-dge_splicing_file <- paste("../../mounted-data", dge_splicing_file_dir, 'robinson-bucket/notebooks/DGE_splicing_data', sep='/')
-dge_splicing_file_tar_gz <- paste(dge_splicing_file, '.tar.gz', sep='')
+data_as_dge_file_dir <- list.files("../../mounted-data", pattern='data_as_dge.tar.gz')
+data_as_dge_file_dir
+rmats_and_annotation_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
+rmats_and_annotation_dir
+```
+
+```{r}
+data_as_dge_file_dir <- list.files("../../mounted-data", pattern='data_as_dge.tar.gz')
+data_as_dge_file <- paste("../../mounted-data", data_as_dge_file_dir, 'robinson-bucket/notebooks/data_as_dge', sep='/')
+data_as_dge_file_tar_gz <- paste(data_as_dge_file, '.tar.gz', sep='')
 message("In order to unpack the necessary files, execute the following commands on the shell.")
-message("1. DGE_splicing_data.tar.gz")
-mycommand = paste("tar xvfz ",dge_splicing_file_tar_gz, "-C ../data", sep=" ")
+message("data_as_dge.tar.gz")
+mycommand = paste("tar xvfz ",data_as_dge_file_tar_gz, "-C ../data", sep=" ")
 message(mycommand)
-message("2. data.tar.gz")
-data_file_dir <- list.files("../../mounted-data", pattern='-data.tar.gz')
-data_file_tar_gz <- paste("../../mounted-data", data_file_dir, 'robinson-bucket/notebooks/data.tar.gz', sep='/')
-mycommand = paste("tar xvfz ",data_file_tar_gz, "-C ../data", sep=" ")
+message("checking sha256sum")
+mycommand = paste("sha256sum", data_as_dge_file_tar_gz, sep = " ")
 message(mycommand)
-message("3. DGE_gene_csv.2020-06-17.tar.gz")
-dge_file <- list.files("../../mounted-data", pattern='DGE_gene_csv')
-dge_file_tar_gz <- paste("../../mounted-data", dge_file, 'robinson-bucket/results-download/DGE_gene_csv.2020-06-17.tar.gz', sep='/')
-mycommand = paste("tar xvfz ",dge_file_tar_gz, "-C ../data", sep=" ")
+rmats_annot_file_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
+rmats_annot_file <- paste("../../mounted-data", data_as_dge_file_dir, 'robinson-bucket/notebooks/rmats_and_annotation', sep='/')
+rmats_annot_file_tar_gz <- paste(rmats_annot_file, '.tar.gz', sep='')
+message("In order to unpack the necessary files, execute the following commands on the shell.")
+message("rmats_and_annotation.tar.gz")
+mycommand = paste("tar xvfz ",rmats_annot_file_tar_gz, "-C ../data", sep=" ")
+message(mycommand)
+message("checking sha256sum")
+mycommand = paste("sha256sum", rmats_annot_file_tar_gz, sep = " ")
 message(mycommand)
 ```
 
@@ -103,7 +114,7 @@ message("We extracted ", length(levels(tissue_reduction$display_name))," differe
 
 ```{r}
 significant_results_dir = "../data/"
-pattern = "DGE_sex_as_events_refined.csv"
+pattern = "model_B_sex_as_events_refined.csv"
 files <- list.files(path = significant_results_dir, pattern = pattern)
 as_types <- c("a3ss", "a5ss", "mxe", "ri", "se")
 length(files)
@@ -123,19 +134,7 @@ head(se_annot)
 
 ```{r}
 gene_as = data.frame()
-GeneJunction <- rep("NA", length(files))
 counts <- rep(NA, length(files))
-ASE <- rep("NA", length(files))
-Tissue <- rep("NA", length(files))
-Display <- rep("NA", length(files))
-GeneSymbol <- rep("NA", length(files))
-GeneID <- rep("NA", length(files))
-chr <- rep("NA", length(files))
-logFC <- rep(NA, length(files))
-AveExpr <- rep("NA", length(files))
-t <- rep("NA", length(files))
-PValue <- rep("NA", length(files))
-AdjPVal <- rep("NA", length(files))
 length(files)
 ```
 
@@ -146,15 +145,13 @@ for (i in 1:length(files)) {
 #    message(paste(dim(lines)[1] >0),collapse = "")
     if (dim(lines)[1] > 0) {
         event     <- as.vector(as.character(rownames(lines)))
-        tissue1   <- gsub("_DGE_sex_as_events_refined.csv","", files[i], fixed = TRUE)
+        tissue1   <- gsub("_AS_model_B_sex_as_events_refined.csv","", files[i], fixed = TRUE)
         counts[i] <- dim(lines)[1]
         event_idx <- substring(event, regexpr("[0-9]+$", event))
         res       <- data.frame()
         if (grepl("^a3ss_", files[i])) {
             # remove the first 5 letters of the string 
             tissue2 <- substring(tissue1,6)
-            ASE[i] <- "A3SS"
-            Tissue[i] <- tissue2
             idx <- match(event_idx, a3ss_annot$ID)
             res <- data.frame(GeneJunction <- event,
                               ASE          <- "A3SS", 
@@ -178,8 +175,6 @@ for (i in 1:length(files)) {
         } else if (grepl("^a5ss_", files[i])) {
             # remove the first 5 letters of the string 
             tissue2 <- substring(tissue1,6)
-            ASE[i] <- "A5SS"
-            Tissue[i] <- tissue2
             idx <- match(event_idx, a5ss_annot$ID)
             res <- data.frame(GeneJunction <- event,
                               ASE          <- "A5SS", 
@@ -200,10 +195,8 @@ for (i in 1:length(files)) {
                                "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
         } else if (grepl("^mxe_", files[i])) {
-            ASE[i] <- "MXE"
             # remove the first 4 letters of the string 
             tissue2 <- substring(tissue1,5)
-            Tissue[i] <- tissue2
             idx <- match(event_idx, a3ss_annot$ID)
             res <- data.frame(GeneJunction <- event,
                               ASE          <- "MXE", 
@@ -224,10 +217,8 @@ for (i in 1:length(files)) {
                                "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
         } else if (grepl("^se_", files[i])) {
-            ASE[i] <- "SE"
             # remove the first 3 letters of the string 
             tissue2 <- substring(tissue1,4)
-            Tissue[i] <- tissue2
             idx <- match(event_idx, se_annot$ID)
             res <- data.frame(GeneJunction <- event,
                               ASE          <- "SE", 
@@ -248,10 +239,8 @@ for (i in 1:length(files)) {
                                "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
             gene_as <- rbind(gene_as,res)
         } else if (grepl("^ri_", files[i])){
-            ASE[i] <- "RI"
             # remove the first 3 letters of the string 
             tissue2 <- substring(tissue1,4)
-            Tissue[i] <- tissue2
             idx <- match(event_idx, ri_annot$ID)
             res <- data.frame(GeneJunction <- event,
                               ASE          <- "RI", 
@@ -294,13 +283,17 @@ head(gene_as)
 This file contains (description)
 Here is a typical line
 <pre>
-        GeneJunction    ASE     ASE_IDX Tissue  GeneSymbol      chr
-1       MDM4-3553       SE      3553    adipovisceral_omentum   RNPEP   chr1
-2       WDR17-8668      SE      8668    adipovisceral_omentum   ANKMY1  chr2
-3       IL17RC-5032     SE      5032    adipovisceral_omentum   SNCAIP  chr5
-4       DDX3X-5712      A3SS    5712    adrenal_gland   DDX3X   chrX
+A data.frame: 6 × 15
+GeneJunction	ASE	ASE_IDX	Tissue	counts	Display	GeneSymbol	GeneID	chr	logFC	AveExpr	t	PValue	AdjPVal	B
+<fct>	<fct>	<int>	<fct>	<int>	<fct>	<fct>	<fct>	<fct>	<dbl>	<dbl>	<dbl>	<dbl>	<dbl>	<dbl>
+1	XIST-2253	A3SS	2253	adipose_subcutaneous	4	Adipose (sc)	XIST	ENSG00000229807.11	chrX	-4.4086049	3.196317	-36.488970	4.635568e-154	3.893877e-150	310.016049
+2	XIST-2252	A3SS	2252	adipose_subcutaneous	4	Adipose (sc)	XIST	ENSG00000229807.11	chrX	-2.4147126	3.647690	-21.921057	1.444102e-78	6.065229e-75	160.028167
+3	GREB1L-4933	A3SS	4933	adipose_subcutaneous	4	Adipose (sc)	GREB1L	ENSG00000141449.14	chr18	1.2793173	2.115005	7.123138	3.052112e-12	8.545914e-09	16.692429
+4	RHCG-1776	A3SS	1776	adipose_subcutaneous	4	Adipose (sc)	RHCG	ENSG00000140519.14	chr15	-0.6930009	1.636472	-3.922124	9.797866e-05	3.919146e-02	1.142232
+5	XIST-2253	A3SS	2253	adipose_visceral_omentum	12	Adipose (v)	XIST	ENSG00000229807.11	chrX	-4.4403352	3.113532	-33.950800	2.654474e-123	2.209585e-119	241.826117
+6	XIST-2252	A3SS	2252	adipose_visceral_omentum	12	Adipose (v)	XIST	ENSG00000229807.11	chrX	-2.4506832	3.650617	-18.890779	2.817671e-58	1.172715e-54	114.731682
 </pre>
-There are 2848 significant events in the file.
+There are 2887 significant events in the file.
 
 ```{r}
 glimpse(gene_as)
