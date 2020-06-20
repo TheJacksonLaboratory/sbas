@@ -5,14 +5,15 @@ This notebook processes the raw counts as provided by rMATS and performs some de
 ## Data files created by this notebook
 Output text files are written to the ``data/`` directory (at the same level as the ``jupyter`` directory). 
 
-1. **gene_AS.tsv**: Alternative splicing events per gene
-2. **genesWithCommonAS.tsv
+1. **gene_as.tsv**: Alternative splicing events per gene, adjusted p-value <= 0.05, fold change >= 1.5.
+2. **all_gene_as.tsv**: all alternative splicing events
+3. **gene_dge.tsv**: Differential gene expression, adjusted p-value <= 0.05, fold change >= 1.5
+3. **genesWithCommonAS.tsv**: genes (as geneSymbol, the number of splicing events, and the number of tissues the event occurs in)
 3. **Total_AS_by_chr.tsv**: Total alternative splicing events per chromosome
 4. **Total_AS_by_geneSymbol.tsv**: Count the number of tissues in which specific genes show significant alternative splicing
 5. **Total_AS_by_tissue.tsv**: Count the number of significant splicing events per tissue
 6. **Total_AS_by_splicingtype.tsv**: Count number of significant splicing events for each of the 5' alternative splicing categories
-7. **Significant_AS_events.tsv**: ?? Counts of significant events per slicing type per tissue
-8. **SplicingIndex_chr.tsv**: Splicing index by chr (number of sigificant AS events per 1000 exons)
+7. **SplicingIndex_chr.tsv**: Splicing index by chr (number of sigificant AS events per 1000 exons)
 
 ```{r}
 defaultW <- getOption("warn")  # suppress warnings for this cell
@@ -46,7 +47,7 @@ For each splicing type, the junctions are defined, so we have 5 specific annotat
 5. **fromGTF.SE.txt**: annotations for the skipped exon junctions
 
 
-## 1.2 Unpack the data.tar file if necessary
+### 1.2 Unpack the data.tar file if necessary
 To run this script, we need to import three compressed files and unpack them.
 
 | file | sha256 | filename  |
@@ -70,19 +71,23 @@ message("In order to unpack the necessary files, execute the following commands 
 message("data_as_dge.tar.gz")
 mycommand = paste("tar xvfz ",data_as_dge_file_tar_gz, "-C ../data", sep=" ")
 message(mycommand)
+system(mycommand)
 message("checking sha256sum")
 mycommand = paste("sha256sum", data_as_dge_file_tar_gz, sep = " ")
 message(mycommand)
+system(mycommand)
 rmats_annot_file_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
-rmats_annot_file <- paste("../../mounted-data", data_as_dge_file_dir, 'robinson-bucket/notebooks/rmats_and_annotation', sep='/')
+rmats_annot_file <- paste("../../mounted-data", rmats_annot_file_dir, 'robinson-bucket/notebooks/rmats_and_annotation', sep='/')
 rmats_annot_file_tar_gz <- paste(rmats_annot_file, '.tar.gz', sep='')
 message("In order to unpack the necessary files, execute the following commands on the shell.")
 message("rmats_and_annotation.tar.gz")
 mycommand = paste("tar xvfz ",rmats_annot_file_tar_gz, "-C ../data", sep=" ")
 message(mycommand)
+system(mycommand)
 message("checking sha256sum")
 mycommand = paste("sha256sum", rmats_annot_file_tar_gz, sep = " ")
 message(mycommand)
+system(mycommand)
 ```
 
 ```{r}
@@ -132,28 +137,29 @@ se_annot <- read.table(file = "../data/fromGTF.SE.txt", sep = "\t", quote = "\""
 head(se_annot)
 ```
 
-```{r}
-gene_as = data.frame()
-counts <- rep(NA, length(files))
-length(files)
-```
+### 2.3 create_as_structure 
+
+This function doees an aggregation of the alternative splicing events - good for all events and the significantly expressed events.
 
 ```{r}
-for (i in 1:length(files)) {
-    lines  <- read.table(file=paste0(significant_results_dir, files[i]), 
+create_as_structure <- function ( results_dir, files, pattern, tissue_reduction) {
+    gene_as = data.frame()
+    counts <- rep(NA, length(files))
+    message("\nnumber of files:", paste(length(files)), collapse = "")
+    for (i in 1:length(files)) {
+       lines  <- read.table(file=paste0(results_dir, files[i]), 
                                      header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
-#    message(paste(dim(lines)[1] >0),collapse = "")
-    if (dim(lines)[1] > 0) {
-        event     <- as.vector(as.character(rownames(lines)))
-        tissue1   <- gsub("_AS_model_B_sex_as_events_refined.csv","", files[i], fixed = TRUE)
-        counts[i] <- dim(lines)[1]
-        event_idx <- substring(event, regexpr("[0-9]+$", event))
-        res       <- data.frame()
-        if (grepl("^a3ss_", files[i])) {
-            # remove the first 5 letters of the string 
-            tissue2 <- substring(tissue1,6)
-            idx <- match(event_idx, a3ss_annot$ID)
-            res <- data.frame(GeneJunction <- event,
+       if (dim(lines)[1] > 0) {
+           event     <- as.vector(as.character(rownames(lines)))
+           tissue1   <- gsub(pattern,"", files[i], fixed = TRUE)
+           counts[i] <- dim(lines)[1]
+           event_idx <- substring(event, regexpr("[0-9]+$", event))
+           res       <- data.frame()
+           if (grepl("^a3ss_", files[i])) {
+               # remove the first 5 letters of the string 
+               tissue2 <- substring(tissue1,6)
+               idx <- match(event_idx, a3ss_annot$ID)
+               res <- data.frame(GeneJunction <- event,
                               ASE          <- "A3SS", 
                               ASE_IDX      <- idx,
                               Tissue       <- tissue2,
@@ -168,15 +174,15 @@ for (i in 1:length(files)) {
                               PValue       <- lines$P.Value,
                               AdjPVal      <- lines$adj.P.Val,
                               B            <- lines$B)
-            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
-                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
-            gene_as <- rbind(gene_as,res)
+               colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                                  "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
+               gene_as <- rbind(gene_as,res)
             
-        } else if (grepl("^a5ss_", files[i])) {
-            # remove the first 5 letters of the string 
-            tissue2 <- substring(tissue1,6)
-            idx <- match(event_idx, a5ss_annot$ID)
-            res <- data.frame(GeneJunction <- event,
+           } else if (grepl("^a5ss_", files[i])) {
+               # remove the first 5 letters of the string 
+               tissue2 <- substring(tissue1,6)
+               idx <- match(event_idx, a5ss_annot$ID)
+               res <- data.frame(GeneJunction <- event,
                               ASE          <- "A5SS", 
                               ASE_IDX      <- idx,
                               Tissue       <- tissue2,
@@ -191,14 +197,14 @@ for (i in 1:length(files)) {
                               PValue       <- lines$P.Value,
                               AdjPVal      <- lines$adj.P.Val,
                               B            <- lines$B)
-            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+               colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
                                "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
-            gene_as <- rbind(gene_as,res)
-        } else if (grepl("^mxe_", files[i])) {
-            # remove the first 4 letters of the string 
-            tissue2 <- substring(tissue1,5)
-            idx <- match(event_idx, a3ss_annot$ID)
-            res <- data.frame(GeneJunction <- event,
+               gene_as <- rbind(gene_as,res)
+           } else if (grepl("^mxe_", files[i])) {
+               # remove the first 4 letters of the string 
+               tissue2 <- substring(tissue1,5)
+               idx <- match(event_idx, a3ss_annot$ID)
+               res <- data.frame(GeneJunction <- event,
                               ASE          <- "MXE", 
                               ASE_IDX      <- idx,
                               Tissue       <- tissue2,
@@ -213,14 +219,14 @@ for (i in 1:length(files)) {
                               PValue       <- lines$P.Value,
                               AdjPVal      <- lines$adj.P.Val,
                               B            <- lines$B)
-            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
-                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
-            gene_as <- rbind(gene_as,res)
-        } else if (grepl("^se_", files[i])) {
-            # remove the first 3 letters of the string 
-            tissue2 <- substring(tissue1,4)
-            idx <- match(event_idx, se_annot$ID)
-            res <- data.frame(GeneJunction <- event,
+               colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                                  "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
+               gene_as <- rbind(gene_as,res)
+           } else if (grepl("^se_", files[i])) {
+               # remove the first 3 letters of the string 
+               tissue2 <- substring(tissue1,4)
+               idx <- match(event_idx, se_annot$ID)
+               res <- data.frame(GeneJunction <- event,
                               ASE          <- "SE", 
                               ASE_IDX      <- idx,
                               Tissue       <- tissue2,
@@ -235,14 +241,14 @@ for (i in 1:length(files)) {
                               PValue       <- lines$P.Value,
                               AdjPVal      <- lines$adj.P.Val,
                               B            <- lines$B)
-            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
-                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
-            gene_as <- rbind(gene_as,res)
-        } else if (grepl("^ri_", files[i])){
-            # remove the first 3 letters of the string 
-            tissue2 <- substring(tissue1,4)
-            idx <- match(event_idx, ri_annot$ID)
-            res <- data.frame(GeneJunction <- event,
+               colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                                  "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
+               gene_as <- rbind(gene_as,res)
+           } else if (grepl("^ri_", files[i])){
+               # remove the first 3 letters of the string 
+               tissue2 <- substring(tissue1,4)
+               idx <- match(event_idx, ri_annot$ID)
+               res <- data.frame(GeneJunction <- event,
                               ASE          <- "RI", 
                               ASE_IDX      <- idx,
                               Tissue       <- tissue2,
@@ -257,22 +263,181 @@ for (i in 1:length(files)) {
                               PValue       <- lines$P.Value,
                               AdjPVal      <- lines$adj.P.Val,
                               B            <- lines$B)
-            colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
-                               "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
-            gene_as <- rbind(gene_as,res)
-        }
+               colnames(res) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display",
+                                  "GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
+               gene_as <- rbind(gene_as,res)
+           }
         
-    } #if has sig. events
+       } #if has sig. events
     
-} #for all files
-colnames(gene_as) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display","GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
-n_unique_genes <- length(summary(as.factor(gene_as$GeneSymbol),maxsum=50000))
-message("We extracted a total of ",nrow(gene_as)," significant alternative splicing events (gene_as)")
-message("This includes ", n_unique_genes, " total genes")
+   } #for all files
+   colnames(gene_as) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display","GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
+   n_unique_genes <- length(summary(as.factor(gene_as$GeneSymbol),maxsum=50000))
+   message("We extracted a total of ",nrow(gene_as)," significant alternative splicing events (gene_as)")
+   message("This includes ", n_unique_genes, " total genes")
+   return (gene_as)
+}
+```
+
+### 2.4 create_dge_structure 
+
+This function doees an aggregation of the differential gene expression events - good for all events and the significantly expressed events.
+
+```{r}
+create_dge_structure <- function ( results_dir, files, pattern, map_pattern, tissue_reduction) {
+   gene_dge = data.frame()
+   counts <- rep(NA, length(files))
+   for (i in 1:length(files)) {
+      lines  <- read.table(file=paste0(results_dir, files[i]), 
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+      if (dim(lines)[1] > 0) {
+         tissue1    <- gsub(pattern,"", files[i], fixed = TRUE)
+         map_lines  <- read.table(file=paste0(paste0(results_dir, tissue1),map_pattern),
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+         counts[i]  <- dim(lines)[1]    
+         tissue1    <- gsub(pattern,"", files[i], fixed = TRUE)
+         map_lines  <- read.table(file=paste0(paste0(results_dir, tissue1),map_pattern),
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+         ensg_ver   <- as.vector(as.character(rownames(lines)))
+         ensg_no_ver<- as.vector(as.character(map_lines$ensg_names))
+         ensg_genes <- as.vector(as.character(map_lines$ensg_genes))
+         counts[i]  <- dim(lines)[1]  
+         res <- data.frame(Tissue       <- tissue1,
+                           ENSG_ver     <- ensg_ver,
+                           ENSG_no_ver  <- ensg_no_ver,
+                           GeneSymbol   <- ensg_genes,
+                           counts       <- counts[i],
+                           Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue1, "display_name"],
+                           logFC        <- lines$logFC,
+                           AveExpr      <- lines$AveExpr,
+                           t            <- lines$t,
+                           PValue       <- lines$P.Value,
+                           AdjPVal      <- lines$adj.P.Val,
+                           B            <- lines$B)
+         colnames(res) <- c("Tissue","ENSG_ver","ENSG_no_ver","GeneSymbol","counts","Display",
+                            "logFC","AveExpr","t","PValue","AdjPVal","B")
+         gene_dge <- rbind(gene_dge, res)
+       } #if has sig. events
+    } #for all files
+    colnames(gene_dge) <- c("Tissue","ENSG_ver","ENSG_no_ver","GeneSymbol","counts","Display",
+                        "logFC","AveExpr","t","PValue","AdjPVal","B")
+    n_unique_genes <- length(summary(as.factor(gene_dge$GeneSymbol),maxsum=50000))
+    message("We extracted a total of ",nrow(gene_dge)," significant differential gene events (gene_dge)")
+    message("This includes ", n_unique_genes, " total genes")
+    return(gene_dge)
+}
+```
+
+### 2.5 Read in the alternative splicing results
+
+We will create an aggregation of  all the results and all the significant results
+
+
+```{r}
+results_dir         <- "../data/"
+significant_pattern <- "_AS_model_B_sex_as_events_refined.csv"
+significant_files   <- list.files(path = results_dir, pattern = significant_pattern)
+all_pattern         <- "_AS_model_B_sex_as_events.csv"
+all_files           <- list.files(path = results_dir, pattern = all_pattern)
+as_types            <- c("a3ss", "a5ss", "mxe", "ri", "se")
+length(all_files)
+length(significant_files)
+
+gene_as     <- create_as_structure (results_dir      <- results_dir, 
+                                    files            <- significant_files, 
+                                    pattern          <- significant_pattern, 
+                                    tissue_reduction <- tissue_reduction)
+all_gene_as <- create_as_structure (results_dir      <- results_dir, 
+                                    files            <- all_files, 
+                                    pattern          <- all_pattern, 
+                                    tissue_reduction <- tissue_reduction)
+head(gene_as,2)
+head(all_gene_as, 2)
+gene_as$Tissue <- factor(gene_as$Tissue)
+write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
+write.table(all_gene_as, "../data/all_gene_as.tsv", quote=FALSE, sep="\t")
+```
+
+### 2.6 Read in the differential gene expression results
+
+Here we create an aggregation of al the significant results differential gene expression events.
+
+```{r}
+results_dir         <- "../data/"
+significant_pattern <- "_DGE_refined.csv"
+significant_files   <- list.files(path = results_dir, pattern = significant_pattern)
+map_pattern         <- "_DGE_ensg_map.csv"
+length(significant_files)
+
+gene_dge     <- create_dge_structure (results_dir      <- results_dir, 
+                                      files            <- significant_files, 
+                                      pattern          <- significant_pattern, 
+                                      map_pattern      <- map_pattern,
+                                      tissue_reduction <- tissue_reduction)
+
+head(gene_dge,2)
 ```
 
 ```{r}
-head(gene_as)
+#
+# add chr information for summary data later, use the annotation we used for rMATS
+#
+if (!("gencode.v30.annotation.gtf.gz" %in% list.files("../data/"))) {
+    message("downloading gencode v30 annotation\n")
+    system("wget -O ../data/gencode.v30.annotation.gtf.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
+    message("Done!\n")
+    message("Unzipping compressed file gencode.v30.annotation.gtf.gz..")
+    system("gunzip ../data/gencode.v30.annotation.gtf.gz", intern = TRUE)
+    message("Done! gencode.v30.annotation.gtf can be found in ../data/")
+}
+gencode <- import("../data/gencode.v30.annotation.gtf")
+gtf.df <- as.data.frame (gencode)
+chr_genes <- unique(gtf.df[,c("seqnames","gene_name","gene_id")])
+colnames(chr_genes) <- c("chr","GeneSymbol", "ENSG")
+head(chr_genes)
+
+```
+
+```{r}
+for (i in 1:dim(chr_genes)[1]) {
+    chr_genes$ENSG[i] <- as.character(strsplit(chr_genes$ENSG[i],'\\.\\w+$'))
+}
+head(chr_genes)
+```
+
+```{r}
+i = 1
+chr <- rep("NA",dim(gene_dge)[1])
+gene_dge$chr <- chr
+for (i in 1:dim(gene_dge)[1]) {
+    match  <- as.character(chr_genes$ENSG) %in% as.character((gene_dge$ENSG_no_ver[i]))
+    if (sum(match==TRUE)== 1) {
+        chr[i] <- as.character(chr_genes[match,]$chr)
+        gene_dge$chr[i] <- chr[i]
+    } else if (sum(match==TRUE)>1) {
+        all <- as.vector(as.character(chr_genes[match,]$chr))
+        gene_dge$chr[i] <- as.character(all[1])
+    }
+}
+head(gene_dge)
+
+write.table(gene_dge, "../data/gene_dge.tsv", quote=FALSE, sep="\t")
+```
+
+### 2.7 Summary gene_as and gene_dge regarding events by tissue
+
+```{r}
+XY <- gene_as %>% group_by(Tissue) %>% tally()
+#XY
+message("Minimum splicing events per tissue ", min(XY$n), " maximum splicing events per tissue ", max(XY$n))
+#XY[XY$n>100,]
+sum(XY$n<100)
+
+XY <- gene_dge %>% group_by(Tissue) %>% tally()
+#XY
+message("Minimum gene expression events per tissue ", min(XY$n), " maximum gene expression events per tissue ", max(XY$n))
+#XY[XY$n>100,]
+sum(XY$n<100)
 ```
 
 ### 3 Data Structures for Figures
@@ -302,7 +467,6 @@ length(levels(gene_as$Tissue))
 table(is.na(gene_as$Display))
 table(gene_as$Display)
 colnames(gene_as)
-write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 head(gene_as)
 tissue_reduction$display_name <- factor(tissue_reduction$display_name)
 ```
@@ -313,60 +477,88 @@ x_as_events <- gene_as[gene_as$chr=="chrX",]
 message("There were ",nrow(gene_as)," total significant alternative splicing events (gene_as)")
 message("There were ",nrow(x_as_events)," total significant alternative splicing events on the X chromosome (gene_as)")
 message("i.e., ", (100*nrow(x_as_events)/nrow(gene_as)), "% of all significant AS events were on the X chromosome")
+
+numberOfUniqueTissues <- length(summary(as.factor(gene_as$Display),maxsum=500))
+numberOfASEmechanisms <- length(summary(as.factor(gene_as$ASE),maxsum=500))
+
+message("gene_as now has ",numberOfUniqueTissues, " tissues and ", numberOfASEmechanisms, " ASE categories")
+message("ASE:")
+summary(as.factor(gene_as$ASE),maxsum=500)
 ```
 
-### 3.2 Tissue specific data frame
+### 3.2 gene_dge.tsv
+
+This file contains (description)
+Here is a typical line
+<pre>
+Tissue  ENSG_ver        ENSG_no_ver     GeneSymbol      counts  Display logFC   AveExpr t       PValue  AdjPVal B
+1       adipose_subcutaneous    ENSG00000176728.7       ENSG00000176728 TTTY14  765     Adipose (sc)    -7.98216577151896     -0.928812923511535       -139.823010017733       0       0       1107.42326360464
+2       adipose_subcutaneous    ENSG00000231535.5       ENSG00000231535 LINC00278       765     Adipose (sc)    -6.09542040758638      -2.77656379347601       -126.913818678612       0       0       1050.36559888639
+3       adipose_subcutaneous    ENSG00000129824.15      ENSG00000129824 RPS4Y1  765     Adipose (sc)    -9.6641901864726      4.63528767282141 -125.827094717734       0       0       1041.87660796556
+4       adipose_subcutaneous    ENSG00000067646.11      ENSG00000067646 ZFY     765     Adipose (sc)    -9.50458982938477     0.672755457406984        -125.037143030325       0       0       1033.61131617113
+5       adipose_subcutaneous    ENSG00000229807.10      ENSG00000229807 XIST    765     Adipose (sc)    9.89280986473167      1.23756039627052 121.69689757218 0       0       1030.17757492281
+6       adipose_subcutaneous    ENSG00000229236.1       ENSG00000229236 TTTY10  765     Adipose (sc)    -6.20901295440725     -2.74524363170072        -122.540297482165       0       0       1029.41424065532
+7       adipose_subcutaneous    ENSG00000233864.7       ENSG00000233864 TTTY15  765     Adipose (sc)    -8.19361688496523     -0.741097276206495       -122.47199454746        0       0       1027.58175958647
+8       adipose_subcutaneous    ENSG00000260197.1       ENSG00000260197 AC010889.1      765     Adipose (sc)    -8.52835806068555      -0.686009457030557      -119.790486729538       0       0       1015.85291786821
+9       adipose_subcutaneous    ENSG00000183878.15      ENSG00000183878 UTY     765     Adipose (sc)    -9.52139275438866     1.60375445153084 -110.599936868261       0       0       953.069478992754
+</pre>
+There are 7417 significant events in the file.
 
 ```{r}
-data <- data.frame(Tissue=gene_as$Display, ASE=gene_as$ASE, Counts=gene_as$counts)
+head(gene_dge[gene_dge$chr=="chrX",])
+x_dge_events <- gene_dge[gene_dge$chr=="chrX",]
+message("There were ",nrow(gene_dge)," total significant differential gene expression events (gene_dge)")
+message("There were ",nrow(x_dge_events)," total significant differential gene expression events on the X chromosome (gene_as)")
+message("i.e., ", (100*nrow(x_dge_events)/nrow(gene_dge)), "% of all significant DGE events were on the X chromosome")
 
-numberOfUniqueTissues <- length(summary(as.factor(data$Tissue),maxsum=500))
-numberOfASEmechanisms <- length(summary(as.factor(data$ASE),maxsum=500))
+numberOfUniqueTissues <- length(summary(as.factor(gene_dge$Display),maxsum=500))
 
-message("data now has ",numberOfUniqueTissues, " tissues and ", numberOfASEmechanisms, " ASE categories")
-message("ASE:")
-summary(as.factor(data$ASE),maxsum=500)
+message("gene_dge now has ",numberOfUniqueTissues, " tissues")
 ```
 
 ### 3.3 Count splicing event by chromosome
 
-Count the number of significant alternative splicing events per chromosome and write to the file **Total_AS_by_chr.tsv**.
+Count the number of significant alternative splicing events per chromosome and save to the file **Total_AS_by_chr.tsv**.
 
 ```{r}
-res2 <- gene_as          %>% 
-       group_by(chr)    %>% 
-       count(chr)       %>% 
-       arrange(desc(n)) %>% 
-       as.data.frame()
-res2$chr <- factor(res2$chr, levels = res2$chr)
-length(res2$chr)
-res2
-glimpse(res2)
-write.table(res2, file= "../data/Total_AS_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
+total_as_by_chr <- gene_as          %>% 
+                   group_by(chr)    %>% 
+                   count(chr)       %>% 
+                   arrange(desc(n)) %>% 
+                   as.data.frame()
+total_as_by_chr$chr <- factor(total_as_by_chr$chr, levels = total_as_by_chr$chr)
+length(total_as_by_chr$chr)
+total_as_by_chr
+glimpse(total_as_by_chr)
+write.table(total_as_by_chr, file= "../data/Total_AS_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
 ```
 
 ### 3.4 Count most frequent spliced genes 
 
 ```{r}
-res3 <- gene_as %>% 
-       group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
-res3$GeneSymbol <- factor(res3$GeneSymbol, levels = res3$GeneSymbol)
-length(res3$GeneSymbol)
-head(res3)
-write.table(res3, file = "../data/Total_AS_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
+total_as_by_geneSymbol <- gene_as %>% 
+                          group_by(GeneSymbol) %>% 
+                          count(GeneSymbol)    %>% 
+                          arrange(desc(n))     %>% 
+                          as.data.frame()
+total_as_by_geneSymbol$GeneSymbol <- factor(total_as_by_geneSymbol$GeneSymbol, 
+                                            levels = total_as_by_geneSymbol$GeneSymbol)
+length(total_as_by_geneSymbol$GeneSymbol)
+head(total_as_by_geneSymbol)
+write.table(total_as_by_geneSymbol, file = "../data/Total_AS_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
 ```
 ### 3.5 Count most frequent splicing by tissue
 
 ```{r}
-res4 <- gene_as %>% 
-       group_by(Display) %>% 
-       count(Display) %>% 
-       arrange(desc(n)) %>% 
-       as.data.frame()
-res4$Display <- factor(res4$Display, levels = res4$Display)
-length(res4$Display)
-res4
-write.table(res4, file = "../data/Total_AS_by_tissue.tsv", sep = "\t", row.names = F)
+total_as_by_tissue <- gene_as %>% 
+                      group_by(Display) %>% 
+                      count(Display)    %>% 
+                      arrange(desc(n))  %>% 
+                      as.data.frame()
+total_as_by_tissue$Display <- factor(total_as_by_tissue$Display, 
+                                     levels = total_as_by_tissue$Display)
+length(total_as_by_tissue$Display)
+write.table(total_as_by_tissue, file = "../data/Total_AS_by_tissue.tsv", sep = "\t", row.names = F)
 ```
 
 ###  3.6 Significant Count by splicing type 
@@ -376,10 +568,14 @@ Our starting values were the significant events, all meeting the criteria FC > 1
 
 
 ```{r}
-res5 <- gene_as %>% group_by(ASE) %>% count(ASE) %>% arrange(desc(n)) %>% as.data.frame()
-res5$ASE <- factor(res5$ASE, levels = res5$ASE)
-head(res5)
-write.table(res5, file= "../data/Total_AS_by_splicingtype.tsv")
+total_as_by_splicingtype <- gene_as %>% 
+                            group_by(ASE)    %>% 
+                            count(ASE)       %>% 
+                            arrange(desc(n)) %>%
+                            as.data.frame()
+total_as_by_splicingtype$ASE <- factor(total_as_by_splicingtype$ASE, levels = total_as_by_splicingtype$ASE)
+total_as_by_splicingtype
+write.table(total_as_by_splicingtype, file= "../data/Total_AS_by_splicingtype.tsv")
 ```
 
 ###  3.7 Significant Count by splicing type (significant == FC > 1.5 and pVal < 0.05)
@@ -449,23 +645,25 @@ head(SE.res)
 ### 3.9 Count most frequent spliced genes
 
 ```{r}
-res <- gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
-res$GeneSymbol <- factor(res$GeneSymbol, levels = res$GeneSymbol)
-length(res$GeneSymbol)
-res2 <- data %>% group_by(Tissue) %>% 
-    summarise(Total = sum(Counts)) %>%
-    arrange(desc(Total)) %>%
-    as.data.frame()
+genesMostFrequentlySpliced <- gene_as %>% 
+                              group_by(GeneSymbol) %>% 
+                              count(GeneSymbol)    %>% 
+                              arrange(desc(n))     %>% 
+                              as.data.frame()
+genesMostFrequentlySpliced$GeneSymbol <- factor(genesMostFrequentlySpliced$GeneSymbol, 
+                                                levels = genesMostFrequentlySpliced$GeneSymbol)
+length(genesMostFrequentlySpliced$GeneSymbol)
 
 #Add number of tissues
-nTissues <- rep(NA, length(res))
-for (i in 1:nrow(res)) {
-  df_gene <- gene_as %>% filter(GeneSymbol == res$GeneSymbol[i])
-  nTissues[i] <- length(unique(df_gene$Tissue))
+nTissues <- rep(NA, length(genesMostFrequentlySpliced))
+for (i in 1:nrow(genesMostFrequentlySpliced)) {
+    df_gene <- gene_as %>% 
+               filter(GeneSymbol == genesMostFrequentlySpliced$GeneSymbol[i])
+    nTissues[i] <- length(unique(df_gene$Tissue))
 }
-res$Tissues <- nTissues
-head(res)
-write.table(res, file = "../data/genesWithCommonAS.tsv", sep = "\t", quote = F, row.names = F)
+genesMostFrequentlySpliced$Tissues <- nTissues
+head(genesMostFrequentlySpliced)
+write.table(genesMostFrequentlySpliced, file = "../data/genesWithCommonAS.tsv", sep = "\t", quote = F, row.names = F)
 ```
 
 ### 3.10 Count most frequent spliced chromosomes
@@ -474,18 +672,6 @@ We create an index based upon the number of exons per chromosome.
 
 get the annotation file, at this writing, gencode.v30.annotation.gtf
 The information as to the number of exons within the chromosome may be found there
-
-```{r}
-if (!("gencode.v30.annotation.gtf.gz" %in% list.files("../data/"))) {
-    message("downloading gencode v30 annotation\n")
-    system("wget -O ../data/gencode.v30.annotation.gtf.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
-    message("Done!\n")
-    message("Unzipping compressed file gencode.v30.annotation.gtf.gz..")
-    system("gunzip ../data/gencode.v30.annotation.gtf.gz", intern = TRUE)
-    message("Done! gencode.v30.annotation.gtf can be found in ../data/")
-}
-gencode <- import("../data/gencode.v30.annotation.gtf")
-```
 
 ```{r}
 exons <- gencode[ gencode$type == "exon", ]
@@ -515,76 +701,55 @@ res$Index <- (res$n / res$ExonCounts) * 1000
 res_sorted <- res %>% arrange(desc(Index))
 res_sorted$chr <- factor(res_sorted$chr, levels = res_sorted$chr)
 glimpse(res_sorted)
-```
-
-```{r}
-write.table(data,       file = "../data/Significant_AS_events.tsv", sep = "\t", row.names = F, quote = F)
 write.table(res_sorted, file = "../data/SplicingIndex_chr.tsv", sep = "\t", quote = F, row.names = F)
 ```
 
-### 3.11 gene_dge.tsv
+### 3.11 Overlap between Differential Gene Expression and Differential Alternative Splicing
 
-Single data structure for all the DGE results
-
-The files called (tissue)\_DGE\_refined.csv contain lists of genes found to have statistically significant differential expression.
-The mapping files contain the ENSG id to gene symbol maps.
+First gather the data
 
 ```{r}
-significant_results_dir = "../data/"
-pattern = "_DGE_refined.csv"
-files <- list.files(path = significant_results_dir, pattern = pattern)
-map_pattern <- "_DGE_ensg_map.csv"
-map_files <- list.files(path = significant_results_dir, pattern = map_pattern)
-message("We got ", length(files), " files with significant DGEs and ", length(map_files), " mapping files")
+total_AS_Genes <- read.table(file="../data/Total_AS_by_geneSymbol.tsv", header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+sigAsGenes <- sort(total_AS_Genes$GeneSymbol)
+dge <- read.table("../data/gene_dge.tsv", sep = "\t", header = FALSE, row.names=1, skip = 1)
+dge_genes <- sort(dge$V5)
+head(dge_genes)
+all_genes_data <- read.table("../assets/all_gene_as_gene_names.csv")
+names(all_genes_data) <- c("GeneSymbol", "ensg")
+all_genes <- sort(all_genes_data$GeneSymbol)
 ```
 
 ```{r}
-gene_dge = data.frame()
-counts <- rep(NA, length(files))
+head(all_genes)
+```
+
+### 3.12 We then do a hypergeometric/Fisher test to look for overrepresentation
+The universe consists of all genes with at least one read (all_genes_data).
+So we have
+
+|  	|  DGE+| DGE-|
+|-	|-	|-	|
+| DAS+|  a|  b|
+| DAS-|  c| d|
+
+```{r}
+message("Number of sigAsGenes ", length(sigAsGenes))
+notSigAs <- setdiff(all_genes,sigAsGenes)
+message("Number of genes that are NOT sigAs ", length(notSigAs))
+message("Number of DGE genes", length(dge_genes))
+notDGE <- setdiff(all_genes,dge_genes)
+message("Number of genes that are NOT DGE ", length(notDGE))
+a <- intersect(sigAsGenes, dge_genes)
+b <- intersect(sigAsGenes, notDGE)
+c <- intersect(notSigAs, dge_genes)
+d <- intersect(notSigAs, notDGE)
+message("a: ", length(a), "; b: ",  length(b), "; c: ",  length(c), "; d: ",  length(d))
 ```
 
 ```{r}
-for (i in 1:length(files)) {
-   lines  <- read.table(file=paste0(significant_results_dir, files[i]), 
-                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
-    if (dim(lines)[1] > 0) {
-         tissue1    <- gsub(pattern,"", files[i], fixed = TRUE)
-         map_lines  <- read.table(file=paste0(paste0(significant_results_dir, tissue1),map_pattern),
-                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
-         counts[i]  <- dim(lines)[1]    
-         tissue1    <- gsub(pattern,"", files[i], fixed = TRUE)
-         map_lines  <- read.table(file=paste0(paste0(significant_results_dir, tissue1),map_pattern),
-                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
-         ensg_ver   <- as.vector(as.character(rownames(lines)))
-         ensg_no_ver<- as.vector(as.character(map_lines$ensg_names))
-         ensg_genes <- as.vector(as.character(map_lines$ensg_genes))
-         counts[i]  <- dim(lines)[1]  
-         res <- data.frame(Tissue       <- tissue1,
-                           ENSG_ver     <- ensg_ver,
-                           ENSG_no_ver  <- ensg_no_ver,
-                           GeneSymbol   <- ensg_genes,
-                           counts       <- counts[i],
-                           Display      <- tissue_reduction[tissue_reduction$SMTSD == tissue1, "display_name"],
-                           logFC        <- lines$logFC,
-                           AveExpr      <- lines$AveExpr,
-                           t            <- lines$t,
-                           PValue       <- lines$P.Value,
-                           AdjPVal      <- lines$adj.P.Val,
-                           B            <- lines$B)
-         colnames(res) <- c("Tissue","ENSG_ver","ENSG_no_ver","GeneSymbol","counts","Display",
-                            "logFC","AveExpr","t","PValue","AdjPVal","B")
-         gene_dge <- rbind(gene_dge, res)
-    } #if has sig. events
-} #for all files
-colnames(gene_dge) <- c("Tissue","ENSG_ver","ENSG_no_ver","GeneSymbol","counts","Display",
-                        "logFC","AveExpr","t","PValue","AdjPVal","B")
-n_unique_genes <- length(summary(as.factor(gene_dge$GeneSymbol),maxsum=50000))
-message("We extracted a total of ",nrow(gene_dge)," significant differential gene events (gene_dge)")
-message("This includes ", n_unique_genes, " total genes")
-```
-
-```{r}
-write.table(gene_dge, "../data/gene_dge.tsv", quote=FALSE, sep="\t")
+m <- matrix(c(length(a),length(b),length(c),length(d)), nrow=2,byrow = TRUE)
+fisher.test(m)
 ```
 
 ### Appendix - Metadata
@@ -602,22 +767,42 @@ rm (notebookid)
 notebookid   = "countGenesAndEvents"
 notebookid
 
+message("Generating sha256 checksums of the file `../data/gene_as.tsv` directory .. ")
+system(paste0("cd ../data && find . -name gene_as.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+message("Generating sha256 checksums of the file `../data/all_gene_as.tsv` directory .. ")
+system(paste0("cd ../data && find . -name gene_dge.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+message("Generating sha256 checksums of the file `../data/gene_dge.tsv` directory .. ")
+system(paste0("cd ../data && find . -name gene_as.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+message("Generating sha256 checksums of the file `../data/Total_AS_by_chr.tsv` directory .. ")
+system(paste0("cd ../data && find . -name Total_AS_by_chr.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+message("Generating sha256 checksums of the file `../data/Total_AS_by_geneSymbol.tsv` directory .. ")
+system(paste0("cd ../data && find . -name Total_AS_by_geneSymbol.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
 message("Generating sha256 checksums of the file `../data/Total_AS_by_tissue.tsv` directory .. ")
+system(paste0("cd ../data && find . -name Total_AS_by_tissue.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+message("Generating sha256 checksums of the file `../data/Total_AS_by_splicingtype.tsv` directory .. ")
+system(paste0("cd ../data && find . -name Total_AS_by_splicingtype.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+message("Generating sha256 checksums of the file `../data/genesWithCommonAS.tsv` directory .. ")
+system(paste0("cd ../data && find . -name genesWithCommonAS.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
+message("Done!\n")
+
+message("Generating sha256 checksums of the file `../data/SplicingIndex_chr.tsv` directory .. ")
 system(paste0("cd ../data && find . -name SplicingIndex_chr.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
 message("Done!\n")
 
-message("Generating sha256 checksums of the file `../data/Significant_events.tsv` directory .. ")
-system(paste0("cd ../data && find . -name SplicingIndex_chr.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
-message("Done!\n")
-
-message("Generating sha256 checksums of the file `../data/Significant_events.tsv` directory .. ")
-system(paste0("cd ../data && find . -name SplicingIndex_chr.tsv -exec sha256sum {} \\;  >  ../metadata/", notebookid, "_sha256sums.txt"), intern = TRUE)
-message("Done!\n")
-
-
-paste0("../metadata/", notebookid, "_sha256sums.txt")
-
-data.table::fread(paste0("../metadata/", notebookid, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
 ```
 
 ### Appendix 2. Libraries metadata
