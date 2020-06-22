@@ -1,0 +1,83 @@
+# Analysis Notebook - summaryAnalysisAnnotations
+
+This notebook looks at specific annotations
+
+```{r}
+defaultW <- getOption("warn")  # suppress warnings for this cell
+options(warn = -1) 
+library(dplyr)
+library(R.utils)
+library(rtracklayer)
+
+options(warn = defaultW)
+```
+
+### 1  TissueReduction Information
+
+
+```{r}
+tissue_reduction_filename <- "../assets/tissues.tsv"
+tissue_reduction <- read.table(tissue_reduction_filename, header=TRUE, sep="\t",
+                               skipNul=FALSE, stringsAsFactors = FALSE)
+colnames(tissue_reduction)  <- c("SMTSD","female","male","include","display_name")
+tissue_reduction <- tissue_reduction[tissue_reduction$display_name != "n/a",]
+tissue_reduction$display_name <- factor(tissue_reduction$display_name)
+levels(tissue_reduction$display_name)
+message("We extracted ", length(levels(tissue_reduction$display_name))," different tissues with at least 50 samples in both M & f")
+```
+
+```{r}
+tissue_reduction <- tissue_reduction[tissue_reduction$include == 1, ]
+length(tissue_reduction$display_name)
+```
+
+### 2 load the currated srr_pdata 
+
+```{r}
+message("Loading srr_pdata\n")
+srr_pdata <- readr::read_csv("../data/srr_pdata.csv")
+message("done!\n")
+```
+
+```{r}
+length(unique(srr_pdata$SAMPID))
+head(srr_pdata$SAMPID)
+length(unique(srr_pdata$SMTSD))
+```
+
+### Appendix - Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+
+### Appendix 1. Checksums with the sha256 algorithm
+
+```{r}
+notebookid   = "summaryAnalysisAnnotations"
+
+```
+
+### Appendix 2. Libraries metadata
+
+```{r}
+dev_session_info   <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
+message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
+saveRDS(dev_session_info, file = paste0("../metadata/", notebookid, "_devtools_session_info.rds"))
+message("Done!\n")
+
+message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
+saveRDS(utils_session_info, file = paste0("../metadata/", notebookid ,"_utils_info.rds"))
+message("Done!\n")
+
+dev_session_info$platform
+dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
+
+```{r}
+
+```
