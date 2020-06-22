@@ -1,0 +1,127 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.1
+  kernelspec:
+    display_name: R
+    language: R
+    name: ir
+---
+
+# **total Alternative Splicing by Tissue Dot plot**
+
+This notebook generates a single figure, the reverse plot of showing the number of alternative splicing by tissue.
+
+1. Get differential gene expression (DGE) files
+2. Use the ``../assets/tissues.tsv`` to limit the tissues to those with at least 50 samples in each sex (``tissues.tsv`` was produced by a Python script)
+3. Use the pattern for the differentially expressed genes **"../data/*DGE.csv"** to get all the values for the matrix.
+
+
+## **Running this notebook**:
+
+See the README for setting up prerequisites for the notebook.
+
+
+## 1. Setup 
+
+Assumes the `countGenesAndEvents.ipynb` notebook was run -- unpacking the results from the differential Gene Expression Analysis as run in the `differentialGeneExpressionAnalysis.ipynb` notebook.
+
+```{r}
+defaultW <- getOption("warn")  # suppress warnings for this cell
+options(warn = -1) 
+
+library(stringr)
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(viridis)
+
+Sys.setenv(TAR = "/bin/tar") # for gzfile
+
+options(warn = defaultW)
+```
+
+## 2 read in the total alternatives splicing by tissue file.
+
+```{r}
+totals <- read.table("../data/Total_AS_by_tissue.tsv", sep = "\t", header = T)
+
+colnames(totals) <- c("Tissue", "Total")
+totals_s <- totals %>% arrange(Total)
+totals_s$Tissue <- factor(totals_s$Tissue, levels = totals_s$Tissue)
+levels(totals_s$Tissue)
+```
+
+## 3 create a function to be used by ggplot to create a reverse log10 scale for the x-axis
+
+```{r}
+reverselog_trans <- function(base = exp(1)) {
+  trans <- function(x) -log(x, base)
+  inv <- function(x) base^(-x)
+  trans_new(paste0("reverselog-", format(base)), trans, inv, 
+            log_breaks(base = base), 
+            domain = c(1e-100, Inf))
+}
+
+```
+
+```{r}
+g<-ggplot(totals_s, aes(y = Tissue, x = Total, size = Total)) +
+  geom_point(color = "red") +
+  theme_bw() +
+  scale_x_continuous(trans=reverselog_trans(), breaks=c(1,10,100,1000,5000,10000)) +#breaks=c(10000, 5000,1000,100,10,1)) +
+  scale_y_discrete(position = "right") +
+  theme(axis.text.x = element_text(size=8, angle = 0, hjust = 0.0, vjust = 0.5),
+        axis.text.y = element_text(size=8),
+        axis.title.x = element_text(face="plain", colour="black", 
+                                    size=10),
+        axis.title.y = element_blank(),
+        legend.title=element_blank(),
+        legend.text = element_text(face="plain", colour="black", 
+                                   size=8)) +
+  xlab(paste("Number of sex-biased splicing events")) +
+  ylab("Tissue") + 
+  guides(size=FALSE)
+
+g
+ggsave("../pdf/total_as_by_tissue.pdf",g, height = 4.5, width = 4)
+```
+
+## Appendix - Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+### Appendix.1. Checksums with the sha256 algorithm
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
+
+```{r}
+figure_id   = "totalAlternativeSplicingByTissue"
+```
+
+### Appendix.2. Library metadata
+
+```{r}
+dev_session_info   <- devtools::session_info()
+utils_session_info <- utils::sessionInfo()
+
+message("Saving `devtools::session_info()` objects in ../metadata/devtools_session_info.rds  ..")
+saveRDS(dev_session_info, file = paste0("../metadata/", figure_id, "_devtools_session_info.rds"))
+message("Done!\n")
+
+message("Saving `utils::sessionInfo()` objects in ../metadata/utils_session_info.rds  ..")
+saveRDS(utils_session_info, file = paste0("../metadata/", figure_id ,"_utils_info.rds"))
+message("Done!\n")
+
+dev_session_info$platform
+dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
+
+```{r}
+
+```
