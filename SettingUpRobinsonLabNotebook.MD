@@ -75,7 +75,6 @@ conda install -c conda-forge r-r.utils -y
 conda install -c bioconda bioconductor-rtracklayer -y
 conda install -c conda-forge r-ggsci -y
 conda install -c conda-forge r-rjags -y
-conda install -c glaxosmithkline r-runjags -y
 conda install -c conda-forge r-compute.es -y
 conda install -c bioconda r-pheatmap -y
 ```
