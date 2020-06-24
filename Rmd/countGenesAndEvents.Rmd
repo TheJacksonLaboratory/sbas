@@ -8,9 +8,10 @@ Output text files are written to the ``data/`` directory (at the same level as t
 1. **gene_as.tsv**: Alternative splicing events per gene, adjusted p-value <= 0.05, fold change >= 1.5.
 2. **all_gene_as.tsv**: all alternative splicing events
 3. **gene_dge.tsv**: Differential gene expression, adjusted p-value <= 0.05, fold change >= 1.5
-3. **genesWithCommonAS.tsv**: genes (as geneSymbol, the number of splicing events, and the number of tissues the event occurs in)
-3. **Total_AS_by_chr.tsv**: Total alternative splicing events per chromosome
-4. **Total_AS_by_geneSymbol.tsv**: Count the number of tissues in which specific genes show significant alternative splicing
+4. **genesWithCommonAS.tsv**: genes (as geneSymbol, the number of splicing events, and the number of tissues the event occurs in)
+5. **Total_AS_by_chr.tsv**: Total alternative splicing events per chromosome
+6. **Total_AS_by_geneSymbol.tsv**: Count the number of tissues in which specific genes show significant alternative splicing
+7. **DGE_by_geneSymbol.tsv***: Most highly expressed genes by tissue
 5. **Total_AS_by_tissue.tsv**: Count the number of significant splicing events per tissue
 6. **Total_AS_by_splicingtype.tsv**: Count number of significant splicing events for each of the 5' alternative splicing categories
 7. **SplicingIndex_chr.tsv**: Splicing index by chr (number of sigificant AS events per 1000 exons)
@@ -99,7 +100,7 @@ message("Done!\n")
 ```
 
 ### 2  Refined results
-We define **refined results* as (FC > 1.5 and pVal < 0.05) for the sex\*as_event coefficient result for the linear model
+We define **refined results** as (FC >= 1.5 and pVal <= 0.05) for the sex\*as_event coefficient result for the linear model
 
 
 ### 2.1 getTissueReduction
@@ -358,7 +359,41 @@ write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 write.table(all_gene_as, "../data/all_gene_as.tsv", quote=FALSE, sep="\t")
 ```
 
-### 2.6 Read in the differential gene expression results
+### 2.6 Create a genes-id file capturing the unique gene-junction locations in a single file
+rMATS 3.2.5 unique junction ids by splicing event tied together with gene names and these identifiers useful for downstream analyses and investigations.
+
+```{r}
+results_dir         <- "../data/"
+significant_pattern <- "^se_*AS_model_B_sex_as_events_refined.csv"
+files   <- list.files(path =results_dir, pattern = glob2rx(significant_pattern))
+geneids <- data.frame()
+i = 1
+files[i]
+pattern="_AS_model_B_sex_as_events_refined.csv"
+for (i in 1:length(files)) {
+    lines  <- read.table(file=paste0(results_dir, files[i]), 
+                                     header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
+    
+    if (dim(lines)[1] > 0) {
+           event     <- as.vector(as.character(rownames(lines)))
+           tissue1   <- gsub(pattern,"", files[i], fixed = TRUE)
+           event_idx <- substring(event, regexpr("[0-9]+$", event))
+           res       <- data.frame()
+           tissue2 <- substring(tissue1,4)
+           idx <- match(event_idx, se_annot$ID)
+           res <- data.frame(geneIDs      <- event,
+                             ID           <- event_idx,
+                             GeneSymbol   <- se_annot$geneSymbol[idx],
+                             GeneID       <- se_annot$GeneID[idx],
+                             chr          <- se_annot$chr[idx])
+           outfilename <- paste0(paste0("../data/se_",tissue2),"_geneids.tsv")
+           write.table(res, outfilename, quote=FALSE, sep="\t")
+           
+     }
+}
+```
+
+### 2.7 Read in the differential gene expression results
 
 Here we create an aggregation of al the significant results differential gene expression events.
 
@@ -377,6 +412,8 @@ gene_dge     <- create_dge_structure (results_dir      <- results_dir,
 
 head(gene_dge,2)
 ```
+
+Load in the gencode.v30.annotation.gtf file for additional annotation
 
 ```{r}
 #
@@ -424,20 +461,31 @@ head(gene_dge)
 write.table(gene_dge, "../data/gene_dge.tsv", quote=FALSE, sep="\t")
 ```
 
-### 2.7 Summary gene_as and gene_dge regarding events by tissue
+### 2.8 Summary gene_as and gene_dge regarding events by tissue
 
 ```{r}
 XY <- gene_as %>% group_by(Tissue) %>% tally()
-#XY
+XY <- XY[order(XY$n),decreasing=TRUE]
+head(XY)
 message("Minimum splicing events per tissue ", min(XY$n), " maximum splicing events per tissue ", max(XY$n))
 #XY[XY$n>100,]
 sum(XY$n<100)
 
 XY <- gene_dge %>% group_by(Tissue) %>% tally()
-#XY
+XY <- XY[order(XY$n),decreasing=TRUE]
+head(XY)
 message("Minimum gene expression events per tissue ", min(XY$n), " maximum gene expression events per tissue ", max(XY$n))
 #XY[XY$n>100,]
 sum(XY$n<100)
+```
+
+```{r}
+
+```
+
+```{r}
+table(gtf.df[,c("gene_type")])
+
 ```
 
 ### 3 Data Structures for Figures
@@ -472,7 +520,6 @@ tissue_reduction$display_name <- factor(tissue_reduction$display_name)
 ```
 
 ```{r}
-head(gene_as[gene_as$chr=="chrX",])
 x_as_events <- gene_as[gene_as$chr=="chrX",]
 message("There were ",nrow(gene_as)," total significant alternative splicing events (gene_as)")
 message("There were ",nrow(x_as_events)," total significant alternative splicing events on the X chromosome (gene_as)")
@@ -505,7 +552,6 @@ Tissue  ENSG_ver        ENSG_no_ver     GeneSymbol      counts  Display logFC   
 There are 7417 significant events in the file.
 
 ```{r}
-head(gene_dge[gene_dge$chr=="chrX",])
 x_dge_events <- gene_dge[gene_dge$chr=="chrX",]
 message("There were ",nrow(gene_dge)," total significant differential gene expression events (gene_dge)")
 message("There were ",nrow(x_dge_events)," total significant differential gene expression events on the X chromosome (gene_as)")
@@ -516,9 +562,12 @@ numberOfUniqueTissues <- length(summary(as.factor(gene_dge$Display),maxsum=500))
 message("gene_dge now has ",numberOfUniqueTissues, " tissues")
 ```
 
-### 3.3 Count splicing event by chromosome
+### 3.3 Count events by chromosome
 
 Count the number of significant alternative splicing events per chromosome and save to the file **Total_AS_by_chr.tsv**.
+
+
+### 3.3.1 by alternative splicing events
 
 ```{r}
 total_as_by_chr <- gene_as          %>% 
@@ -533,7 +582,25 @@ glimpse(total_as_by_chr)
 write.table(total_as_by_chr, file= "../data/Total_AS_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
 ```
 
-### 3.4 Count most frequent spliced genes 
+### 3.3.2 by gene expression
+
+```{r}
+total_dge_by_chr <- gene_dge          %>% 
+                   group_by(chr)    %>% 
+                   count(chr)       %>% 
+                   arrange(desc(n)) %>% 
+                   as.data.frame()
+total_dge_by_chr$chr <- factor(total_dge_by_chr$chr, levels = total_dge_by_chr$chr)
+length(total_dge_by_chr$chr)
+total_dge_by_chr
+glimpse(total_dge_by_chr)
+write.table(total_dge_by_chr, file= "../data/Total_DGE_by_chr.tsv", sep="\t", quote = FALSE, row.names=F)
+```
+
+### 3.4 Count events by genes 
+
+
+### 3.4.1 by alternative splicing
 
 ```{r}
 total_as_by_geneSymbol <- gene_as %>% 
@@ -544,10 +611,13 @@ total_as_by_geneSymbol <- gene_as %>%
 total_as_by_geneSymbol$GeneSymbol <- factor(total_as_by_geneSymbol$GeneSymbol, 
                                             levels = total_as_by_geneSymbol$GeneSymbol)
 length(total_as_by_geneSymbol$GeneSymbol)
-head(total_as_by_geneSymbol)
+head(total_as_by_geneSymbol,10)
 write.table(total_as_by_geneSymbol, file = "../data/Total_AS_by_geneSymbol.tsv", sep = "\t", quote=FALSE, row.names = F)
 ```
 ### 3.5 Count most frequent splicing by tissue
+
+
+### 3.5.1 by alternative splicing
 
 ```{r}
 total_as_by_tissue <- gene_as %>% 
@@ -557,8 +627,26 @@ total_as_by_tissue <- gene_as %>%
                       as.data.frame()
 total_as_by_tissue$Display <- factor(total_as_by_tissue$Display, 
                                      levels = total_as_by_tissue$Display)
+head(total_as_by_tissue,10)
 length(total_as_by_tissue$Display)
 write.table(total_as_by_tissue, file = "../data/Total_AS_by_tissue.tsv", sep = "\t", row.names = F)
+```
+
+### 3.5.2 by gene expression
+
+```{r}
+#glimpse(gene_dge)
+gene_dge$GeneSymbol <- factor(gene_dge$GeneSymbol)
+total_dge_by_tissue <- gene_dge %>% 
+                          select(c(GeneSymbol, Display, logFC)) %>%
+                          group_by(Display) %>%
+                          arrange(desc(logFC)) %>%
+                          tally() %>%
+                          arrange(desc(n)) %>%
+                          as.data.frame()
+head(total_dge_by_tissue,10)
+length(total_dge_by_tissue$Display)
+write.table(total_dge_by_tissue, file = "../data/Total_DGE_by_tissue.tsv", sep = "\t", quote=FALSE, row.names = F)
 ```
 
 ###  3.6 Significant Count by splicing type 
@@ -702,6 +790,10 @@ res_sorted <- res %>% arrange(desc(Index))
 res_sorted$chr <- factor(res_sorted$chr, levels = res_sorted$chr)
 glimpse(res_sorted)
 write.table(res_sorted, file = "../data/SplicingIndex_chr.tsv", sep = "\t", quote = F, row.names = F)
+```
+
+```{r}
+
 ```
 
 ### 3.11 Overlap between Differential Gene Expression and Differential Alternative Splicing
