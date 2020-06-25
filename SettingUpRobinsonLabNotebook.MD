@@ -76,7 +76,9 @@ conda install -c bioconda bioconductor-rtracklayer -y
 conda install -c conda-forge r-ggsci -y
 conda install -c conda-forge r-rjags -y
 conda install -c conda-forge r-compute.es -y
+conda install -c conda-forge plotly -y
 conda install -c bioconda r-pheatmap -y
+conda install -c bioconda gffread -y
 ```
 
 ### 2.2 What do you do if there are more missing packages
