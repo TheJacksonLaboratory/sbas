@@ -1,0 +1,217 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.4.1
+  kernelspec:
+    display_name: R
+    language: R
+    name: ir
+---
+
+# Nonsense-mediated decay in sex-biased alternative splicing
+
+
+This notebook uses **gencode.v30.annotation.gtf** and the associated genome assembly **GRCH30.p12.genome.fa** and the **fromGTF.SE.txt** file from the rMATS 3.2.5 experiment to generate a single output file **NMD_summary.txt**
+
+
+## 1. Library Dependencies
+
+```{r}
+suppressWarnings({suppressMessages({
+library(Biostrings)
+library(rtracklayer)
+})})
+```
+
+## 1.1 Obtain the appropriate genome assembly 
+
+The rMATS 3.2.5 experiment was done with gencode v.30.  Using this release obtain the proper fasta file for the genome.   
+
+ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/GRCh38.p12.genome.fa.gz
+
+```{r}
+if (!("GRCh38.p12.genome.fa.gz" %in% list.files("../data/"))) {
+    message("downloading genome assembly associated with the Gencode release 30 - GRCh38.p12.genome.fa.gzn")
+    system("wget -O ../data/GRCh38.p12.genome.fa.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/GRCh38.p12.genome.fa.gz")
+    message("Done!\n")
+    message("Unzipping compressed file GRCh38.p12.genome.fa.gz..")
+    system("gunzip ../data/GRCh38.p12.genome.fa.gz", intern = TRUE)
+    message("Done! GRCh38.p12.genome.fa can be found in ../data/")
+}
+fasta.file <- "../data/GRCh38.p12.genome.fa"
+```
+
+## 1.2 Obtain the gencode.v30.gtf file
+
+gencode.v30.annotation.gtf file was used for the rMATS 3.2.5 experiment.  
+
+```{r}
+#
+# add chr information for summary data later, use the annotation we used for rMATS
+#
+if (!("gencode.v30.annotation.gtf.gz" %in% list.files("../data/"))) {
+    message("downloading gencode v30 annotation\n")
+    system("wget -O ../data/gencode.v30.annotation.gtf.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
+    message("Done!\n")
+    message("Unzipping compressed file gencode.v30.annotation.gtf.gz..")
+    system("gunzip ../data/gencode.v30.annotation.gtf.gz", intern = TRUE)
+    message("Done! gencode.v30.annotation.gtf can be found in ../data/")
+}
+gencode <- rtracklayer::import("../data/gencode.v30.annotation.gtf")
+gtf.df <- as.data.frame (gencode)
+```
+
+```{r}
+head(gtf.df)
+```
+
+## 1.3 Import the rMATS 3.2.5 fromGTF definition file
+
+```{r}
+from.gtf <- read.table(file = "../data/fromGTF.SE.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
+```
+
+## 1.4 Create the matrix for the Nonsense mediated decay results
+
+```{r}
+res<-matrix(c(rep(0,nrow(from.gtf)),rep(0,nrow(from.gtf)),rep('',nrow(from.gtf))),ncol=3)
+colnames(res)<-c('num.nmd','num.transcripts','nmd.ids')
+```
+
+## 2.0 Main program to obtain the NMD_summary.txt
+
+```{r}
+finished=0
+
+message(" dim (gtf.df) before removing chrY ")
+dim(gtf.df)
+
+gtf.df <- gtf.df[gtf.df$seqnames != "chrY", ]
+message("dim (gtf.df) without chrY ")
+dim(gtf.df)
+
+#
+# for testing - look at a single chromosome
+#
+chr <- "chr17"
+# loop through one chromosome at a time through the fromGTF.SE.txt file from rMATS 3.2.5
+#for (chr in as.character(unique(from.gtf$chr))) {
+    message("looking at chr -> ", chr)
+      
+    cur.gtf <- gtf.df[gtf.df$seqnames == chr, ] 
+
+    for (exon.itr in ((1:nrow(from.gtf))[from.gtf$chr==chr])){
+ 
+        exon.rows <- which((cur.gtf$start == from.gtf$exonStart_0base[exon.itr]+1) & 
+                           (cur.gtf$end   == from.gtf$exonEnd        [exon.itr]) & 
+                            cur.gtf$type  == 'exon')
+
+        for (exon.row in 1:exon.rows) {
+            transcript.first.row<-max(which((cur.gtf$type=='transcript') & 
+                                            ((1:nrow(cur.gtf))<exon.row)  ))
+        
+            if (sum((cur.gtf$type %in% c('transcript','gene')) & 
+                    ((1:nrow(cur.gtf))>exon.row)) == 0) {
+                transcript.last.row<-nrow(cur.gtf)
+            } else {
+                transcript.last.row<-min(which((cur.gtf$type %in% c('transcript','gene')) & 
+                                               ((1:nrow(cur.gtf)) > exon.row)  ))
+            }
+            out.gtf<-cur.gtf[transcript.first.row:transcript.last.row,]
+            if (sum(c(sum((out.gtf$start == from.gtf$upstreamES  [exon.itr]+1) & 
+                           out.gtf$end   == from.gtf$upstreamEE  [exon.itr]) > 0, 
+                      sum((out.gtf$start == from.gtf$downstreamES[exon.itr]+1) & 
+                           out.gtf$end   == from.gtf$downstreamEE[exon.itr])>0))<2)
+                next
+            if (sum(out.gtf$type == 'CDS' ) < 3)
+                next       
+            write.table(out.gtf,"../data/transcript.gtf",sep='\t',col.names = FALSE,
+                        row.names = FALSE, quote = FALSE)
+        
+            command <- paste0('gffread transcript.gtf -g GRCh38.p12.genome.fa -y gene.fa')
+            system(paste('gffread -y ../data/gene.fa -g ',fasta.file,' ../data/transcript.gtf',sep=''))
+            system(command)       
+            seq<-readAAStringSet('../data/gene.fa')
+        
+            if (length(seq)==0)
+                next
+        
+            l.inc<-length(seq[[1]])
+        
+            out.gtf <- out.gtf [(out.gtf$start != (from.gtf$exonStart_0base[exon.itr]+1)) & 
+                                (out.gtf$end   != (from.gtf$exonEnd[exon.itr])),]
+        
+            write.table(out.gtf,"../data/transcript.gtf",sep='\t',col.names = FALSE,
+                        row.names = FALSE,quote = FALSE)
+        
+            command <- paste0('gffread transcript.gtf -g GRCh38.p12.genome.fa -y gene.fa')
+            system(paste('gffread -y gene.fa -g ',fasta.file,' ../data/transcript.gtf',sep=''))
+            system(command)       
+            seq<-readAAStringSet('../data/gene.fa')
+        
+            l.skip<-length(seq[[1]])
+        
+            skip.exon.aa.length <- (from.gtf$exonEnd[exon.itr] - (from.gtf$exonStart_0base[exon.itr]+1))/3
+        
+            res[exon.itr,2] <- as.integer(res[exon.itr,2])+1
+        
+            if (l.inc<(l.skip+skip.exon.aa.length-1)) {
+                res[exon.itr,1] <- as.integer(res[exon.itr,1])+1
+                res[exon.itr,3] <- paste(res[exon.itr,3],cur.gtf$gene_id,sep='***')
+            }
+            
+        } # end for (exon.row in exon.rows) 
+    } # end for (exon.itr in ((1:nrow(from.gtf))[from.gtf$chr==chr])){
+    
+    finished<-finished+sum(from.gtf$chr==chr)
+  
+    print(paste0("Finished: ",finished))
+  
+#} # for (chr in as.character(unique(from.gtf$chr))) 
+```
+
+```{r}
+?which
+
+```
+
+## 3.0 write out **NMD_summary.txt**
+
+```{r}
+write.table(res,"../data/NMD_summary.txt",sep='\t',row.names = TRUE,col.names = TRUE,quote = FALSE)
+```
+
+## Appendix - Metadata
+
+For replicability and reproducibility purposes, we also print the following metadata:
+
+1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+2. List of environment metadata, dependencies, versions of libraries using `conda list`
+
+
+### Appendix - 1. Checksums with the sha256 algorithm
+
+```{r}
+notebook_id = "nonsenseMediatedDecay"
+os.system("echo true")
+
+print("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
+os.system(f"cd ../data/ && sha256sum NMD_summary.txt > ../metadata/{notebook_id}_sha256sums.txt")
+print("Done!\n")
+
+pd.read_csv(f"../metadata/{notebook_id}_sha256sums.txt")
+```
+
+### 2. Libraries metadata
+
+```{r}
+notebook_id = "nonsenseMediatedDecay"
+
+print(f"Saving `conda list` packages in ../metadata/{notebook_id}_conda_list.txt  ..")
+os.system(f"conda list > ../metadata/{notebook_id}_conda_list.txt")
+print("Done!\n")
+```
