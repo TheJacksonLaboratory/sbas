@@ -43,10 +43,10 @@ Which looks like this in my window on Peters notebook.
 #### 1.2.2 DGE_splicing_data.tar.gz
 
 ```bash
-tar xvzf ../mounted_data/{long hashed key}DGE_splicing_data.tar.gz{more hashed data} -C data
+tar xvzf ../mounted_data/{long hashed key}rmats_and_annotation.tar.gz{more hashed data} -C data
 ```
 
-![tar xvzf DGE_splicing_data.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/unpackingFilesFromMountedDirectory.png)
+![tar xvzf rmats_and_annotation.tar.gz](https://github.com/TheJacksonLaboratory/sbas/blob/master/assets/unpackingFilesFromMountedDirectory.png)
 
 ## 2 Preparing your jupyter notebook
 
