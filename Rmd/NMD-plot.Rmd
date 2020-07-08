@@ -40,72 +40,77 @@ To run this script, we need to import three compressed files and unpack them.
 |------|------  |-----------|
 |  1   | b0c4bb23b96d77aba7e731fa2a15dc74a34daf490312478aca94443f9a6d4e90 | results/data_as_dge.tar.gz |
 |  2   | a0c2c5a7d7cfa0a89c8a39e2f7a4c6c3ac8c6a860f721077c087614505d869cf | rmats_and_annotation.tar.gz |
-|  3   | 005d6096bff744ca6aaf41e58a7cef57dce7d8763a523856a4c50fe19a452471 | NMD_summary.txt.gz |
+
+The NMD_summary.txt file is found in "../assets/"
 
 ```{r}
 data_as_dge_file_dir <- list.files("../../mounted-data", pattern='data_as_dge.tar.gz')
 data_as_dge_file_dir
 rmats_and_annotation_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
 rmats_and_annotation_dir
-NMD_summary_dir <- list.files("../../mounted-data", pattern='NMD_summary.txt.gz')
-rmats_and_annotation_dir
+NMD_summary_dir <- list.files("../assets", pattern='NMD_summary.txt')
+NMD_summary_dir
 ```
-
-```{r}
-data_as_dge_file_dir <- list.files("../../mounted-data", pattern='data_as_dge.tar.gz')
-data_as_dge_file <- paste("../../mounted-data", data_as_dge_file_dir, 'robinson-bucket/notebooks/data_as_dge', sep='/')
-data_as_dge_file_tar_gz <- paste(data_as_dge_file, '.tar.gz', sep='')
-message("In order to unpack the necessary files, execute the following commands on the shell.")
-message("data_as_dge.tar.gz")
-mycommand = paste("tar xvfz ",data_as_dge_file_tar_gz, "-C ../data", sep=" ")
-message(mycommand)
-system(mycommand)
-message("checking sha256sum")
-mycommand = paste("sha256sum", data_as_dge_file_tar_gz, sep = " ")
-message(mycommand)
-system(mycommand)
-rmats_annot_file_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
-rmats_annot_file <- paste("../../mounted-data", rmats_annot_file_dir, 'robinson-bucket/notebooks/rmats_and_annotation', sep='/')
-rmats_annot_file_tar_gz <- paste(rmats_annot_file, '.tar.gz', sep='')
-message("In order to unpack the necessary files, execute the following commands on the shell.")
-message("rmats_and_annotation.tar.gz")
-mycommand = paste("tar xvfz ",rmats_annot_file_tar_gz, "-C ../data", sep=" ")
-message(mycommand)
-system(mycommand)
-message("checking sha256sum")
-mycommand = paste("sha256sum", rmats_annot_file_tar_gz, sep = " ")
-message(mycommand)
-system(mycommand)
-NMD_summary_dir <- list.files("../../mounted-data", pattern='NMD_summary.txt.gz')
-NMD_summary_file <- paste("../../mounted-data", NMD_summary_dir, 'robinson-bucket/notebooks/NMD_summary.txt', sep='/')
-NMD_summary_file_gz <- paste(NMD_summary_file, '.gz', sep='')
-message("In order to unpack the necessary files, execute the following commands on the shell.")
-message("NMD_summary_file_gz")
-mycommand = paste("gunzip ",NMD_summary_file_gz, "-C ../data", sep=" ")
-message(mycommand)
-system(mycommand)
-message("checking sha256sum")
-mycommand = paste("sha256sum", NMD_summary_file_gz, sep = " ")
-message(mycommand)
-system(mycommand)
-```
-
-## 2.0 preprocessing
 
 ```{r}
 dataDir <- "../data/"
 
 metadata.file.name    = paste0(dataDir, "srr_pdata.csv")
-file.exists(metadata.file.name)
-
-inc.counts.file.name  = paste0(dataDir, "rmats_final.se.jc.ijc.txt.gz")
-file.exists(inc.counts.file.name)
+if (!(file.exists(metadata.file.name))) {
+    data_as_dge_file_dir <- list.files("../../mounted-data", pattern='data_as_dge.tar.gz')
+    data_as_dge_file <- paste("../../mounted-data", data_as_dge_file_dir, 'robinson-bucket/notebooks/data_as_dge', sep='/')
+    data_as_dge_file_tar_gz <- paste(data_as_dge_file, '.tar.gz', sep='')
+    message("In order to unpack the necessary files, execute the following commands on the shell.")
+    message("data_as_dge.tar.gz")
+    mycommand = paste("tar xvfz ",data_as_dge_file_tar_gz, "-C ../data", sep=" ")
+    message(mycommand)
+    system(mycommand)
+    message("checking sha256sum")
+    mycommand = paste("sha256sum", data_as_dge_file_tar_gz, sep = " ")
+    message(mycommand)
+    system(mycommand)
+}
 
 skip.counts.file.name <- paste0(dataDir, "rmats_final.se.jc.sjc.txt.gz")
-file.exists(skip.counts.file.name)
+inc.counts.file.name  = paste0(dataDir, "rmats_final.se.jc.ijc.txt.gz")
+if (!(file.exists(inc.counts.file.name)) | !(file.exists(skip.counts.file.name))) {
+    rmats_annot_file_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
+    rmats_annot_file <- paste("../../mounted-data", rmats_annot_file_dir, 'robinson-bucket/notebooks/rmats_and_annotation', sep='/')
+    rmats_annot_file_tar_gz <- paste(rmats_annot_file, '.tar.gz', sep='')
+    message("In order to unpack the necessary files, execute the following commands on the shell.")
+    message("rmats_and_annotation.tar.gz")
+    mycommand = paste("tar xvfz ",rmats_annot_file_tar_gz, "-C ../data", sep=" ")
+    message(mycommand)
+    system(mycommand)
+    message("checking sha256sum")
+    mycommand = paste("sha256sum", rmats_annot_file_tar_gz, sep = " ")
+    message(mycommand)
+    system(mycommand)
+}
+
+
+nmd.tab.file <- paste0("../assets/", "NMD_summary.txt")
+if (!(file.exists(nmd.tab.file))) {
+    message("checking sha256sum")
+    mycommand = paste("sha256sum", "../data/NMD_summary.txt", sep = " ")
+    message(mycommand)
+    system(mycommand)
+    NMD_summary_dir <- list.files("../../mounted-data", pattern='NMD_summary.txt.gz')
+    NMD_summary_file <- paste("../../mounted-data", NMD_summary_dir, 'robinson-bucket/notebooks/NMD_summary.txt', sep='/')
+    NMD_summary_file_gz <- paste(NMD_summary_file, '.gz', sep='')
+    message("In order to unpack the necessary files, execute the following commands on the shell.")
+    message("NMD_summary_file_gz")
+    mycommand = paste("gunzip ",NMD_summary_file_gz, " ../data", sep=" ")
+    message(mycommand)
+    system(mycommand)    
+}
+
 ```
 
-```{r jupyter={'source_hidden': True}}
+## 2.0 preprocessing or read in the files
+
+
+```{r}
 meta.data = readr::read_csv(metadata.file.name)
 dim(meta.data)
 
@@ -115,7 +120,9 @@ dim(inc.counts)
 skip.counts  = as.data.frame(data.table::fread(skip.counts.file.name))
 dim(skip.counts)
 
-nmd.tab = read.table('data/NMD_summary.txt',sep='\t')
+nmd.tab.file
+nmd.tab <- read.table(nmd.tab.file, header=TRUE, sep = "\t")
+head(nmd.tab, 24)
 ```
 
 ## 3.0 make figure
@@ -153,6 +160,8 @@ for (tissue in unique(snakecase::to_snake_case(meta.data$SMTSD)))
     annotate("text", x=1.5, y=10, label= paste0("p-value: ",round(pval,-log10(pval)+3))) 
 
     plot(p) 
+    nmd_plot_name <- paste0(paste0("../pdf/NMD_plot_",tissue),".pdf")
+    ggsave(file = nmd_plot_name, plot = p)
 }
     
     
@@ -174,11 +183,6 @@ For replicability and reproducibility purposes, we also print the following meta
 ```{r}
 notebook_id   = "NMD-plot"
 
-message("Generating sha256 checksums of the artefacts in the `..data/` directory .. ")
-system(paste0("cd ../data/ && sha256sum * > ../metadata/", notebook_id, "_sha256sums.txt"), intern = TRUE)
-message("Done!\n")
-
-data.table::fread(paste0("../metadata/", notebook_id, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
 ```
 
 ### Appendix 2. Library Metadata
@@ -197,4 +201,8 @@ message("Done!\n")
 
 dev_session_info$platform
 dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
+```
+
+```{r}
+
 ```
