@@ -1,9 +1,8 @@
-﻿# Getting set up fast on the Robinson-Lab Jupyter Lab notebook.
+# Setting up the CloudOS environment to run the SBAS scripts
 
 ## 1 Cloning the repository
 
-You should begin by git cloning the repository
-At the launcher page
+Begin by cloning the repository at the launcher page.
 
 ### 1.1 Start a terminal
 
@@ -13,7 +12,7 @@ From the Launcher Page select Terminal
 
 ### 1.1 Clone the repository
 
-Within the terminal window, git clone the Robinson Lab sbas repository
+Within the terminal window, git clone the sbas repository:
 
 ```bash
 git clone https://github.com/TheJacksonLaboratory/sbas.git
@@ -71,7 +70,6 @@ conda install -c conda-forge r-pheatmap -y
 conda install -c bioconda bioconductor-limma -y
 conda install -c bioconda bioconductor-edger -y
 conda install -c bioconda bioconductor-multtest -y
-conda install -c conda-forge r-r.utils -y
 conda install -c bioconda bioconductor-rtracklayer -y
 conda install -c conda-forge r-ggsci -y
 conda install -c conda-forge r-rjags -y
@@ -82,21 +80,9 @@ conda install -c bioconda gffread -y
 conda install -c bioconda bioconductor-biostrings -y
 ```
 
-### 2.2 What do you do if there are more missing packages
-
-Refer to the documentation to go further with Christina’s gitbook.
-
-https://lifebit.gitbook.io/cloudos/web-interface/jupyter-lab#how-can-i-install-the-dependencies-i-need-in-the-notebook-session
-
 ## 3 Opening your notebook and unpacking the data files.
 
-It is worthwhile that everyone run this notebook `countGenesAndEvents.ipynb` first as it will unpack the tarred files and show you the code that can read them in.  For any figure work you can use this as a template to create your work.
-
-Now to test that all is well start with this notebook.
-
-`countGenesAndEvents.ipynb`
-
-Running this notebook will give some of the required downstream files for the subsequent notebooks.
+To run the notebooks, first run the notebook `countGenesAndEvents.ipynb`, as it will unpack the tarred files and write a few summary files to ``data`` that are required by other notebooks.
 
 ### 3.1 Click Folder Icon
 
