@@ -43,10 +43,15 @@ The remaining notebooks can be run in any order. Most of the notebooks generate 
 
 
 * [expressionHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/expressionHeatplot.ipynb). Generate a heatplot representing expression across tissues.
+* [totalDGEByTissue.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/totalDGEByTissue.ipynb). Generate a plot representing counts of expression eventsacross tissues.
 * [alternativeSplicingHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/alternativeSplicingHeatplot.ipynb). Generate a heatplot representing alternative splicing across tissues.
+* [totalAlternativeSplicingByTissue.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/totalAlternativeSplicingByTissue.ipynb). Generate a plot representing counts of alternative splicing across tissues.
 * [XchromosomalEscapePlot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/XchromosomalEscapePlot.ipynb). Investigate the overlap of alternative splicing and genes on the X chromosome that escape inactivation.
 * [splicingIndex.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/splicingIndex.ipynb). Calculate the splicing index for each chromosome.
 * [spliceTypeByChromosome.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/spliceTypeByChromosome.ipynb). Calculate the distribution of the 5 types of alternative splicing event analyzed in this manuscript for each chromosome.
 * [altSplicing_events_per_gene.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/altSplicing_events_per_gene.ipynb). Create a plot showing genes that display alternative splicing in many tissues.
+* [tissue_piechart.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/tissue_piechart.ipynb). Create a piechart showing distribution of genes according to number of tissues showing differential alternative splicing.
+
+
 
 
