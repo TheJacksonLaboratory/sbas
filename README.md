@@ -47,6 +47,6 @@ The remaining notebooks can be run in any order. Most of the notebooks generate 
 * [XchromosomalEscapePlot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/XchromosomalEscapePlot.ipynb). Investigate the overlap of alternative splicing and genes on the X chromosome that escape inactivation.
 * [splicingIndex.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/splicingIndex.ipynb). Calculate the splicing index for each chromosome.
 * [spliceTypeByChromosome.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/spliceTypeByChromosome.ipynb). Calculate the distribution of the 5 types of alternative splicing event analyzed in this manuscript for each chromosome.
-
+* [altSplicing_events_per_gene.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/altSplicing_events_per_gene.ipynb). Create a plot showing genes that display alternative splicing in many tissues.
 
 
