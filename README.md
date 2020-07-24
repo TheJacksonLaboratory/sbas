@@ -30,25 +30,23 @@ setup scripts.
 ### 3.1 Summarizing events
 
 Most of the notebooks require that the raw rMATS files are first processed to generate summary files. This is done by the notebook
-[countGenesAndEvents.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/countGenesAndEvents.ipynb). Additionally, two notebooks are used to
+[countGenesAndEvents.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/countGenesAndEvents.ipynb). Additionally, two notebooks are used to
 perform DGE and DAS analysis. These three notebooks should be run first.
 
 
 
-1. [differentialGeneExpressionAnalysis.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/differentialGeneExpressionAnalysis.ipynb). Perform differential gene analysis with voom.
-2. [differentialSplicingJunctionAnalysis.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/differentialSplicingJunctionAnalysis.ipynb). Regression analysis to characterize sex-biased alternative splicing events.
-3. [countGenesAndEvents.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/countGenesAndEvents.ipynb). Set up the overall analysis. Write various files to the ``data`` subdirectory that will be used by other scripts.
+1. [differentialGeneExpressionAnalysis.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/differentialGeneExpressionAnalysis.ipynb). Perform differential gene analysis with voom.
+2. [differentialSplicingJunctionAnalysis.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/differentialSplicingJunctionAnalysis.ipynb). Regression analysis to characterize sex-biased alternative splicing events.
+3. [countGenesAndEvents.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/countGenesAndEvents.ipynb). Set up the overall analysis. Write various files to the ``data`` subdirectory that will be used by other scripts.
 
 The remaining notebooks can be run in any order. Most of the notebooks generate a Figure or a Table or a result that is described in the manuscript.
 
 
-* [expressionHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/expressionHeatplot.ipynb). Generate a heatplot representing expression across tissues.
-* [alternativeSplicingHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/alternativeSplicingHeatplot.ipynb). Generate a heatplot representing alternative splicing across tissues.
-
-
-
-* [XchromosomalEscapePlot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/XchromosomalEscapePlot.ipynb). Investigate the overlap of alternative splicing and genes on the X chromosome that escape inactivation.
-* [splicingIndex.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/splicingIndex.ipynb). Calculate the splicing index for each chromosome.
+* [expressionHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/expressionHeatplot.ipynb). Generate a heatplot representing expression across tissues.
+* [alternativeSplicingHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/alternativeSplicingHeatplot.ipynb). Generate a heatplot representing alternative splicing across tissues.
+* [XchromosomalEscapePlot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/XchromosomalEscapePlot.ipynb). Investigate the overlap of alternative splicing and genes on the X chromosome that escape inactivation.
+* [splicingIndex.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/splicingIndex.ipynb). Calculate the splicing index for each chromosome.
+* [spliceTypeByChromosome.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/spliceTypeByChromosome.ipynb). Calculate the distribution of the 5 types of alternative splicing event analyzed in this manuscript for each chromosome.
 
 
 
