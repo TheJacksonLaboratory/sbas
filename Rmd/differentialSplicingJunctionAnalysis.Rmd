@@ -5,7 +5,7 @@ jupyter:
       extension: .Rmd
       format_name: rmarkdown
       format_version: '1.2'
-      jupytext_version: 1.4.1
+      jupytext_version: 1.4.2
   kernelspec:
     display_name: R
     language: R
@@ -55,10 +55,10 @@ library(R.utils)
 library(snakecase)
 ```
 
-## 1.1 Nextflow execution parameter execution
-
-Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
 ```{r}
+# ## 1.1 Nextflow execution parameter execution
+#
+# Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
 # parameters for nextflow execution of notebook
 tissue_index = 17
 ```
@@ -83,8 +83,8 @@ getReleasedGTFAnnotations <- function ( destDir ) {
     message("Done!\n")
    return (0)
 }
-
 ```
+
 ## 1.2.3 Read in SraRunData metadata 
 
 - `Sequence Read Archive (SRA)` Accession Data, `SRR` numbers, this is used to map the SRR accession numbers to the sample information (SAMPID) which will be used to obtain the phenotype information.
@@ -152,8 +152,8 @@ inspectAndCorrectExpressionSetObject <- function ( es ) {
 
    return(es)
 }
-
 ```
+
 ```{r}
 renewGTExExpressionSet <- function ( destDir ) {
   if (!("gtex.rds" %in% list.files(destDir))) {
@@ -207,20 +207,18 @@ getTissueReduction <- function ( filename ) {
 
     return(tissue_reduction)
 }
-```
-### 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
-
-Matching SraRunTable, Sequence Read Archive Sequence Run accession number, SRR to the sample, SAMPID, that will be used to match the SRR to the samples phenotype information to make the phenotype data portion of the expressionSet object.
-
-counts data supplies the SRR through the column
-Metadata from the SraRunTable.txt file matches the SRR to the SAMPID
-Phenotype data retrieved from the GTEx gene ExpressionSet data object for that SAMPID
-
-SRR -> SAMPID -> Phenotype Data
-
-This routine takes a while to run, could be improved by changing it to a lapply function.
-Luckily, this needs only to be run once for all 10 matrices since the ijc, sjc counts were done on the same samples and defined alternative splicing events.
-```{r}
+# ### 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
+#
+# Matching SraRunTable, Sequence Read Archive Sequence Run accession number, SRR to the sample, SAMPID, that will be used to match the SRR to the samples phenotype information to make the phenotype data portion of the expressionSet object.
+#
+# counts data supplies the SRR through the column
+# Metadata from the SraRunTable.txt file matches the SRR to the SAMPID
+# Phenotype data retrieved from the GTEx gene ExpressionSet data object for that SAMPID
+#
+# SRR -> SAMPID -> Phenotype Data
+#
+# This routine takes a while to run, could be improved by changing it to a lapply function.
+# Luckily, this needs only to be run once for all 10 matrices since the ijc, sjc counts were done on the same samples and defined alternative splicing events.
 makePData <- function (counts_srr, gtexPhenoDataObj, srr_metadata) {
     started = FALSE
     srr_missing = FALSE
@@ -300,10 +298,10 @@ getGTExPhenoDataForSRR <- function (destDir) {
 
     return(srr_pdata)
 }
+# ### 1.2.9 makeCountsMatrix 
+#
+# Given the counts filename, make a data matrix.
 ```
-### 1.2.9 makeCountsMatrix 
-
-Given the counts filename, make a data matrix.
 
 ```{r}
 makeCountsMatrix <- function (filename_gz) {
@@ -376,8 +374,8 @@ getDGEResults <- function ( destDir ) {
 
    return (0)
 }
-
 ```
+
 
 ## 1.3 Preprocessing 
 
@@ -436,10 +434,10 @@ reduceSampleSet <- function (tissue_reduction, es) {
    # end test
    return (es)
 }
+# ### 1.3.2 Eliminate ChrY fromGTF
+#
+# We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
 ```
-### 1.3.2 Eliminate ChrY fromGTF
-
-We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
 
 ```{r}
 eliminateChrYfromGTF <- function ( fromGTF ) {
@@ -449,11 +447,11 @@ eliminateChrYfromGTF <- function ( fromGTF ) {
    rownames(fromGTF) <- fromGTF$ID
    return(fromGTF)
 }
+# ### 1.3.3 Eliminate ChrY from expressionSet Object
+#
+# We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
+# This time from the expressionSet Object
 ```
-### 1.3.3 Eliminate ChrY from expressionSet Object
-
-We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
-This time from the expressionSet Object
 
 ```{r}
 eliminateChrYfromExpressionSet <- function ( fromGTF, es ) {
@@ -658,20 +656,41 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     #
     # ensure the matrices do not have too many zeros
     #
-    ijc.rs <- rowSums(exprs(ijc)) 
-    keep.ijc.rs <- (ijc.rs > 10)
-    sjc.rs <- rowSums(exprs(sjc)) 
-    keep.sjc.rs <- (sjc.rs > 10)
-    keep <- keep.ijc.rs | keep.sjc.rs
-    message("\nijc.rs > 10 \n", 
-        paste(table(keep.ijc.rs), collapse = " ") )                    
-    message("\nsjc.rs > 10 \n", 
-        paste(table(keep.sjc.rs), collapse = " ") )
-    message("\nkeep combined ijc | sjc \n", 
-        paste(table(keep), collapse = " ") )                    
     
-    ijc <- ijc[keep==TRUE,]
-    sjc <- sjc[keep==TRUE,]
+    count_threshold = min(table(pData(ijc)$SEX))*0.25
+    message("count_threshold\n",
+           count_threshold)
+    message("table(pData(ijc)$SEX)\n",
+           table(pData(ijc)$SEX))
+    
+    male.sjc.rs = rowSums(cpm(exprs(sjc[,pData(ijc)$SEX==1]))>=1)
+    
+    male.ijc.rs = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==1]))>=1)
+    
+    female.sjc.rs = rowSums(cpm(exprs(sjc[,pData(ijc)$SEX==2]))>=1)
+    
+    female.ijc.rs = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==2]))>=1)
+    
+    keep= (male.sjc.rs>=count_threshold)  & (male.ijc.rs>=count_threshold) & (female.sjc.rs>=count_threshold) & (female.ijc.rs>=count_threshold)
+    
+    #keep events with only skip reads for male and inclusion for female and vice versa
+    table(keep)
+    sex_specific_junctions_filename         = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_specific_junctions.csv')
+
+    keep2= !keep & ((male.sjc.rs>=count_threshold & female.ijc.rs>=count_threshold) | (male.ijc.rs>=count_threshold & female.sjc.rs>=count_threshold))
+    
+    write.table(rownames(sjc)[keep2], file = sex_specific_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+    
+    
+    ijc <- ijc[keep2==TRUE,]
+    sjc <- sjc[keep2==TRUE,]
+    message("dim pData(ijc)\n",
+           paste(dim(pData(ijc))), collapse = " ")
+    message("dim exprs(es)\n",
+           paste(dim(exprs(es))), collapse = " ")
+    message("done!\n")
     message("\ndim(ijc)\n", 
         paste(dim(ijc), collapse = " ") )                    
     message("\ndim(sjc)\n", 
@@ -896,7 +915,6 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
 ### 3 Execution of All Tissues and All Splicing Variants
 
 Additional values set to enable this notebook to be executed as a nextflow workflow or to run in place with appropriate settings.
-
 ### 3.1 parameters Setting
 
 1. Setting `dup=TRUE` causes lengthy execution times.
@@ -925,15 +943,13 @@ Additional values set to enable this notebook to be executed as a nextflow workf
 # 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
 #
 getReleasedGTFAnnotations (destDir <- "../data/")
-
 ```
+
 ```{r}
 #
 # 1.2.3 get SRR Accession Metadata (available through dbGaP)
 #
 srr_metadata <- getSraRunData (destDir <- "../data/")
-```
-```{r}
 #
 # 1.2.4 Renew GTEx expression object
 # OPTIONAL and TIME CONSUMINGrenewGTExPhenoDataObj - set this to FALSE by default
@@ -942,8 +958,6 @@ renewGTExPhenoDataObj=FALSE
 if (renewGTExPhenoDataObj) {
   gtexPhenoObj <- renewGTExExpressionSet(destDir <- "../data/")
 } 
-```
-```{r}
 #
 # 1.2.5 get corrected GTEx expression Set Data
 # Released in previous runs the corrected GTEx expression Set Object, grab from the release
@@ -951,14 +965,10 @@ if (renewGTExPhenoDataObj) {
 if (!renewGTExPhenoDataObj) {
    gtexPhenoDataObj <- getGTExCorrectedRDS (destDir <- "../data/")
 }
-```
-```{r}
 #
 # 1.2.6 get reduced Tissue data
 #
 tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
-```
-```{r}
 #
 # 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
 # Any counts matrix will do...
@@ -995,7 +1005,7 @@ getDGEResults("../data/")
 # splice_list <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 #
 plot         <- TRUE
-dup          <- FALSE
+dup          <- TRUE
 splice_list  <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
@@ -1154,7 +1164,185 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
  
     } # for se
 #}  # for all tissues
+# ## Testing
 ```
+
+```{r}
+### testing ###
+ plot         <- TRUE
+dup          <- TRUE
+splice_list  <- c("a3ss_","a5ss_","mxe_","ri_","se_")
+tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
+tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
+write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.names=TRUE, col.names=FALSE)
+   splice_type = "a3ss_"
+    res = splice_list %in% splice_type
+    tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
+
+    if (sum(res) == 1) {
+        message ("splice_list does contain\n",
+             paste(splice_type), " continuing with processing\n")
+        fromGTF    <- read.table("../data/fromGTF.A3SS.txt", header=TRUE)
+        fromGTF    <- eliminateChrYfromGTF (fromGTF)
+        ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a3ss.jc.ijc.txt.gz")
+        ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
+        ijc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- ijc)
+        ijc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- ijc)
+        sjc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a3ss.jc.sjc.txt.gz")
+        sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
+        sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
+        sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
+}
+
+
+    pdf_sub_directory = '../pdf/'
+    csv_sub_directory = '../data/'
+
+    fromGTF           <- fromGTF
+    tissue_true       <- tissue_list == tissue_of_interest
+
+    message("\nLimiting phenotype data to tissue of interest\n",
+           paste(tissue_of_interest),collapse=" ")    
+    keep = pData(ijc)$SMTSD== tissue_of_interest
+    message("\nkeep\n",
+           paste(table(keep)),collapse=" ")
+       
+    ijc <- ijc[,keep==TRUE]
+    sjc <- sjc[,keep==TRUE]
+
+    message("\ndimensions of the pData ijc_tissue \n", 
+        paste(  dim(pData(ijc)), collapse = " ") )
+    message("\ndimensions of the pData sjc_tissue \n", 
+        paste(  dim(pData(sjc)), collapse = " ") )
+
+    message("\ndimensions of the pData ijc_tissue \n", 
+        paste(  dim(exprs(ijc)), collapse = " ") )
+    message("\ndimensions of the pData sjc_tissue \n", 
+        paste(  dim(exprs(sjc)), collapse = " ") )
+
+    #
+    #  We need to filter low CPM.  This is done ins a similar manner as is done with
+    #  genes in an RNA-seq experements.  But rather than ignoring genes, we will ignore
+    #  the junctions that do not show significant
+    #  levels of expression, this filtering is dependent on two criteria:
+    #     1. Minimum CPM: This is the counts per million that a gene must have in at
+    #        least some specified number of samples.
+    #     2. Minumum Samples: This is the number of samples in which the CPM requirement
+    #        must be met in order for that junction (rows) to be acknowledged
+    # 
+    # Implemented here, the minimum samples must have least at least a greater than 1/4 the size of the
+    # smallest sample set between male and female.
+    #
+    minimum_sample_size = min(table(pData(ijc)$SEX))*0.25
+    message("minimum_sample_size\n",
+           minimum_sample_size)
+
+    #
+    # now using the expression object function, we get the number of samples
+    # in each set that have expression counts (normalized as counts per million) greater than 1
+    # for each gender set and for each count matrices (sjc and ijc).  Otherwise we will
+    # ignore the associated junction.
+    #
+    male.ijc.num_of_samples_gt_1 = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==1]))>=1)
+    male.sjc.num_of_samples_gt_1 = rowSums(cpm(exprs(sjc[,pData(sjc)$SEX==1]))>=1)
+    
+    female.ijc.num_of_samples_gt_1 = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==2]))>=1)
+    female.sjc.num_of_samples_gt_1 = rowSums(cpm(exprs(sjc[,pData(sjc)$SEX==2]))>=1)
+
+    #
+    # we keep only junctions for each sex, that have either a minimum number of samples in
+    # either the sjc or ijc counts)
+    #
+    keep.male.ijc   = (  male.ijc.num_of_samples_gt_1 >= count_threshold)
+    keep.male.sjc   = (  male.sjc.num_of_samples_gt_1 >= count_threshold)
+    keep.female.ijc = (female.ijc.num_of_samples_gt_1 >= count_threshold)
+    keep.female.sjc = (female.sjc.num_of_samples_gt_1 >= count_threshold)
+
+    keep.male   <- keep.male.ijc | keep.male.sjc
+    keep.female <- keep.female.ijc | keep.female.sjc
+    #
+    # and we keep only those junctions that have at least a minimum in each gender
+    #
+    keep  <- keep.male & keep.female
+
+    #
+    # save the junctions that will be used for analysis
+    #
+    sex_specific_ijc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+							   '_AS_model_B_sex_specific_ijc_junctions.csv')
+    sex_specific_sjc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+							   '_AS_model_B_sex_specific_sjc_junctions.csv')
+
+
+    write.table(rownames(ijc)[keep], file = sex_specific_ijc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+    
+    write.table(rownames(sjc)[keep], file = sex_specific_sjc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+    
+    ijc <- ijc[keep==TRUE,]
+    sjc <- sjc[keep==TRUE,]
+    
+    message("dim pData(ijc)\n",
+           paste(dim(pData(ijc))), collapse = " ")
+    message("dim exprs(es)\n",
+           paste(dim(exprs(es))), collapse = " ")
+    message("done!\n")
+    message("\ndim(ijc)\n", 
+        paste(dim(ijc), collapse = " ") )                    
+    message("\ndim(sjc)\n", 
+        paste(dim(sjc), collapse = " ") )
+    message("removing DGE Genes prior to making one of the y linear model")
+    ijc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
+    sjc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- sjc)
+
+    # use ijc expressionSet  for the phenotype data
+    count_desc = "ijc_wo_DGE_"
+    execute_model_A(counts_expr_set    = ijc_wo_DGE, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
+
+    count_desc = "ijc_"
+    execute_model_A(counts_expr_set    = ijc, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
+    
+    count_desc = "sjc_wo_DGE_"
+    execute_model_A(counts_expr_set    = sjc_wo_DGE, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
+
+    count_desc = "sjc_"
+    execute_model_A(counts_expr_set    = sjc, 
+                    pData_expr_set     = ijc, 
+                    tissue_of_interest = tissue_of_interest, 
+                    fromGTF            = fromGTF,
+                    pdf_sub_directory  = pdf_sub_directory,
+                    csv_sub_directory  = csv_sub_directory,
+                    count_desc         = count_desc) 
+    
+    message("Executing model B \n")
+    sample_names <- as.character(pData(ijc)$SAMPID)
+    # we will add donor as a blocking parameter
+    # rather than sample name -- we should use donor for real
+    sample     <- factor(sample_names)
+```
+
+
 ### Appendix - Metadata
 
 For replicability and reproducibility purposes, we also print the following metadata:
@@ -1196,7 +1384,7 @@ message("Done!\n")
 dev_session_info$platform
 dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
 ```
-
 ```{r}
 
 ```
+
