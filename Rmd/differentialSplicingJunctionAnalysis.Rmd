@@ -45,6 +45,7 @@ For our analysis here, we used just the jc count matrices.
 ## 1. Loading dependencies
 
 ```{r}
+suppressMessages({
 library(readr)
 library(edgeR)
 library(limma)
@@ -53,6 +54,7 @@ library(Biobase)
 library(tibble)
 library(R.utils)
 library(snakecase)
+})
 ```
 
 ```{r}
@@ -648,53 +650,135 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     ijc <- ijc[,keep==TRUE]
     sjc <- sjc[,keep==TRUE]
 
-    message("\ndimensions of the ijc_tissue \n", 
-        paste(  dim(ijc), collapse = " ") )
-    message("\ndimensions of the sjc_tissue \n", 
-        paste(  dim(sjc), collapse = " ") )
+    message("\ndimensions of the pData ijc_tissue \n", 
+        paste(  dim(pData(ijc)), collapse = " ") )
+    message("\ndimensions of the pData sjc_tissue \n", 
+        paste(  dim(pData(sjc)), collapse = " ") )
+
+    message("\ndimensions of the pData ijc_tissue \n", 
+        paste(  dim(exprs(ijc)), collapse = " ") )
+    message("\ndimensions of the pData sjc_tissue \n", 
+        paste(  dim(exprs(sjc)), collapse = " ") )
 
     #
-    # ensure the matrices do not have too many zeros
+    #  We need to filter low CPM.  This is done ins a similar manner as is done with
+    #  genes in an RNA-seq experements.  But rather than ignoring genes, we will ignore
+    #  the junctions that do not show significant
+    #  levels of expression, this filtering is dependent on two criteria:
+    #     1. Minimum CPM: This is the counts per million that a gene must have in at
+    #        least some specified number of samples.
+    #     2. Minumum Samples: This is the number of samples in which the CPM requirement
+    #        must be met in order for that junction (rows) to be acknowledged
+    # 
+    # Implemented here, the minimum samples must have least at least a greater than 1/4 the size of the
+    # smallest sample set between male and female.
     #
-    
-    count_threshold = min(table(pData(ijc)$SEX))*0.25
-    message("count_threshold\n",
-           count_threshold)
-    message("table(pData(ijc)$SEX)\n",
-           table(pData(ijc)$SEX))
-    
-    male.sjc.rs = rowSums(cpm(exprs(sjc[,pData(ijc)$SEX==1]))>=1)
-    
-    male.ijc.rs = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==1]))>=1)
-    
-    female.sjc.rs = rowSums(cpm(exprs(sjc[,pData(ijc)$SEX==2]))>=1)
-    
-    female.ijc.rs = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==2]))>=1)
-    
-    keep= (male.sjc.rs>=count_threshold)  & (male.ijc.rs>=count_threshold) & (female.sjc.rs>=count_threshold) & (female.ijc.rs>=count_threshold)
-    
-    #keep events with only skip reads for male and inclusion for female and vice versa
-    table(keep)
-    sex_specific_junctions_filename         = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                   snakecase::to_snake_case(tissue_of_interest)),'_AS_model_B_sex_specific_junctions.csv')
+    minimum_sample_size = round(min(table(pData(ijc)$SEX))*0.25)
+    message("minimum_sample_size\n",
+           minimum_sample_size)
 
-    keep2= !keep & ((male.sjc.rs>=count_threshold & female.ijc.rs>=count_threshold) | (male.ijc.rs>=count_threshold & female.sjc.rs>=count_threshold))
-    
-    write.table(rownames(sjc)[keep2], file = sex_specific_junctions_filename, 
+    #
+    # Using the expression object function, we get the number of samples
+    # in each set that have expression counts (normalized as counts per million) greater than 1
+    # for each gender set.
+    # Specificly for each sample, either ijc or sjc will need to meet the requirement.
+    # Otherwise, we will not keep the associated junction.
+    #
+    keep_sampl = rep(TRUE,length(pData(ijc)$SAMPID))
+    message("length samples\n",
+             length(keep_sampl)
+
+    #
+    # number of junctions is given in the first dimension of exprs(ijc) matrix
+    #
+    male_junction_samp_ct   <- as.vector(rep(0,dim(exprs(ijc))[1]))
+    female_junction_samp_ct <- as.vector(rep(0,dim(exprs(ijc))[1]))
+    #
+    # for each sample, male or female, do we keep the junction based upon ijc or sjc counts?
+    #
+    #
+    #   only one example, 'GTEX.X4EP.2926.SM.3P5YQ', has been sequenced 3 times
+    #   checking if there is any difference between the samples we find no difference between 1 and 2
+    #
+    #   not1_2 <- exprs(ijc)[,pData(ijc)$SAMPID==sampid][,1] != exprs(ijc)[,pData(ijc)$SAMPID==sampid][,2]
+    #   table(not1_2)not1_2
+    #    TRUE 
+    #    7855
+    #
+    #   but between 1 and 3, there is - we will use the first sample since 1 and 2 are the same
+    #   not1_3 <- exprs(ijc)[,pData(ijc)$SAMPID==sampid][,1] == exprs(ijc)[,pData(ijc)$SAMPID==sampid][,3]
+    #   table(not1_3)
+    #   not1_3
+    #   FALSE  TRUE 
+    #     163  7692
+    #
+    for (i in 1:length(keep_sampl)) {
+        sampid           <- pData(ijc)$SAMPID[i]
+        sex              <- pData(ijc)[pData(ijc)$SAMPID == sampid,]$SEX
+        sampid_ijc_exprs <- exprs(ijc)[,pData(ijc)$SAMPID == sampid]
+        sampid_sjc_exprs <- exprs(sjc)[,pData(sjc)$SAMPID == sampid]
+        if (sampid == 'GTEX.X4EP.2926.SM.3P5YQ') {
+            sex              <- sex[1]
+            sampid_ijc_exprs <- as.vector(sampid_ijc_exprs[,1])
+            sampid_sjc_exprs <- as.vector(sampid_sjc_exprs[,1])
+        }
+        sampid_ijc_cpm   <- as.vector(cpm(sampid_ijc_exprs))
+        sampid_sjc_cpm   <- as.vector(cpm(sampid_sjc_exprs))
+        sampid_ijc_gt_1  <- as.vector(sampid_ijc_cpm > 1)
+        sampid_sjc_gt_1  <- as.vector(sampid_sjc_cpm > 1)
+        keep_sampid_junc <- as.vector(sampid_ijc_gt_1 | sampid_sjc_gt_1)
+        
+        if (sex == 1) {
+            for (j in 1:length(male_junction_samp_ct)) {
+                if (keep_sampid_junc[j] == TRUE) {
+                    male_junction_samp_ct[j] <- male_junction_samp_ct[j] + 1
+                }
+            }
+        } else {
+            for (j in 1:length(male_junction_samp_ct)) {
+                if (keep_sampid_junc[j] == TRUE) {
+                    female_junction_samp_ct[j] <- female_junction_samp_ct[j] + 1
+                }
+            }
+        }
+    }
+
+    #
+    # we keep only junctions for each sex, that have either a minimum number of samples in
+    # either the sjc or ijc counts)
+    #
+    keep_male   <- as.vector(male_junction_samp_ct > minimum_sample_size)
+    keep_female <- as.vector(female_junction_samp_ct > minimum_sample_size)
+    keep        <- keep_male & keep_female
+
+    #
+    # save the junctions that will be used for analysis
+    #
+    sex_specific_ijc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+                                                           '_AS_model_B_sex_specific_ijc_junctions.csv')
+    sex_specific_sjc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+                                                           '_AS_model_B_sex_specific_sjc_junctions.csv')
+
+    write.table(rownames(ijc)[keep], file = sex_specific_ijc_junctions_filename, 
                 row.names = T, col.names = T, quote = F, sep = ",")
     
+    write.table(rownames(sjc)[keep], file = sex_specific_sjc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
     
-    ijc <- ijc[keep2==TRUE,]
-    sjc <- sjc[keep2==TRUE,]
+    ijc <- ijc[keep==TRUE,]
+    sjc <- sjc[keep==TRUE,]
+    
     message("dim pData(ijc)\n",
            paste(dim(pData(ijc))), collapse = " ")
-    message("dim exprs(es)\n",
-           paste(dim(exprs(es))), collapse = " ")
-    message("done!\n")
-    message("\ndim(ijc)\n", 
-        paste(dim(ijc), collapse = " ") )                    
-    message("\ndim(sjc)\n", 
-        paste(dim(sjc), collapse = " ") )
+    message("dim exprs(ijc)\n",
+           paste(dim(exprs(ijc))), collapse = " ")
+    message("dim pData(sjc)\n",
+           paste(dim(pData(sjc))), collapse = " ")
+    message("dim exprs(sjc)\n",
+           paste(dim(exprs(sjc))), collapse = " ")
+
 
     message("removing DGE Genes prior to making one of the y linear model")
     ijc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
@@ -742,7 +826,7 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     # we will add donor as a blocking parameter
     # rather than sample name -- we should use donor for real
     sample     <- factor(sample_names)
-    
+
     donor    <- rep(sample, 2)
     message("\ndonor size", 
         paste(length(donor)), collapse = " ") 
@@ -1164,182 +1248,6 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
  
     } # for se
 #}  # for all tissues
-# ## Testing
-```
-
-```{r}
-### testing ###
- plot         <- TRUE
-dup          <- TRUE
-splice_list  <- c("a3ss_","a5ss_","mxe_","ri_","se_")
-tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
-tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
-write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.names=TRUE, col.names=FALSE)
-   splice_type = "a3ss_"
-    res = splice_list %in% splice_type
-    tissue_of_interest  = as.vector(as.character(tissue_list[tissue_index]))
-
-    if (sum(res) == 1) {
-        message ("splice_list does contain\n",
-             paste(splice_type), " continuing with processing\n")
-        fromGTF    <- read.table("../data/fromGTF.A3SS.txt", header=TRUE)
-        fromGTF    <- eliminateChrYfromGTF (fromGTF)
-        ijc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a3ss.jc.ijc.txt.gz")
-        ijc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- ijc_counts)
-        ijc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- ijc)
-        ijc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- ijc)
-        sjc_counts <- makeCountsMatrix( filename_gz  <- "../data/rmats_final.a3ss.jc.sjc.txt.gz")
-        sjc        <- makeSplicingExpressionSetObject (srr_pdata <- srr_pdata, counts <- sjc_counts)
-        sjc        <- reduceSampleSet(tissue_reduction <- tissue_reduction, es <- sjc)
-        sjc        <- eliminateChrYfromExpressionSet (fromGTF <- fromGTF, es <- sjc)
-}
-
-
-    pdf_sub_directory = '../pdf/'
-    csv_sub_directory = '../data/'
-
-    fromGTF           <- fromGTF
-    tissue_true       <- tissue_list == tissue_of_interest
-
-    message("\nLimiting phenotype data to tissue of interest\n",
-           paste(tissue_of_interest),collapse=" ")    
-    keep = pData(ijc)$SMTSD== tissue_of_interest
-    message("\nkeep\n",
-           paste(table(keep)),collapse=" ")
-       
-    ijc <- ijc[,keep==TRUE]
-    sjc <- sjc[,keep==TRUE]
-
-    message("\ndimensions of the pData ijc_tissue \n", 
-        paste(  dim(pData(ijc)), collapse = " ") )
-    message("\ndimensions of the pData sjc_tissue \n", 
-        paste(  dim(pData(sjc)), collapse = " ") )
-
-    message("\ndimensions of the pData ijc_tissue \n", 
-        paste(  dim(exprs(ijc)), collapse = " ") )
-    message("\ndimensions of the pData sjc_tissue \n", 
-        paste(  dim(exprs(sjc)), collapse = " ") )
-
-    #
-    #  We need to filter low CPM.  This is done ins a similar manner as is done with
-    #  genes in an RNA-seq experements.  But rather than ignoring genes, we will ignore
-    #  the junctions that do not show significant
-    #  levels of expression, this filtering is dependent on two criteria:
-    #     1. Minimum CPM: This is the counts per million that a gene must have in at
-    #        least some specified number of samples.
-    #     2. Minumum Samples: This is the number of samples in which the CPM requirement
-    #        must be met in order for that junction (rows) to be acknowledged
-    # 
-    # Implemented here, the minimum samples must have least at least a greater than 1/4 the size of the
-    # smallest sample set between male and female.
-    #
-    minimum_sample_size = min(table(pData(ijc)$SEX))*0.25
-    message("minimum_sample_size\n",
-           minimum_sample_size)
-
-    #
-    # now using the expression object function, we get the number of samples
-    # in each set that have expression counts (normalized as counts per million) greater than 1
-    # for each gender set and for each count matrices (sjc and ijc).  Otherwise we will
-    # ignore the associated junction.
-    #
-    male.ijc.num_of_samples_gt_1 = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==1]))>=1)
-    male.sjc.num_of_samples_gt_1 = rowSums(cpm(exprs(sjc[,pData(sjc)$SEX==1]))>=1)
-    
-    female.ijc.num_of_samples_gt_1 = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==2]))>=1)
-    female.sjc.num_of_samples_gt_1 = rowSums(cpm(exprs(sjc[,pData(sjc)$SEX==2]))>=1)
-
-    #
-    # we keep only junctions for each sex, that have either a minimum number of samples in
-    # either the sjc or ijc counts)
-    #
-    keep.male.ijc   = (  male.ijc.num_of_samples_gt_1 >= count_threshold)
-    keep.male.sjc   = (  male.sjc.num_of_samples_gt_1 >= count_threshold)
-    keep.female.ijc = (female.ijc.num_of_samples_gt_1 >= count_threshold)
-    keep.female.sjc = (female.sjc.num_of_samples_gt_1 >= count_threshold)
-
-    keep.male   <- keep.male.ijc | keep.male.sjc
-    keep.female <- keep.female.ijc | keep.female.sjc
-    #
-    # and we keep only those junctions that have at least a minimum in each gender
-    #
-    keep  <- keep.male & keep.female
-
-    #
-    # save the junctions that will be used for analysis
-    #
-    sex_specific_ijc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                           snakecase::to_snake_case(tissue_of_interest)),
-							   '_AS_model_B_sex_specific_ijc_junctions.csv')
-    sex_specific_sjc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                           snakecase::to_snake_case(tissue_of_interest)),
-							   '_AS_model_B_sex_specific_sjc_junctions.csv')
-
-
-    write.table(rownames(ijc)[keep], file = sex_specific_ijc_junctions_filename, 
-                row.names = T, col.names = T, quote = F, sep = ",")
-    
-    write.table(rownames(sjc)[keep], file = sex_specific_sjc_junctions_filename, 
-                row.names = T, col.names = T, quote = F, sep = ",")
-    
-    ijc <- ijc[keep==TRUE,]
-    sjc <- sjc[keep==TRUE,]
-    
-    message("dim pData(ijc)\n",
-           paste(dim(pData(ijc))), collapse = " ")
-    message("dim exprs(es)\n",
-           paste(dim(exprs(es))), collapse = " ")
-    message("done!\n")
-    message("\ndim(ijc)\n", 
-        paste(dim(ijc), collapse = " ") )                    
-    message("\ndim(sjc)\n", 
-        paste(dim(sjc), collapse = " ") )
-    message("removing DGE Genes prior to making one of the y linear model")
-    ijc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
-    sjc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- sjc)
-
-    # use ijc expressionSet  for the phenotype data
-    count_desc = "ijc_wo_DGE_"
-    execute_model_A(counts_expr_set    = ijc_wo_DGE, 
-                    pData_expr_set     = ijc, 
-                    tissue_of_interest = tissue_of_interest, 
-                    fromGTF            = fromGTF,
-                    pdf_sub_directory  = pdf_sub_directory,
-                    csv_sub_directory  = csv_sub_directory,
-                    count_desc         = count_desc) 
-
-    count_desc = "ijc_"
-    execute_model_A(counts_expr_set    = ijc, 
-                    pData_expr_set     = ijc, 
-                    tissue_of_interest = tissue_of_interest, 
-                    fromGTF            = fromGTF,
-                    pdf_sub_directory  = pdf_sub_directory,
-                    csv_sub_directory  = csv_sub_directory,
-                    count_desc         = count_desc) 
-    
-    count_desc = "sjc_wo_DGE_"
-    execute_model_A(counts_expr_set    = sjc_wo_DGE, 
-                    pData_expr_set     = ijc, 
-                    tissue_of_interest = tissue_of_interest, 
-                    fromGTF            = fromGTF,
-                    pdf_sub_directory  = pdf_sub_directory,
-                    csv_sub_directory  = csv_sub_directory,
-                    count_desc         = count_desc) 
-
-    count_desc = "sjc_"
-    execute_model_A(counts_expr_set    = sjc, 
-                    pData_expr_set     = ijc, 
-                    tissue_of_interest = tissue_of_interest, 
-                    fromGTF            = fromGTF,
-                    pdf_sub_directory  = pdf_sub_directory,
-                    csv_sub_directory  = csv_sub_directory,
-                    count_desc         = count_desc) 
-    
-    message("Executing model B \n")
-    sample_names <- as.character(pData(ijc)$SAMPID)
-    # we will add donor as a blocking parameter
-    # rather than sample name -- we should use donor for real
-    sample     <- factor(sample_names)
 ```
 
 
