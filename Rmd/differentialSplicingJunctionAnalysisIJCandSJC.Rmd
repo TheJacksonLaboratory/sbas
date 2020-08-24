@@ -686,7 +686,7 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     #
     keep_sampl = rep(TRUE,length(pData(ijc)$SAMPID))
     message("length samples\n",
-             length(keep_sampl)
+             length(keep_sampl))
 
     #
     # number of junctions is given in the first dimension of exprs(ijc) matrix
@@ -726,7 +726,7 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
         sampid_sjc_cpm   <- as.vector(cpm(sampid_sjc_exprs))
         sampid_ijc_gt_1  <- as.vector(sampid_ijc_cpm > 1)
         sampid_sjc_gt_1  <- as.vector(sampid_sjc_cpm > 1)
-        keep_sampid_junc <- as.vector(sampid_ijc_gt_1 | sampid_sjc_gt_1)
+        keep_sampid_junc <- as.vector(sampid_ijc_gt_1 & sampid_sjc_gt_1)
         
         if (sex == 1) {
             for (j in 1:length(male_junction_samp_ct)) {
@@ -1089,7 +1089,7 @@ getDGEResults("../data/")
 # splice_list <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 #
 plot         <- TRUE
-dup          <- TRUE
+dup          <- FALSE
 splice_list  <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
