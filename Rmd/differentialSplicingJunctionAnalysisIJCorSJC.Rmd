@@ -61,8 +61,8 @@ library(snakecase)
 # ## 1.1 Nextflow execution parameter execution
 #
 # Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
-# parameters for nextflow execution of notebook
-tissue_index = 17
+# parameters for nextflow execution of notebook you must comment out the definition of tissue_index
+# tissue_index = 17
 ```
 
 ### 1.2 get rMATS GTF annotations
@@ -691,7 +691,7 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     #
     # number of junctions is given in the first dimension of exprs(ijc) matrix
     #
-        male_junction_samp_ct   <- as.vector(rep(0,dim(exprs(ijc))[1]))
+    male_junction_samp_ct   <- as.vector(rep(0,dim(exprs(ijc))[1]))
     female_junction_samp_ct <- as.vector(rep(0,dim(exprs(ijc))[1]))
     #
     # for each sample, male or female, do we keep the junction based upon ijc or sjc counts?
@@ -735,7 +735,7 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
                 }
             }
         } else {
-            for (j in 1:length(male_junction_samp_ct)) {
+            for (j in 1:length(female_junction_samp_ct)) {
                 if (keep_sampid_junc[j] == TRUE) {
                     female_junction_samp_ct[j] <- female_junction_samp_ct[j] + 1
                 }
@@ -747,38 +747,27 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     # we keep only junctions for each sex, that have either a minimum number of samples in
     # either the sjc or ijc counts)
     #
-    keep_male   <- as.vector(male_junction_samp_ct > minimum_sample_size)
-    keep_female <- as.vector(female_junction_samp_ct > minimum_sample_size)
-    keep        <- keep_male & keep_female
+    rm(keep)
+    keep_male        <- as.vector(male_junction_samp_ct > minimum_sample_size)
+    keep_female      <- as.vector(female_junction_samp_ct > minimum_sample_size)
+    keep_male_female <- keep_male & keep_female
 
+    ijc_keep_male_female <- ijc[keep_male_female==TRUE,]
+    sjc_keep_male_female <- sjc[keep_male_female==TRUE,]
+
+    ijc <- ijc_keep_male_female
+    sjc <- sjc_keep_male_female
     #
     # save the junctions that will be used for analysis
     #
-    sex_specific_ijc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+    sex_specific_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
                                                            snakecase::to_snake_case(tissue_of_interest)),
-                                                           '_AS_model_B_sex_specific_ijc_junctions.csv')
-    sex_specific_sjc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
-                                                           snakecase::to_snake_case(tissue_of_interest)),
-                                                           '_AS_model_B_sex_specific_sjc_junctions.csv')
+                                                           '_AS_model_B_sex_specific_junctions.csv')
 
-    write.table(rownames(ijc)[keep], file = sex_specific_ijc_junctions_filename, 
+    junc <- as.character(fromGTF$ID) %in% as.character(rownames(ijc_keep_male_female))
+    write.table(fromGTF[junc == TRUE,], file = sex_specific_junctions_filename, 
                 row.names = T, col.names = T, quote = F, sep = ",")
     
-    write.table(rownames(sjc)[keep], file = sex_specific_sjc_junctions_filename, 
-                row.names = T, col.names = T, quote = F, sep = ",")
-    
-    ijc <- ijc[keep==TRUE,]
-    sjc <- sjc[keep==TRUE,]
-    
-    message("dim pData(ijc)\n",
-           paste(dim(pData(ijc))), collapse = " ")
-    message("dim exprs(ijc)\n",
-           paste(dim(exprs(ijc))), collapse = " ")
-    message("dim pData(sjc)\n",
-           paste(dim(pData(sjc))), collapse = " ")
-    message("dim exprs(sjc)\n",
-           paste(dim(exprs(sjc))), collapse = " ")
-
 
     message("removing DGE Genes prior to making one of the y linear model")
     ijc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
@@ -1030,6 +1019,7 @@ getReleasedGTFAnnotations (destDir <- "../data/")
 ```
 
 ```{r}
+
 #
 # 1.2.3 get SRR Accession Metadata (available through dbGaP)
 #
@@ -1089,7 +1079,7 @@ getDGEResults("../data/")
 # splice_list <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 #
 plot         <- TRUE
-dup          <- FALSE
+dup          <- TRUE
 splice_list  <- c("a3ss_","a5ss_","mxe_","ri_","se_")
 tissue_reduction <- tissue_reduction[tissue_reduction$include==1,]
 tissue_list  <- factor(snakecase::to_snake_case(as.character(tissue_reduction$SMTSD)))  
