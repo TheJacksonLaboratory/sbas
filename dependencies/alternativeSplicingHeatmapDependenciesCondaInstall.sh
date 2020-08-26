@@ -6,5 +6,11 @@ conda install -c r r-magrittr -y
 conda install -c r r-dplyr -y
 conda install -c r r-ggplot2 -y
 conda install -c r r-scales -y
+conda install -c conda-forge r-viridislite -y
+conda install -c r r-magrittr -y
 conda install -c bioconda bioconductor-complexheatmap -y
 conda install -c conda-forge r-circlize -y
+conda install -c conda-forge r-snakecase -y
+conda install -c conda-forge r-pvclust -y
+conda install -c conda-forge r-devtools -y
+

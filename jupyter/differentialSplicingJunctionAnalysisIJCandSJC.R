@@ -1,50 +1,49 @@
----
-jupyter:
-  jupytext:
-    text_representation:
-      extension: .Rmd
-      format_name: rmarkdown
-      format_version: '1.2'
-      jupytext_version: 1.4.2
-  kernelspec:
-    display_name: R
-    language: R
-    name: ir
----
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .R
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.4.2
+#   kernelspec:
+#     display_name: R
+#     language: R
+#     name: ir
+# ---
 
-# differenticalSplicingJunctionExpressionAnalysis as a Notebook 
+# # differenticalSplicingJunctionExpressionAnalysis as a Notebook 
+#
+# rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stored in the Sequence Read Archive with controlled access managed by dbGaP.   This experiment was run with the fastq files from GTEx v8.
+#
+# The output (read in by section 1.2.1) are matrices which are the result of executing the rmats-nf nextflow workflow on all the samples from GTEx V8 https://github.com/lifebit-ai/rmats-nf.   The workflow begins with the accessions file and continues until a matrix.  Run without statistics, for the purposes of rMATS creating an annotated junction file for each of the five (5) splicing types.  The matrix is possible with this version of rMATS, as the junction ID is unique per annotation GTF.  In this running, we used gencode.v30.annotation.gtf (complete annotation).   The result is 5 matrices per splicing type.
+#
+# rMATS RNASeq-MATS.py produces 10 different output types which get assembled into as type junction ID by sample ID matrices
+#
+# ## Alternative Splice Site Types are: (se, a3ss, a5ss, mxe, ri)
+#
+#   * Skipped Exon events (se),
+#   * Alternative 3' splice site (a3ss),
+#   * Alternative 5' splice site (a5ss),
+#   * Mutually exclusive exon (mxe),
+#   * and retention intron (ri)
+#
+# ## There are two different kinds of junction counts
+#
+# For our analysis here, we used just the jc count matrices.
+#   * jc = junction counts - reads that cross the junction
+#   * jcec = junction counts plus reads on the target (such as included exon)
+#
+# ## And the count type -- there are 5 types
+#
+#   * inclusion levels (percent spliced in)
+#   * included junction counts (ijc)
+#   * skipped junction counts (sjc)
+#   * inclusion length (inclen)
+#   * skipped length (skiplen)
+#
+# ## 1. Loading dependencies
 
-rMATS 3.2.5 was run on controlled access RNASeq files retrieved experiments stored in the Sequence Read Archive with controlled access managed by dbGaP.   This experiment was run with the fastq files from GTEx v8.
-
-The output (read in by section 1.2.1) are matrices which are the result of executing the rmats-nf nextflow workflow on all the samples from GTEx V8 https://github.com/lifebit-ai/rmats-nf.   The workflow begins with the accessions file and continues until a matrix.  Run without statistics, for the purposes of rMATS creating an annotated junction file for each of the five (5) splicing types.  The matrix is possible with this version of rMATS, as the junction ID is unique per annotation GTF.  In this running, we used gencode.v30.annotation.gtf (complete annotation).   The result is 5 matrices per splicing type.
-
-rMATS RNASeq-MATS.py produces 10 different output types which get assembled into as type junction ID by sample ID matrices
-
-## Alternative Splice Site Types are: (se, a3ss, a5ss, mxe, ri)
-
-  * Skipped Exon events (se),
-  * Alternative 3' splice site (a3ss),
-  * Alternative 5' splice site (a5ss),
-  * Mutually exclusive exon (mxe),
-  * and retention intron (ri)
-
-## There are two different kinds of junction counts
-
-For our analysis here, we used just the jc count matrices.
-  * jc = junction counts - reads that cross the junction
-  * jcec = junction counts plus reads on the target (such as included exon)
-
-## And the count type -- there are 5 types
-
-  * inclusion levels (percent spliced in)
-  * included junction counts (ijc)
-  * skipped junction counts (sjc)
-  * inclusion length (inclen)
-  * skipped length (skiplen)
-
-## 1. Loading dependencies
-
-```{r}
 suppressMessages({
 library(readr)
 library(edgeR)
@@ -55,26 +54,24 @@ library(tibble)
 library(R.utils)
 library(snakecase)
 })
-```
 
-```{r}
 # ## 1.1 Nextflow execution parameter execution
 #
-# Using the papermill library, we can parallelize execution of this notebook.  To do this, the loop at the bottom of this notebook should be commented out -- and papermill will run across all tissues fed into it.
-# parameters for nextflow execution of notebook you must comment out the definition of tissue_index
-# tissue_index = 17
-```
+# Using the papermill library, we can parallelize execution of this notebook.  
+# To do this, the loop at the bottom of this notebook should be commented out 
+# -- and papermill will run across all tissues fed into it.
+# parameters for nextflow execution of notebook
+tissue_index = 17
 
-### 1.2 get rMATS GTF annotations
+# ### 1.2 get rMATS GTF annotations
+#
+# For each splicing type, the junctions are defined, so we have 5 specific annotated splicing specific junction ID annotation files:
+# fromGTF.A3SS.txt <- annotations for the alternative 3' splice site junctions
+# fromGTF.A5SS.txt <- annotations for the alternative 5' splice site junctions
+# fromGTF.MXE.txt <- annotations for the mutually exclusive exon junctions
+# fromGTF.RI.txt <- annotations for the retained introns junctions
+# fromGTF.SE.txt <- annotations for the skipped exon junctions
 
-For each splicing type, the junctions are defined, so we have 5 specific annotated splicing specific junction ID annotation files:
-fromGTF.A3SS.txt <- annotations for the alternative 3' splice site junctions
-fromGTF.A5SS.txt <- annotations for the alternative 5' splice site junctions
-fromGTF.MXE.txt <- annotations for the mutually exclusive exon junctions
-fromGTF.RI.txt <- annotations for the retained introns junctions
-fromGTF.SE.txt <- annotations for the skipped exon junctions
-
-```{r}
 getReleasedGTFAnnotations <- function ( destDir ) {
 
     message("Decompressing fromGTF.tar.gz into ../data")
@@ -85,13 +82,12 @@ getReleasedGTFAnnotations <- function ( destDir ) {
     message("Done!\n")
    return (0)
 }
-```
 
-## 1.2.3 Read in SraRunData metadata 
+# ## 1.2.3 Read in SraRunData metadata 
+#
+# - `Sequence Read Archive (SRA)` Accession Data, `SRR` numbers, this is used to map the SRR accession numbers to the sample information (SAMPID) which will be used to obtain the phenotype information.
 
-- `Sequence Read Archive (SRA)` Accession Data, `SRR` numbers, this is used to map the SRR accession numbers to the sample information (SAMPID) which will be used to obtain the phenotype information.
-
-```{r}
+# +
 getSraRunData <- function ( destDir ) {
 
   message("Loading metadata from SraRunTable.txt.gz ../data/ ..\n")
@@ -103,13 +99,12 @@ getSraRunData <- function ( destDir ) {
   return(srr_metadata)
 
 }
-```
-### 1.2.4 Renew GTEx expression object
+# -
+# ### 1.2.4 Renew GTEx expression object
+#
+# - `Genome Tissue Expression (GTEx)` Clinical Annotation - this is the expressionSet object that has the phenotype information
+# In this analysis there will be 3 expressionSet objects.  This one contains the gene Expression Count Data and phenotypes  -- this is done in two parts, pull it from yarn, and then inspect and correct.
 
-- `Genome Tissue Expression (GTEx)` Clinical Annotation - this is the expressionSet object that has the phenotype information
-In this analysis there will be 3 expressionSet objects.  This one contains the gene Expression Count Data and phenotypes  -- this is done in two parts, pull it from yarn, and then inspect and correct.
-
-```{r}
 inspectAndCorrectExpressionSetObject <- function ( es ) {
 
    message("\nBEFORE: dim(exprs(es))[2]\n",
@@ -154,9 +149,8 @@ inspectAndCorrectExpressionSetObject <- function ( es ) {
 
    return(es)
 }
-```
 
-```{r}
+# +
 renewGTExExpressionSet <- function ( destDir ) {
   if (!("gtex.rds" %in% list.files(destDir))) {
       message("Downloading and loading obj with GTEx v8 with 'yarn::downloadGTExV8()'\n")
@@ -181,11 +175,11 @@ renewGTExExpressionSet <- function ( destDir ) {
   return (es)
 
 }
-```
+# -
 
-### 1.2.5 get gtex.corrected.rds
+# ### 1.2.5 get gtex.corrected.rds
 
-```{r}
+# +
 getGTExCorrectedRDS <- function ( destDir ) {
 
   message("Loading gtex.corrected.rds ..\n")
@@ -194,13 +188,12 @@ getGTExCorrectedRDS <- function ( destDir ) {
   return(es)
 
 }
-```
+# -
 
-### 1.2.6 get reduced Tissue Data
+# ### 1.2.6 get reduced Tissue Data
+#
+# Stored in the assets subdirectory, reduced by inspection and selection focusing on those tissues with sufficient samples.
 
-Stored in the assets subdirectory, reduced by inspection and selection focusing on those tissues with sufficient samples.
-
-```{r}
 getTissueReduction <- function ( filename ) {
 
     tissue_reduction <- read.table(filename, header=TRUE, sep="\t",
@@ -286,12 +279,10 @@ makePData <- function (counts_srr, gtexPhenoDataObj, srr_metadata) {
     write.csv(pdfinal                  , pdfinal_filename          , quote=FALSE, row.names=FALSE)
     return(pdfinal)
 }
-```
 
-### 1.2.8 get GTEx phenotype data for the SRR accessions
-Transitive closure permits the association of the sequence reads, SRR Accessions, through the SraRunTable.txt (obtained from selecting annotation from the dbGaP login) with the SAMPID used with the GTEx.  This SAMPID is the means by which we can get this phenotype data and associate it with the counts data.
+# ### 1.2.8 get GTEx phenotype data for the SRR accessions
+# Transitive closure permits the association of the sequence reads, SRR Accessions, through the SraRunTable.txt (obtained from selecting annotation from the dbGaP login) with the SAMPID used with the GTEx.  This SAMPID is the means by which we can get this phenotype data and associate it with the counts data.
 
-```{r}
 getGTExPhenoDataForSRR <- function (destDir) {
 
     message("Loading srr_pdata\n")
@@ -303,9 +294,7 @@ getGTExPhenoDataForSRR <- function (destDir) {
 # ### 1.2.9 makeCountsMatrix 
 #
 # Given the counts filename, make a data matrix.
-```
 
-```{r}
 makeCountsMatrix <- function (filename_gz) {
     message("\nloading ", paste(filename_gz), collapse=" ")
     counts <- data.table::fread(filename_gz)
@@ -315,14 +304,12 @@ makeCountsMatrix <- function (filename_gz) {
     counts <- data.matrix(counts)
     return(counts)
 }
-```
 
+#
+# ### 1.2.10 makeSplicingExpressionSetObject 
+#
+# Given the phenotype data object for each of the count matrices, create an expressionSet object for each to facilitate analysis.
 
-### 1.2.10 makeSplicingExpressionSetObject 
-
-Given the phenotype data object for each of the count matrices, create an expressionSet object for each to facilitate analysis.
-
-```{r}
 makeSplicingExpressionSetObject <- function (srr_pdata, counts) {
     message("making splicing expressionSet object")
     #
@@ -361,13 +348,11 @@ makeSplicingExpressionSetObject <- function (srr_pdata, counts) {
     
     return(es)
 }
-```
 
-### 1.2.11 getDGEResults 
+# ### 1.2.11 getDGEResults 
+#
+# Using the output of the differentialGeneExpression analysis, we will screen those genes differentially expressed prior to performing the linear regression.
 
-Using the output of the differentialGeneExpression analysis, we will screen those genes differentially expressed prior to performing the linear regression.
-
-```{r}
 getDGEResults <- function ( destDir ) {
 
    message("Decompressing DGE_gene_csv.2020-06-17.tar.gz into ../data")
@@ -376,18 +361,15 @@ getDGEResults <- function ( destDir ) {
 
    return (0)
 }
-```
 
 
-## 1.3 Preprocessing 
+# ## 1.3 Preprocessing 
+#
 
+# ### 1.3.1  Reduce Sample Set 
+# Read in all requirements so that the stage is properly set -- tissues.tsv contains the subset of files desired for analysis.
+# It is found in the `assets` subdirectory
 
-
-### 1.3.1  Reduce Sample Set 
-Read in all requirements so that the stage is properly set -- tissues.tsv contains the subset of files desired for analysis.
-It is found in the `assets` subdirectory
-
-```{r}
 reduceSampleSet <- function (tissue_reduction, es) {
 
    message("\nsize tissue_reduction\n",
@@ -439,9 +421,7 @@ reduceSampleSet <- function (tissue_reduction, es) {
 # ### 1.3.2 Eliminate ChrY fromGTF
 #
 # We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
-```
 
-```{r}
 eliminateChrYfromGTF <- function ( fromGTF ) {
 
    fromGTF.keepAllButChrY <- (fromGTF$chr != "chrY")
@@ -453,9 +433,7 @@ eliminateChrYfromGTF <- function ( fromGTF ) {
 #
 # We are studying the sex-biased differences, to do this we need to eliminate chromosome Y, this is not shared between the sexes
 # This time from the expressionSet Object
-```
 
-```{r}
 eliminateChrYfromExpressionSet <- function ( fromGTF, es ) {
 
     es_row_ids <- rownames(es)
@@ -473,13 +451,11 @@ eliminateChrYfromExpressionSet <- function ( fromGTF, es ) {
 
     return(es)
 }
-```
 
-### 1.3.4 Remove DGE genes from expressionSet Obj
+# ### 1.3.4 Remove DGE genes from expressionSet Obj
+#
+# DGE are removed prior to the construction of the linear model.  It is assumed that the DGE files were obtained from the release.  Using these results, we will remove the junction rows corresponding to those genes.
 
-DGE are removed prior to the construction of the linear model.  It is assumed that the DGE files were obtained from the release.  Using these results, we will remove the junction rows corresponding to those genes.
-
-```{r}
 removeDGEGenes <- function ( tissue_of_interest, fromGTF, es ) {
 
     #
@@ -508,50 +484,45 @@ removeDGEGenes <- function ( tissue_of_interest, fromGTF, es ) {
 
     return(es)
 }
-```
 
-### 2 Exploratory and Differential analysis as_event:ijc, sjc 
+# ### 2 Exploratory and Differential analysis as_event:ijc, sjc 
+#
+# Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
+#
+#            y = B0 + B1 sex + epsilon (error) * model A *
+#            
+#            
+#
+# where y is the included exon junction count expression; sex denotes the reported sex of the subject
 
-Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
+# ### 2.1 Differential analysis as_event (combined ijc and sjc)
+#
+# Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
+#
+#            y = B0 + B1 sex + B2 as_event + B3 sex*as_event + epsilon (error)  * model B * 
+#            
+#
+# where y is the alternative splicing event expression; sex denotes the reported sex of the subject, as_event represents the specific alternative splicing event - either included exon junction counts or skipped exon junction counts and their interaction terms.   Donor is added to our model as a blocking variable used in both the calculation of duplicate correlation as well as in the linear fit.
 
-           y = B0 + B1 sex + epsilon (error) * model A *
-           
-           
+# ### 2.2 Voom, limma's lmFit and eBayes
+#
+# Using sample as a blocking variable, we are able to model the effects of the donor on the results, which improves the power.  This topic is discussed in biostars https://www.biostars.org/p/54565/.  And Gordon Smyth answers the question here https://mailman.stat.ethz.ch/pipermail/bioconductor/2014-February/057887.html.  The method of modeling is a random effects approach in which the intra-donor correlation is incorporated into the covariance matrix instead of the linear predictor.   And though as Gordon Smyth states both are good method and the twoway anova approach makes fewer assumptions, the random effects approach is statistically more powerful.  
+#
+# We have a balanced design in which all donors receive all stimuli (which is really in healthy human donors, life and all of its factors!) Our measurement has so many points -- we are measuring in the skipped exon approach, 42,611 junctions!   It is not possible to encorporate those measurements into the linear predictor.  A two-way ANOVA approach is virtually as powerful as the random effects approach 
+# and hence is preferable as it makes fewer assumptions.
+#
+# For an unbalanced design in which each donor receives only a subset of the stimula, the random effects approach is more powerful.
+#
+# Random effects approach is equivalent to The first method is twoway anova, a generalization of a paired analysis.
+#
+# The ijc and sjc are expressionSet objects:
+#  counts are obtained from exprs(ijc) and exprs(sjc)
+#  
+#  operations at the main object level will ripple to the phenotype and expression set information.
+#  so filtering occurs on the expressionSet object ijc and sjc
 
-where y is the included exon junction count expression; sex denotes the reported sex of the subject
+# ### 2.3 Model A
 
-
-### 2.1 Differential analysis as_event (combined ijc and sjc)
-
-Differential Analysis (DE) was performed using voom (Law et.al., 2014) to transform junction counts (reads that were aligned to junctions when an exon is included - ijc, and reads that were aligned to junctions when the exon is excluded - sjc) with associated precision weights, followed by linear modeling and empirical Bayes procedure using limma.    In each tissue, the following linear regression model was used to detec secually dimorphic alternative splicing event expression: 
-
-           y = B0 + B1 sex + B2 as_event + B3 sex*as_event + epsilon (error)  * model B * 
-           
-
-where y is the alternative splicing event expression; sex denotes the reported sex of the subject, as_event represents the specific alternative splicing event - either included exon junction counts or skipped exon junction counts and their interaction terms.   Donor is added to our model as a blocking variable used in both the calculation of duplicate correlation as well as in the linear fit.
-
-
-### 2.2 Voom, limma's lmFit and eBayes
-
-Using sample as a blocking variable, we are able to model the effects of the donor on the results, which improves the power.  This topic is discussed in biostars https://www.biostars.org/p/54565/.  And Gordon Smyth answers the question here https://mailman.stat.ethz.ch/pipermail/bioconductor/2014-February/057887.html.  The method of modeling is a random effects approach in which the intra-donor correlation is incorporated into the covariance matrix instead of the linear predictor.   And though as Gordon Smyth states both are good method and the twoway anova approach makes fewer assumptions, the random effects approach is statistically more powerful.  
-
-We have a balanced design in which all donors receive all stimuli (which is really in healthy human donors, life and all of its factors!) Our measurement has so many points -- we are measuring in the skipped exon approach, 42,611 junctions!   It is not possible to encorporate those measurements into the linear predictor.  A two-way ANOVA approach is virtually as powerful as the random effects approach 
-and hence is preferable as it makes fewer assumptions.
-
-For an unbalanced design in which each donor receives only a subset of the stimula, the random effects approach is more powerful.
-
-Random effects approach is equivalent to The first method is twoway anova, a generalization of a paired analysis.
-
-The ijc and sjc are expressionSet objects:
- counts are obtained from exprs(ijc) and exprs(sjc)
- 
- operations at the main object level will ripple to the phenotype and expression set information.
- so filtering occurs on the expressionSet object ijc and sjc
-
-
-### 2.3 Model A
-
-```{r}
 #
 # Model A with DGE genes
 # 
@@ -628,11 +599,9 @@ execute_model_A <- function ( counts_expr_set, pData_expr_set, tissue_of_interes
    
     return (0)
 }
-```
 
-### 2.4 Model A and Model B execution
+# ### 2.4 Model A and Model B execution
 
-```{r}
 execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, fromGTF, tissue_list, ijc, sjc) {
 
     pdf_sub_directory = '../pdf/'
@@ -660,6 +629,25 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     message("\ndimensions of the pData sjc_tissue \n", 
         paste(  dim(exprs(sjc)), collapse = " ") )
 
+    count_threshold = min(table(pData(ijc)$SEX))*0.25
+
+    male.skip.rs = rowSums(cpm(exprs(sjc[,pData(ijc)$SEX==1]))>=1)
+    
+    male.inc.rs = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==1]))>=1)
+    
+    female.skip.rs = rowSums(cpm(exprs(sjc[,pData(ijc)$SEX==2]))>=1)
+    
+    female.inc.rs = rowSums(cpm(exprs(ijc[,pData(ijc)$SEX==2]))>=1)
+    
+    male.keep   =  (male.skip.rs>=count_threshold)  & (male.inc.rs>=count_threshold)
+    female.keep = (female.skip.rs>=count_threshold) & (female.inc.rs>=count_threshold)
+
+    keep.guy = male.keep & female.keep
+    #keep events with only skip reads for male and inclusion for female and vice versa
+ 
+    keep2.guy = !keep.guy & ((male.skip.rs>=count_threshold & female.inc.rs>=count_threshold) |
+                     (male.inc.rs>=count_threshold & female.skip.rs>=count_threshold))
+     
     #
     #  We need to filter low CPM.  This is done ins a similar manner as is done with
     #  genes in an RNA-seq experements.  But rather than ignoring genes, we will ignore
@@ -726,7 +714,7 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
         sampid_sjc_cpm   <- as.vector(cpm(sampid_sjc_exprs))
         sampid_ijc_gt_1  <- as.vector(sampid_ijc_cpm > 1)
         sampid_sjc_gt_1  <- as.vector(sampid_sjc_cpm > 1)
-        keep_sampid_junc <- as.vector(sampid_ijc_gt_1 | sampid_sjc_gt_1)
+        keep_sampid_junc <- as.vector(sampid_ijc_gt_1 & sampid_sjc_gt_1)
         
         if (sex == 1) {
             for (j in 1:length(male_junction_samp_ct)) {
@@ -747,27 +735,69 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
     # we keep only junctions for each sex, that have either a minimum number of samples in
     # either the sjc or ijc counts)
     #
-    rm(keep)
-    keep_male        <- as.vector(male_junction_samp_ct > minimum_sample_size)
-    keep_female      <- as.vector(female_junction_samp_ct > minimum_sample_size)
-    keep_male_female <- keep_male & keep_female
+    keep_male   <- as.vector(male_junction_samp_ct > minimum_sample_size)
+    keep_female <- as.vector(female_junction_samp_ct > minimum_sample_size)
+    keep        <- keep_male & keep_female
 
-    ijc_keep_male_female <- ijc[keep_male_female==TRUE,]
-    sjc_keep_male_female <- sjc[keep_male_female==TRUE,]
-
-    ijc <- ijc_keep_male_female
-    sjc <- sjc_keep_male_female
     #
     # save the junctions that will be used for analysis
     #
-    sex_specific_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+    sex_specific_ijc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
                                                            snakecase::to_snake_case(tissue_of_interest)),
-                                                           '_AS_model_B_sex_specific_junctions.csv')
+                                                           '_AS_model_B_sex_specific_ijc_junctions.csv')
+    sex_specific_sjc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+                                                           '_AS_model_B_sex_specific_sjc_junctions.csv')
 
-    junc <- as.character(fromGTF$ID) %in% as.character(rownames(ijc_keep_male_female))
-    write.table(fromGTF[junc == TRUE,], file = sex_specific_junctions_filename, 
+    write.table(rownames(ijc)[keep], file = sex_specific_ijc_junctions_filename, 
                 row.names = T, col.names = T, quote = F, sep = ",")
     
+    write.table(rownames(sjc)[keep], file = sex_specific_sjc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+    
+    #
+    # save the Guy's keep and keep2 junctions that will be used for analysis
+    #
+    sex_specific_ijc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+                                                           '_AS_model_B_sex_specific_ijc_junctions_guy_keep.csv')
+    sex_specific_sjc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+                                                           '_AS_model_B_sex_specific_sjc_junctions_guy_keep.csv')
+
+    write.table(rownames(ijc)[keep.guy], file = sex_specific_ijc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+    
+    write.table(rownames(sjc)[keep.guy], file = sex_specific_sjc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+
+
+    sex_specific_ijc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+                                                           '_AS_model_B_sex_specific_ijc_junctions_guy_keep2.csv')
+    sex_specific_sjc_junctions_filename = paste0(paste0(paste0(csv_sub_directory, splice_type),
+                                                           snakecase::to_snake_case(tissue_of_interest)),
+                                                           '_AS_model_B_sex_specific_sjc_junctions_guy_keep2.csv')
+
+    write.table(rownames(ijc)[keep2.guy], file = sex_specific_ijc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+    
+    write.table(rownames(sjc)[keep2.guy], file = sex_specific_sjc_junctions_filename, 
+                row.names = T, col.names = T, quote = F, sep = ",")
+
+
+    ijc <- ijc[keep2==TRUE,]
+    sjc <- sjc[keep2==TRUE,]
+    
+    message("dim pData(ijc)\n",
+           paste(dim(pData(ijc))), collapse = " ")
+    message("dim exprs(ijc)\n",
+           paste(dim(exprs(ijc))), collapse = " ")
+    message("dim pData(sjc)\n",
+           paste(dim(pData(sjc))), collapse = " ")
+    message("dim exprs(sjc)\n",
+           paste(dim(exprs(sjc))), collapse = " ")
+
 
     message("removing DGE Genes prior to making one of the y linear model")
     ijc_wo_DGE <- removeDGEGenes(tissue_of_interest <- tissue_of_interest, fromGTF <- fromGTF, es <- ijc)
@@ -983,32 +1013,95 @@ execute_models_A_and_B <- function (plot, dup, tissue_of_interest, splice_type, 
 
     return(0)
 }
-```
 
-### 3 Execution of All Tissues and All Splicing Variants
+# ### 3 Execution of All Tissues and All Splicing Variants
+#
+# Additional values set to enable this notebook to be executed as a nextflow workflow or to run in place with appropriate settings.
+# ### 3.1 parameters Setting
+#
+# 1. Setting `dup=TRUE` causes lengthy execution times.
+#
+# 2. Setting `plot=TRUE` can overwhelm the saving capacity within a jupyter-lab notebook - 
+#    this sets to print all the voom plots.
+#    
+# 3. Adjusting `splice_type` will allow you to play with a variety of results
+#
+#    a. all splice types desired to be run:
+#     
+#     `splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")`
+#     
+#    b. a subset (leaving out say `splice_type = "se_"` since it is the largest, for example)
+#     
+#     `splice_list       = c("a3ss_","a5ss_","mxe_","ri_")`
 
-Additional values set to enable this notebook to be executed as a nextflow workflow or to run in place with appropriate settings.
-### 3.1 parameters Setting
+# ### 3.2 MAIN routine
 
-1. Setting `dup=TRUE` causes lengthy execution times.
+# 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
+#
+getReleasedGTFAnnotations (destDir <- "../data/")
 
-2. Setting `plot=TRUE` can overwhelm the saving capacity within a jupyter-lab notebook - 
-   this sets to print all the voom plots.
-   
-3. Adjusting `splice_type` will allow you to play with a variety of results
+#
+# 1.2.3 get SRR Accession Metadata (available through dbGaP)
+#
+srr_metadata <- getSraRunData (destDir <- "../data/")
+#
+# 1.2.4 Renew GTEx expression object
+# OPTIONAL and TIME CONSUMINGrenewGTExPhenoDataObj - set this to FALSE by default
+#
+renewGTExPhenoDataObj=FALSE
+if (renewGTExPhenoDataObj) {
+  gtexPhenoObj <- renewGTExExpressionSet(destDir <- "../data/")
+}
+#
+# 1.2.5 get corrected GTEx expression Set Data
+# Released in previous runs the corrected GTEx expression Set Object, grab from the release
+#
+if (!renewGTExPhenoDataObj) {
+   gtexPhenoDataObj <- getGTExCorrectedRDS (destDir <- "../data/")
+}
+#
+# 1.2.6 get reduced Tissue data
+#
+tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
+#
+# 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
+# Any counts matrix will do...
+# OPTIONAL AND TIME CONSUMING - better to grab from release!
+#
+grabFromRelease = TRUE
+# 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
+#
+getReleasedGTFAnnotations (destDir <- "../data/")
 
-   a. all splice types desired to be run:
-    
-    `splice_list       = c("a3ss_","a5ss_","mxe_","ri_","se_")`
-    
-   b. a subset (leaving out say `splice_type = "se_"` since it is the largest, for example)
-    
-    `splice_list       = c("a3ss_","a5ss_","mxe_","ri_")`
-
-
-### 3.2 MAIN routine
-
-```{r}
+#
+# 1.2.3 get SRR Accession Metadata (available through dbGaP)
+#
+srr_metadata <- getSraRunData (destDir <- "../data/")
+#
+# 1.2.4 Renew GTEx expression object
+# OPTIONAL and TIME CONSUMINGrenewGTExPhenoDataObj - set this to FALSE by default
+#
+renewGTExPhenoDataObj=FALSE
+if (renewGTExPhenoDataObj) {
+  gtexPhenoObj <- renewGTExExpressionSet(destDir <- "../data/")
+}
+#
+# 1.2.5 get corrected GTEx expression Set Data
+# Released in previous runs the corrected GTEx expression Set Object, grab from the release
+#
+if (!renewGTExPhenoDataObj) {
+   gtexPhenoDataObj <- getGTExCorrectedRDS (destDir <- "../data/")
+}
+#
+# 1.2.6 get reduced Tissue data
+#
+tissue_reduction <- getTissueReduction ( "../assets/tissues.tsv" )
+#
+# 1.2.7 make phenotype data matrix portion of ExpressionSet (makePData)
+# Any counts matrix will do...
+# OPTIONAL AND TIME CONSUMING - better to grab from release!
+#
+grabFromRelease = TRUE
 #
 # Main routine
 #
@@ -1016,9 +1109,6 @@ Additional values set to enable this notebook to be executed as a nextflow workf
 # 1.2.2 get the rmats 3.2.5 discovered/annoated junction information in GTF format
 #
 getReleasedGTFAnnotations (destDir <- "../data/")
-```
-
-```{r}
 
 #
 # 1.2.3 get SRR Accession Metadata (available through dbGaP)
@@ -1054,25 +1144,20 @@ if (!grabFromRelease) {
     counts_srr <- makeCountsMatrix (filename_gz)
     srr_pdata <- getGTExPhenoDataForSRR (counts_srr, gtexPhenoDataObj, srr_metadata)
 }
-```
 
-```{r}
 #
 # 1.2.8 get GTEx Phenotype Data accessions SRR from releaase
 #
 if (grabFromRelease) {
     srr_pdata <- getGTExPhenoDataForSRR ("../data/")
 }
-```
 
-```{r}
 #
 # 1.2.11 getDGEResults
 #
 getDGEResults("../data/")
-```
 
-```{r}
+# +
 #
 # Now the meat of our work
 # and to reduce to a subset of entire splice_list
@@ -1094,8 +1179,7 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
 # Requirements are that all required input are in a bucket data.tar.gz
 # and assets 
 # for (tissue_index in 1:length(tissue_list)) {
-```
-```{r}
+# -
 #for (tissue_index in (tissue_list)) {
     # a3ss
     splice_type = "a3ss_"
@@ -1238,20 +1322,18 @@ write.table(tissue_list, "../data/tissue_list.csv", sep=",", quote=FALSE, row.na
  
     } # for se
 #}  # for all tissues
-```
 
 
-### Appendix - Metadata
+# ### Appendix - Metadata
+#
+# For replicability and reproducibility purposes, we also print the following metadata:
+#
+# 1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
+# 2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
 
-For replicability and reproducibility purposes, we also print the following metadata:
+# ### Appendix - 1. Checksums with the sha256 algorithm
 
-1. Checksums of **'artefacts'**, files generated during the analysis and stored in the folder directory **`data`**
-2. List of environment metadata, dependencies, versions of libraries using `utils::sessionInfo()` and [`devtools::session_info()`](https://devtools.r-lib.org/reference/session_info.html)
-
-
-### Appendix - 1. Checksums with the sha256 algorithm
-
-```{r}
+# +
 rm (notebookid)
 notebookid   = "differentialSplicingJunctionExpressionAnalysis"
 notebookid
@@ -1263,11 +1345,11 @@ message("Done!\n")
 paste0("../metadata/", notebookid, "_sha256sums.txt")
 
 data.table::fread(paste0("../metadata/", notebookid, "_sha256sums.txt"), header = FALSE, col.names = c("sha256sum", "file"))
-```
+# -
 
-### Appendix - 2. Libraries Metadata
+# ### Appendix - 2. Libraries Metadata
 
-```{r}
+# +
 dev_session_info   <- devtools::session_info()
 utils_session_info <- utils::sessionInfo()
 
@@ -1281,8 +1363,6 @@ message("Done!\n")
 
 dev_session_info$platform
 dev_session_info$packages[dev_session_info$packages$attached==TRUE, ]
-```
-```{r}
+# -
 
-```
 
