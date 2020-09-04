@@ -20,11 +20,7 @@
 suppressMessages({
     options(warn = -1) 
     library(dplyr)
-    library(ggplot2)
-    library(limma)
-    library(multtest)
     library(Biobase)
-    library(edgeR)
     library(tibble)
     library(R.utils)
     library(rtracklayer)
@@ -43,51 +39,7 @@ suppressMessages({
 # 3. **fromGTF.MXE.txt**: annotations for the mutually exclusive exon junctions
 # 4. **fromGTF.RI.txt**: annotations for the retained introns junctions
 # 5. **fromGTF.SE.txt**: annotations for the skipped exon junctions
-
-# ### 1.2 Unpack the data.tar file if necessary
-# To run this script, we need to import three compressed files and unpack them.
 #
-# | file | sha256 | filename  |
-# |------|------  |-----------|
-# |  1   | b0c4bb23b96d77aba7e731fa2a15dc74a34daf490312478aca94443f9a6d4e90 | results/data_as_dge.tar.gz |
-# |  2   | a0c2c5a7d7cfa0a89c8a39e2f7a4c6c3ac8c6a860f721077c087614505d869cf | rmats_and_annotation.tar.gz |
-#
-
-data_as_dge_file_dir <- list.files("../../mounted-data", pattern='data_as_dge.tar.gz')
-data_as_dge_file_dir
-rmats_and_annotation_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
-rmats_and_annotation_dir
-
-data_as_dge_file_dir <- list.files("../../mounted-data", pattern='data_as_dge.tar.gz')
-data_as_dge_file <- paste("../../mounted-data", data_as_dge_file_dir, 'robinson-bucket/notebooks/data_as_dge', sep='/')
-data_as_dge_file_tar_gz <- paste(data_as_dge_file, '.tar.gz', sep='')
-message("In order to unpack the necessary files, execute the following commands on the shell.")
-message("data_as_dge.tar.gz")
-mycommand = paste("tar xvfz ",data_as_dge_file_tar_gz, "-C ../data", sep=" ")
-message(mycommand)
-system(mycommand)
-message("checking sha256sum")
-mycommand = paste("sha256sum", data_as_dge_file_tar_gz, sep = " ")
-message(mycommand)
-system(mycommand)
-rmats_annot_file_dir <- list.files("../../mounted-data", pattern='rmats_and_annotation.tar.gz')
-rmats_annot_file <- paste("../../mounted-data", rmats_annot_file_dir, 'robinson-bucket/notebooks/rmats_and_annotation', sep='/')
-rmats_annot_file_tar_gz <- paste(rmats_annot_file, '.tar.gz', sep='')
-message("In order to unpack the necessary files, execute the following commands on the shell.")
-message("rmats_and_annotation.tar.gz")
-mycommand = paste("tar xvfz ",rmats_annot_file_tar_gz, "-C ../data", sep=" ")
-message(mycommand)
-system(mycommand)
-message("checking sha256sum")
-mycommand = paste("sha256sum", rmats_annot_file_tar_gz, sep = " ")
-message(mycommand)
-system(mycommand)
-
-## get the rmats 3.2.5 discovered/annotated junction information in GTF format
-message("Decompressing fromGTF.tar.gz into ../data")
-system("mkdir -p ../data && tar xvfz ../data/fromGTF.tar.gz -C ../data", intern = TRUE)
-system("gunzip ../data/fromGTF.*txt.gz", intern = TRUE)
-message("Done!\n")
 
 # ### 2  Refined results
 # We define **refined results** as (FC >= 1.5 and pVal <= 0.05) for the sex\*as_event coefficient result for the linear model
@@ -109,7 +61,7 @@ significant_results_dir = "../data/"
 pattern = "model_B_sex_as_events_refined.csv"
 files <- list.files(path = significant_results_dir, pattern = pattern)
 as_types <- c("a3ss", "a5ss", "mxe", "ri", "se")
-length(files)
+message("We extracted ", length(files), " model_B_sex_as_events_refined.csv files")
 
 a3ss_annot <- read.table(file = "../data/fromGTF.A3SS.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
 a5ss_annot <- read.table(file = "../data/fromGTF.A5SS.txt", sep = "\t", quote = "\"", header = T, stringsAsFactors = F)
@@ -123,7 +75,7 @@ head(se_annot)
 #
 # This function doees an aggregation of the alternative splicing events - good for all events and the significantly expressed events.
 
-create_as_structure <- function ( results_dir, files, pattern, tissue_reduction) {
+create_as_structure <- function ( results_dir, files, all_or_das, pattern, tissue_reduction) {
     gene_as = data.frame()
     counts <- rep(NA, length(files))
     message("\nnumber of files:", paste(length(files)), collapse = "")
@@ -252,18 +204,20 @@ create_as_structure <- function ( results_dir, files, pattern, tissue_reduction)
        } #if has sig. events
     
    } #for all files
-   colnames(gene_as) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display","GeneSymbol","GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
+   colnames(gene_as) <- c("GeneJunction","ASE","ASE_IDX","Tissue","counts","Display","GeneSymbol",
+                           "GeneID","chr","logFC","AveExpr","t","PValue","AdjPVal","B")
    n_unique_genes <- length(summary(as.factor(gene_as$GeneSymbol),maxsum=50000))
-   message("We extracted a total of ",nrow(gene_as)," significant alternative splicing events (gene_as)")
+   message("For the run for ", all_or_das, " run")
+   message("We extracted a total of ",nrow(gene_as)," alternative splicing events (gene_as)")
    message("This includes ", n_unique_genes, " total genes")
    return (gene_as)
 }
 
 # ### 2.4 create_dge_structure 
 #
-# This function doees an aggregation of the differential gene expression events - good for all events and the significantly expressed events.
+# This function does an aggregation of the differential gene expression events - good for all events and the significantly expressed events.
 
-create_dge_structure <- function ( results_dir, files, pattern, map_pattern, tissue_reduction) {
+create_dge_structure <- function ( results_dir, files, all_or_dge, pattern, map_pattern, tissue_reduction) {
    gene_dge = data.frame()
    counts <- rep(NA, length(files))
    for (i in 1:length(files)) {
@@ -301,7 +255,8 @@ create_dge_structure <- function ( results_dir, files, pattern, map_pattern, tis
     colnames(gene_dge) <- c("Tissue","ENSG_ver","ENSG_no_ver","GeneSymbol","counts","Display",
                         "logFC","AveExpr","t","PValue","AdjPVal","B")
     n_unique_genes <- length(summary(as.factor(gene_dge$GeneSymbol),maxsum=50000))
-    message("We extracted a total of ",nrow(gene_dge)," significant differential gene events (gene_dge)")
+    message("For the run for ", all_or_dge, "run")
+    message("We extracted a total of ",nrow(gene_dge)," gene events (gene_dge)")
     message("This includes ", n_unique_genes, " total genes")
     return(gene_dge)
 }
@@ -318,19 +273,20 @@ significant_files   <- list.files(path = results_dir, pattern = significant_patt
 all_pattern         <- "_AS_model_B_sex_as_events.csv"
 all_files           <- list.files(path = results_dir, pattern = all_pattern)
 as_types            <- c("a3ss", "a5ss", "mxe", "ri", "se")
-length(all_files)
-length(significant_files)
+message("Length of all_files: ", length(all_files))
+message("Length of significant_files: ", length(significant_files))
 
 gene_as     <- create_as_structure (results_dir      <- results_dir, 
-                                    files            <- significant_files, 
+                                    files            <- significant_files,
+				    all_or_das       <- "differentially significant alternative splicing",
                                     pattern          <- significant_pattern, 
                                     tissue_reduction <- tissue_reduction)
 all_gene_as <- create_as_structure (results_dir      <- results_dir, 
                                     files            <- all_files, 
+				    all_or_das       <- "all alternatively spliced",
                                     pattern          <- all_pattern, 
                                     tissue_reduction <- tissue_reduction)
 head(gene_as,2)
-head(all_gene_as, 2)
 gene_as$Tissue <- factor(gene_as$Tissue)
 write.table(gene_as, "../data/gene_as.tsv", quote=FALSE, sep="\t")
 write.table(all_gene_as, "../data/all_gene_as.tsv", quote=FALSE, sep="\t")
@@ -342,10 +298,9 @@ write.table(all_gene_as, "../data/all_gene_as.tsv", quote=FALSE, sep="\t")
 results_dir         <- "../data/"
 significant_pattern <- "^se_*AS_model_B_sex_as_events_refined.csv"
 files   <- list.files(path =results_dir, pattern = glob2rx(significant_pattern))
-geneids <- data.frame()
-i = 1
-files[i]
+message("The first file from ^se_*AS_model_B_sex_as_events_refined.csv: ", files[1])
 pattern="_AS_model_B_sex_as_events_refined.csv"
+geneids <- data.frame()
 for (i in 1:length(files)) {
     lines  <- read.table(file=paste0(results_dir, files[i]), 
                                      header = TRUE, sep = ",", quote = "\"'", skipNul = FALSE)
@@ -367,49 +322,55 @@ for (i in 1:length(files)) {
            
      }
 }
+message("Done writing ", length(files), " files.")
 
 # ### 2.7 Read in the differential gene expression results
 #
 # Here we create an aggregation of al the significant results differential gene expression events.
 
 # +
-results_dir         <- "../data/"
-significant_pattern <- "_DGE_refined.csv"
-significant_files   <- list.files(path = results_dir, pattern = significant_pattern)
-map_pattern         <- "_DGE_ensg_map.csv"
+results_dir             <- "../data/"
+significant_dge_pattern <- "_DGE_refined.csv"
+significant_dge_files   <- list.files(path = results_dir, pattern = significant_dge_pattern)
+map_pattern             <- "_DGE_ensg_map.csv"
 length(significant_files)
 
 gene_dge     <- create_dge_structure (results_dir      <- results_dir, 
-                                      files            <- significant_files, 
-                                      pattern          <- significant_pattern, 
+                                      files            <- significant_dge_files, 
+ 				      all_or_dge       <- "differential gene expression",
+                                      pattern          <- significant_dge_pattern, 
                                       map_pattern      <- map_pattern,
                                       tissue_reduction <- tissue_reduction)
 
 head(gene_dge,2)
+gene_dge$Tissue <- factor(gene_dge$Tissue)
+write.table(gene_dge,     "../data/gene_dge.tsv",     quote=FALSE, sep="\t")
+
+# Note the all_gene_dge are in the assets directory and do not change 
+# write.table(all_gene_dge, "../assets/all_gene_dge.tsv", quote=FALSE, sep="\t")
 # -
 
 # Load in the gencode.v30.annotation.gtf file for additional annotation
 
-#
+# +
 # add chr information for summary data later, use the annotation we used for rMATS
-#
-if (!("gencode.v30.annotation.gtf.gz" %in% list.files("../data/"))) {
-    message("downloading gencode v30 annotation\n")
-    system("wget -O ../data/gencode.v30.annotation.gtf.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
-    message("Done!\n")
-    message("Unzipping compressed file gencode.v30.annotation.gtf.gz..")
-    system("gunzip ../data/gencode.v30.annotation.gtf.gz", intern = TRUE)
-    message("Done! gencode.v30.annotation.gtf can be found in ../data/")
-}
+message("downloading gencode v30 annotation\n")
+system("wget -O ../data/gencode.v30.annotation.gtf.gz ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_30/gencode.v30.annotation.gtf.gz")
+message("Done!\n")
+message("Unzipping compressed file gencode.v30.annotation.gtf.gz..")
+system("gunzip ../data/gencode.v30.annotation.gtf.gz", intern = TRUE)
+message("Done! gencode.v30.annotation.gtf can be found in ../data/")
+
 gencode <- import("../data/gencode.v30.annotation.gtf")
 gtf.df <- as.data.frame (gencode)
 chr_genes <- unique(gtf.df[,c("seqnames","gene_name","gene_id")])
 colnames(chr_genes) <- c("chr","GeneSymbol", "ENSG")
 head(chr_genes)
-
+# -
 
 for (i in 1:dim(chr_genes)[1]) {
     chr_genes$ENSG[i] <- as.character(strsplit(chr_genes$ENSG[i],'\\.\\w+$'))
+ #    chr_genes$ENSG[i] <- gsub('\\.*$', '', chr_genes$ENSG[i])
 }
 head(chr_genes)
 
@@ -446,14 +407,8 @@ XY <- gene_dge %>% group_by(Tissue) %>% tally()
 XY <- XY[order(XY$n),decreasing=TRUE]
 head(XY)
 message("Minimum gene expression events per tissue ", min(XY$n), " maximum gene expression events per tissue ", max(XY$n))
-#XY[XY$n>100,]
-sum(XY$n<100)
+# table(gtf.df[,c("gene_type")])
 # -
-
-
-
-table(gtf.df[,c("gene_type")])
-
 
 # ### 3 Data Structures for Figures
 
@@ -652,31 +607,31 @@ A3SS.res <- A3SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arra
 A3SS.res$GeneSymbol <- factor(A3SS.res$GeneSymbol, levels = A3SS.res$GeneSymbol)
 message("Significant spliced genes for A3SS\n",
         paste(length(A3SS.res$GeneSymbol)), collapse=" ")
-head(A3SS.res)
+#head(A3SS.res)
 
 A5SS.res <- A5SS.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
 A5SS.res$GeneSymbol <- factor(A5SS.res$GeneSymbol, levels = A5SS.res$GeneSymbol)
 message("Significant spliced genes for A5SS\n",
         paste(length(A5SS.res$GeneSymbol)), collapse=" ")
-head(A5SS.res)
+#head(A5SS.res)
 
 MXE.res <- MXE.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
 MXE.res$GeneSymbol <- factor(MXE.res$GeneSymbol, levels = MXE.res$GeneSymbol)
 message("Significant spliced genes for MXE\n",
         paste(length(MXE.res$GeneSymbol)), collapse=" ")
-head(MXE.res)
+#head(MXE.res)
 
 RI.res <- RI.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
 RI.res$GeneSymbol <- factor(RI.res$GeneSymbol, levels = RI.res$GeneSymbol)
 message("Significant spliced genes for RI\n",
         paste(length(RI.res$GeneSymbol)), collapse=" ")
-head(RI.res)
+#head(RI.res)
 
 SE.res <- SE.gene_as %>% group_by(GeneSymbol) %>% count(GeneSymbol) %>% arrange(desc(n)) %>% as.data.frame()
 SE.res$GeneSymbol <- factor(SE.res$GeneSymbol, levels = SE.res$GeneSymbol)
 message("Significant spliced genes for SE\n",
         paste(length(SE.res$GeneSymbol)), collapse=" ")
-head(SE.res)
+#head(SE.res)
 # -
 
 # ### 3.9 Count most frequent spliced genes
@@ -741,8 +696,6 @@ glimpse(res_sorted)
 write.table(res_sorted, file = "../data/SplicingIndex_chr.tsv", sep = "\t", quote = F, row.names = F)
 # -
 
-
-
 # ### 3.11 Overlap between Differential Gene Expression and Differential Alternative Splicing
 #
 # First gather the data
@@ -753,7 +706,7 @@ sigAsGenes <- sort(total_AS_Genes$GeneSymbol)
 dge <- read.table("../data/gene_dge.tsv", sep = "\t", header = FALSE, row.names=1, skip = 1)
 dge_genes <- sort(dge$V5)
 head(dge_genes)
-all_genes_data <- read.table("../assets/all_gene_as_gene_names.csv")
+all_genes_data <- read.table("../assets/all_gene_dge.tsv")
 names(all_genes_data) <- c("GeneSymbol", "ensg")
 all_genes <- sort(all_genes_data$GeneSymbol)
 
