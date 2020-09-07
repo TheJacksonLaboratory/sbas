@@ -18,3 +18,5 @@ conda install -c conda-forge plotly -y
 conda install -c bioconda r-pheatmap -y
 conda install -c bioconda gffread -y
 conda install -c bioconda bioconductor-biostrings -y
+conda install -c conda-forge r-gprofiler2 
+conda install -c conda-forge r-downloader 
