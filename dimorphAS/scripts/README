@@ -1,9 +1,0 @@
-README
-
-This directory contains various scripts and prototypes for conducting the planned analysis of sexual dimorphism with alternative splicing data.
-
-1. runQ.sh
--- download an example dataset from the NIH SRA, align it, and run the ChIP-seq peak caller called "Q"
-
-2. rnaSeqAlign.sh
--- download two example RNA-seq datasets from NIH SRA, align them with STAR. 
