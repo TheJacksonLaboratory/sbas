@@ -1,4 +1,4 @@
-## The folder `data`
+## The folder `pdf`
 
 ### Why is this folder empty?
 
