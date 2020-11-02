@@ -13,4 +13,7 @@ conda install -c conda-forge r-circlize -y
 conda install -c conda-forge r-snakecase -y
 conda install -c conda-forge r-pvclust -y
 conda install -c conda-forge r-devtools -y
-
+conda install -c conda-forge r-ellipsis -y
+conda install -c conda-forge r-pkgbuild -y
+conda install -c conda-forge r-pkgload -y
+conda install -c conda-forge r-remotes -y
