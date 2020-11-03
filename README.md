@@ -1,3 +1,6 @@
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4179559.svg)](https://doi.org/10.5281/zenodo.4179559)
+
 # The impact of sex on alternative splicing
 
 This repository documents the analysis performed for [The impact of sex on alternative splicing](https://www.biorxiv.org/content/10.1101/490904v1.full);
