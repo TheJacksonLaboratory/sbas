@@ -1,9 +1,16 @@
+# This script can be only executed on machines with conda already available.
+# Please make sure you have initialised the terminal for use of conda before proceeding
+# To do so you can run the following command in your terminal:
+# `conda init zsh && exec -l zsh`
+# or
+#  `conda init bash && exec -l bash`
+
+
 # Clone sbas repo
 git clone https://github.com/TheJacksonLaboratory/sbas
 
 # cd into repo
 cd sbas
-
 
 # Install dependencies in your linux machine with conda available
 ## Install mamba, a faster alternative/implementation compared conda 
@@ -11,9 +18,6 @@ conda install mamba -y
 
 ## Create a new isolated environment for the analysis
 mamba env create --name sbas -f environment.yml 
-
-## Initialise the terminal for use of conda
-conda init zsh && exec -l zsh
 
 ## Activate the new environment
 conda activate sbas
