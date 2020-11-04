@@ -7,17 +7,21 @@
 # Clone sbas repo
 # git clone https://github.com/TheJacksonLaboratory/sbas
 # cd into repo
-cd sbas
+# cd sbas
 
 # Install dependencies in your linux machine with conda available
-## Install mamba, a faster alternative/implementation compared conda 
-conda install mamba -y
 
-## Create a new isolated environment for the analysis
-mamba env create --name sbas -f environment.yml 
+## Create new empty environment to avoid conflicts
+conda env create --name sbas
 
 ## Activate the new environment
 conda activate sbas
+
+## Install mamba, a faster alternative/implementation compared conda
+conda install mamba -y
+
+## Create a new isolated environment for the analysis
+mamba env update --name sbas -f environment.yml
 
 # Retrieve prerequisite input files for Jupyter Notebooks from ZENODO
 wget https://zenodo.org/record/4179559/files/as.tar.gz
