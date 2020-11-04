@@ -47,7 +47,7 @@ The remaining notebooks can be run in any order. Most of the notebooks generate 
 
 
 * [expressionHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/expressionHeatplot.ipynb). Generate a heatplot representing expression across tissues.
-* [totalDGEByTissue.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/totalDGEByTissue.ipynb). Generate a plot representing counts of expression eventsacross tissues.
+* [totalDGEByTissue.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/totalDGEByTissue.ipynb). Generate a plot representing counts of expression events across tissues.
 * [alternativeSplicingHeatplot.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/alternativeSplicingHeatplot.ipynb). Generate a heatplot representing alternative splicing across tissues.
 * [totalAlternativeSplicingByTissue.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/totalAlternativeSplicingByTissue.ipynb). Generate a plot representing counts of alternative splicing across tissues.
 * [XchromosomalEscape.ipynb](https://github.com/TheJacksonLaboratory/sbas/blob/master/jupyter/XchromosomalEscape.ipynb). Investigate the overlap of alternative splicing and genes on the X chromosome that escape inactivation.
