@@ -68,12 +68,10 @@ To facilitate reproducing the results from the secondary analysis that generates
 
 You can find the file at [`./reproduce.sh`](reproduce.sh). The only prerequisite is a machine with `conda` installed.
 
-The contents of file are showed below:
-
 <details>
 <summary>
     
-The contents of file are showed below:
+The contents of file are displayed below:
 
 </summary>
 
