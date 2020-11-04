@@ -58,7 +58,7 @@ The remaining notebooks can be run in any order. Most of the notebooks generate 
 
 
 
-## 4. Reproducibility note
+## 4. Reproducibility note: How can I reproduce the Jupyter Notebooks analysis?
 
 To facilitate reproducing the results from the secondary analysis that generates all the plots and tables of the publication, we have created a helper bash script that can be run to perform the following:
 
@@ -66,77 +66,91 @@ To facilitate reproducing the results from the secondary analysis that generates
 2. Retrieve the data that we have made available via Zenodo [/DOI/10.5281/zenodo.4179559](https://doi.org/10.5281/zenodo.4179559)
 3. Programmatically executing all Jupyter Notebooks leveraging the [papermill](https://papermill.readthedocs.io/en/latest/) library.
 
-You can find the file at [`./reproduce.sh`](reproduce.sh). The only prerequisite is a machine with `conda` installed.
+You can find the file at [`./reproduce.sh`](reproduce.sh). 
+
+
+### a) I have <img src="https://hackernoon.com/hn-images/1*rW03Wtue71AKfxnx6XN_iQ.png" alt="drawing" width="20"/></a> conda available in my system and want to reproduce the analysis
+
+<details>
+<summary> Instructions for environments with conda available
+
+</summary>
+
+    
+The only prerequisite in this case is a machine with `conda` installed.
 
 > IMPORTANT NOTE:
 Before executing the bash script, make sure your terminal is initialises for using `conda`.
 You can do so by running the following command, depending on you default shell:
 
 i) for `zsh`
-```
+
+```zsh
 ## Initialise the terminal for use of conda
 conda init zsh && exec -l zsh
 ```
+
 ii) for `bash`
 
-```
+```bash
 ## Initialise the terminal for use of conda
 conda init bash && exec -l bash
 ```
 
-<details>
-<summary> The contents of file are displayed below:
-
-</summary>
+Copy the following commands in your terminal to reproduce the Jupyter Notebooks analysis:
 
 ```bash
-# Clone sbas repo
-git clone https://github.com/TheJacksonLaboratory/sbas
-
-# cd into repo
+git clone https://github.com/TheJacksonLaboratory/sbas.git
 cd sbas
+git checkout adds-rendered-notebooks
+conda init zsh && exec -l zsh
+```
 
-# Install dependencies in your linux machine with conda available
-## Install mamba, a faster alternative/implementation compared conda 
-conda install mamba -y
+After this has finished, run the bash script `reproduce.sh`:
 
-## Create a new isolated environment for the analysis
-mamba env create --name sbas -f environment.yml 
-
-## Activate the new environment
-conda activate sbas
-
-# Retrieve prerequisite input files for Jupyter Notebooks from ZENODO
-wget https://zenodo.org/record/4179559/files/as.tar.gz
-wget https://zenodo.org/record/4179559/files/dge.tar.gz
-wget https://zenodo.org/record/4179559/files/fromGTF.tar.gz
-wget https://zenodo.org/record/4179559/files/gtex.tar.gz 
-wget https://zenodo.org/record/4179559/files/rmats_final.tar.gz
-wget https://zenodo.org/record/4179559/files/srr.tar.gz
-
-# Decompress archives into the empty data folder and delete the archives after 
-tar xzvf as.tar.gz -C data && rm as.tar.gz
-tar xzvf dge.tar.gz -C data && rm dge.tar.gz
-tar xzvf fromGTF.tar.gz -C data && rm fromGTF.tar.gz
-tar xzvf gtex.tar.gz  -C data && rm  gtex.tar.gz
-tar xzvf rmats_final.tar.gz -C data && rm rmats_final.tar.gz
-tar xzvf srr.tar.gz -C data && rm srr.tar.gz
-
-# cd into jupyter
-cd jupyter
-
-# Execute programmatically the notebooks with Papermill
-papermill countGenesAndEvents.ipynb countGenesAndEvents.ipynb
-papermill expressionHeatplot.ipynb expressionHeatplot.ipynb 
-papermill totalDGEByTissue.ipynb totalDGEByTissue.ipynb 
-papermill alternativeSplicingHeatplot.ipynb alternativeSplicingHeatplot.ipynb 
-papermill totalAlternativeSplicingByTissue.ipynb totalAlternativeSplicingByTissue.ipynb
-papermill XchromosomalEscape.ipynb XchromosomalEscape.ipynb
-papermill splicingIndex.ipynb splicingIndex.ipynb
-papermill spliceTypeByChromosome.ipynb spliceTypeByChromosome.ipynb
-papermill altSplicing_events_per_gene.ipynb altSplicing_events_per_gene.ipynb
-papermill tissue_piechart.ipynb tissue_piechart.ipynb    
+```bash
+time bash ./reproduce.sh
 ```
     
+</details>
+
+### b) I have <img src="https://www.aldakur.net/wp-content/uploads/2017/03/docker-logo.png" width="35"/></a> docker but _**not conda**_ available in my system and want to reproduce the analysis
+
+<details>
+<summary> Instructions for environments with docker but not conda available
+</summary>
+
+    
+The only prerequisite in this case is a machine with `docker` installed.
+
+You can use a docker image with conda, like this one for example [`continuumio/miniconda3`](https://hub.docker.com/r/continuumio/miniconda3).
+Copy the following commands in your terminal to reproduce the Jupyter Notebooks analysis:
+
+```
+## use the container, mount it so tha input and output data are available in PWD
+docker run -v $PWD:$PWD -w $PWD -it continuumio/miniconda3
+```
+
+Continue running the commands below (inside the docker container):
+
+```zsh
+## Initialise the terminal for use of conda
+conda init zsh && exec -l zsh
+```
+
+Copy the following commands in your terminal to reproduce the Jupyter Notebooks analysis:
+
+```bash
+git clone https://github.com/TheJacksonLaboratory/sbas.git
+cd sbas
+git checkout adds-rendered-notebooks
+conda init zsh && exec -l zsh
+```
+
+After this has finished, run the bash script `reproduce.sh`:
+
+```bash
+time bash ./reproduce.sh
+```
     
 </details>
