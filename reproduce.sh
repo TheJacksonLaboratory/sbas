@@ -4,11 +4,8 @@
 # `conda init zsh && exec -l zsh`
 # or
 #  `conda init bash && exec -l bash`
-
-
 # Clone sbas repo
-git clone https://github.com/TheJacksonLaboratory/sbas
-
+# git clone https://github.com/TheJacksonLaboratory/sbas
 # cd into repo
 cd sbas
 
