@@ -68,10 +68,24 @@ To facilitate reproducing the results from the secondary analysis that generates
 
 You can find the file at [`./reproduce.sh`](reproduce.sh). The only prerequisite is a machine with `conda` installed.
 
+> IMPORTANT NOTE:
+Before executing the bash script, make sure your terminal is initialises for using `conda`.
+You can do so by running the following command, depending on you default shell:
+
+i) for `zsh`
+```
+## Initialise the terminal for use of conda
+conda init zsh && exec -l zsh
+```
+ii) for `bash`
+
+```
+## Initialise the terminal for use of conda
+conda init bash && exec -l bash
+```
+
 <details>
-<summary>
-    
-The contents of file are displayed below:
+<summary> The contents of file are displayed below:
 
 </summary>
 
@@ -88,9 +102,6 @@ conda install mamba -y
 
 ## Create a new isolated environment for the analysis
 mamba env create --name sbas -f environment.yml 
-
-## Initialise the terminal for use of conda
-conda init zsh && exec -l zsh
 
 ## Activate the new environment
 conda activate sbas
