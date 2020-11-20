@@ -53,3 +53,4 @@ papermill splicingIndex.ipynb splicingIndex.ipynb
 papermill spliceTypeByChromosome.ipynb spliceTypeByChromosome.ipynb
 papermill altSplicing_events_per_gene.ipynb altSplicing_events_per_gene.ipynb
 papermill tissue_piechart.ipynb tissue_piechart.ipynb
+papermill FisherExactTests.ipynb FisherExactTests.ipynb
