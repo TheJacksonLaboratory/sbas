@@ -12,7 +12,7 @@
 # Install dependencies in your linux machine with conda available
 
 ## Create new empty environment to avoid conflicts
-conda env create --name sbas
+conda create --name sbas
 
 ## Activate the new environment
 conda activate sbas
