@@ -1,5 +1,4 @@
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4179559.svg)](https://doi.org/10.5281/zenodo.4179559)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4647841.svg)](https://doi.org/10.5281/zenodo.4647841)
 
 # The impact of sex on alternative splicing
 
