@@ -12,11 +12,19 @@
 # Install dependencies in your linux machine with conda available
 
 ## Create new empty environment to avoid conflicts
-conda create --name sbas
-
-## Activate the new environment
-conda activate sbas
-
+# prior to running this script please run
+#
+#`conda create --name sbas -y `
+#
+# and then Activate the new environment
+#
+# with
+# `conda activate sbas`
+#
+## Execute this script now with
+#
+# `bash reproduce.sh`
+#
 ## Install mamba, a faster alternative/implementation compared conda
 conda install mamba -y
 
