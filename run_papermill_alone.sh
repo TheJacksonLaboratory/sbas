@@ -1,0 +1,15 @@
+#!/bin/bash
+# Execute programmatically the notebooks with Papermill
+conda install mamba -y
+mamba install -c conda-forge papermill
+papermill countGenesAndEvents.ipynb countGenesAndEvents.ipynb
+papermill expressionHeatplot.ipynb expressionHeatplot.ipynb
+papermill totalDGEByTissue.ipynb totalDGEByTissue.ipynb
+papermill alternativeSplicingHeatplot.ipynb alternativeSplicingHeatplot.ipynb
+papermill totalAlternativeSplicingByTissue.ipynb totalAlternativeSplicingByTissue.ipynb
+papermill XchromosomalEscape.ipynb XchromosomalEscape.ipynb
+papermill splicingIndex.ipynb splicingIndex.ipynb
+papermill spliceTypeByChromosome.ipynb spliceTypeByChromosome.ipynb
+papermill altSplicing_events_per_gene.ipynb altSplicing_events_per_gene.ipynb
+papermill tissue_piechart.ipynb tissue_piechart.ipynb
+papermill FisherExactTests.ipynb FisherExactTests.ipynb
