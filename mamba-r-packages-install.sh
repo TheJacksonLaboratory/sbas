@@ -31,3 +31,5 @@ mamba install -c r r-stringr -y
 mamba install -c r r-magrittr -y
 mamba install -c r r-ggplot2 -y
 mamba install -c r r-viridis -y
+mamba install -c r r-reshape2 -y
+mamba install -c conda-forge r-reshape -y
