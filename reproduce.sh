@@ -28,6 +28,9 @@
 ## Install mamba, a faster alternative/implementation compared conda
 conda install mamba -y
 
+# install github command line interface for convenience
+mamba install gh --channel conda-forge -y
+
 # install gcsfs due to a bug noted in issue on github 
 mamba install  gcsfs==0.2.3 --force-reinstall -y
 
@@ -52,16 +55,17 @@ source dependencies/spliceTypeByChromosomeDependenciesCondaInstall.sh
 source dependencies/splicingIndexDependenciesCondaInstall.sh
 
 # Retrieve prerequisite input files for Jupyter Notebooks from ZENODO
-wget https://zenodo.org/record/5519916/files/fromGTF.tar.gz
-wget https://zenodo.org/record/5519916/files/gtex.tar.gz 
-wget https://zenodo.org/record/5519916/files/rmats_final.tar.gz
-wget https://zenodo.org/record/5519916/files/srr.tar.gz
-
+wget https://zenodo.org/record/5524975/files/fromGTF.tar.gz
+wget https://zenodo.org/record/5524975/files/gtex.tar.gz 
+wget https://zenodo.org/record/5524975/files/rmats_final.tar.gz
+wget https://zenodo.org/record/5524975/files/srr.tar.gz
+wget https://zenodo.org/record/5524975/files/SraRunTable.txt.gz
 # Decompress archives into the empty data folder and delete the archives after 
 tar xzvf fromGTF.tar.gz -C data && rm fromGTF.tar.gz
 tar xzvf gtex.tar.gz  -C data && rm  gtex.tar.gz
 tar xzvf rmats_final.tar.gz -C data && rm rmats_final.tar.gz
 tar xzvf srr.tar.gz -C data && rm srr.tar.gz
+# we do not unzip SraRunTable.txt.gz - it is used in its gz state
 
 # cd into jupyter
 cd jupyter
