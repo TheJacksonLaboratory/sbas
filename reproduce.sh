@@ -28,20 +28,36 @@
 ## Install mamba, a faster alternative/implementation compared conda
 conda install mamba -y
 
-## Create a new isolated environment for the analysis
-mamba env update --name sbas -f environment.yml
+# install gcsfs due to a bug noted in issue on github 
+mamba install  gcsfs==0.2.3 --force-reinstall -y
+
+# install papermill inside our isolated environment
+mamba install papermill -y
+
+# update the isolated environment for the analysis
+#mamba env update --name sbas -f environment.yml
+
+# install the interactive r kernel for the jupyterlab notebooks
+mamba install -c r r-irkernel -y
+
+# install the interactive pythong kernel for the jupyterlab notebooks
+mamba install -c conda-forge ipykernel -y
+
+# intall the specific notebook dependencies
+source dependencies/alternativeSplicingHeatmapDependenciesCondaInstall.sh
+source dependencies/countGenesDependenciesCondaInstall.sh
+source dependencies/differentialGeneAnalysisDependenciesCondaInstall.sh
+source dependencies/differentialSplicingJunctionAnalysis.sh
+source dependencies/spliceTypeByChromosomeDependenciesCondaInstall.sh
+source dependencies/splicingIndexDependenciesCondaInstall.sh
 
 # Retrieve prerequisite input files for Jupyter Notebooks from ZENODO
-wget https://zenodo.org/record/4179559/files/as.tar.gz
-wget https://zenodo.org/record/4179559/files/dge.tar.gz
-wget https://zenodo.org/record/4179559/files/fromGTF.tar.gz
-wget https://zenodo.org/record/4179559/files/gtex.tar.gz 
-wget https://zenodo.org/record/4179559/files/rmats_final.tar.gz
-wget https://zenodo.org/record/4179559/files/srr.tar.gz
+wget https://zenodo.org/record/5519916/files/fromGTF.tar.gz
+wget https://zenodo.org/record/5519916/files/gtex.tar.gz 
+wget https://zenodo.org/record/5519916/files/rmats_final.tar.gz
+wget https://zenodo.org/record/5519916/files/srr.tar.gz
 
 # Decompress archives into the empty data folder and delete the archives after 
-tar xzvf as.tar.gz -C data && rm as.tar.gz
-tar xzvf dge.tar.gz -C data && rm dge.tar.gz
 tar xzvf fromGTF.tar.gz -C data && rm fromGTF.tar.gz
 tar xzvf gtex.tar.gz  -C data && rm  gtex.tar.gz
 tar xzvf rmats_final.tar.gz -C data && rm rmats_final.tar.gz
@@ -51,14 +67,15 @@ tar xzvf srr.tar.gz -C data && rm srr.tar.gz
 cd jupyter
 
 # Execute programmatically the notebooks with Papermill
-papermill countGenesAndEvents.ipynb countGenesAndEvents.ipynb
-papermill expressionHeatplot.ipynb expressionHeatplot.ipynb 
-papermill totalDGEByTissue.ipynb totalDGEByTissue.ipynb 
-papermill alternativeSplicingHeatplot.ipynb alternativeSplicingHeatplot.ipynb 
-papermill totalAlternativeSplicingByTissue.ipynb totalAlternativeSplicingByTissue.ipynb
-papermill XchromosomalEscape.ipynb XchromosomalEscape.ipynb
-papermill splicingIndex.ipynb splicingIndex.ipynb
-papermill spliceTypeByChromosome.ipynb spliceTypeByChromosome.ipynb
-papermill altSplicing_events_per_gene.ipynb altSplicing_events_per_gene.ipynb
-papermill tissue_piechart.ipynb tissue_piechart.ipynb
-papermill FisherExactTests.ipynb FisherExactTests.ipynb
+papermill differentialGeneExpressionAnalysis.ipynb differentialGeneExpressionAnalysis.ipynb -k ir
+papermill differentialSplicingJunctionAnalysis.ipynb differentialSplicingJunctionAnalysis.ipynb -k ir
+papermill countGenesAndEvents.ipynb countGenesAndEvents.ipynb -k ir
+papermill expressionHeatplot.ipynb expressionHeatplot.ipynb -k ir
+papermill totalDGEByTissue.ipynb totalDGEByTissue.ipynb -k ir
+papermill alternativeSplicingHeatplot.ipynb alternativeSplicingHeatplot.ipynb -k ir
+papermill totalAlternativeSplicingByTissue.ipynb totalAlternativeSplicingByTissue.ipynb -k ir
+papermill XchromosomalEscape.ipynb XchromosomalEscape.ipynb -k ir
+papermill splicingIndex.ipynb splicingIndex.ipynb -k ir
+papermill spliceTypeByChromosome.ipynb spliceTypeByChromosome.ipynb -k ir
+papermill altSplicing_events_per_gene.ipynb altSplicing_events_per_gene.ipynb -k ir
+papermill tissue_piechart.ipynb tissue_piechart.ipynb -k ir
