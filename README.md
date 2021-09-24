@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4647841.svg)](https://doi.org/10.5281/zenodo.4647841)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5524975.svg)](https://doi.org/10.5281/zenodo.5524975)
 
 # The impact of sex on alternative splicing
 
@@ -62,7 +62,7 @@ The remaining notebooks can be run in any order. Most of the notebooks generate 
 To facilitate reproducing the results from the secondary analysis that generates all the plots and tables of the publication, we have created a helper bash script that can be run to perform the following:
 
 1. Prepare the environment by installing dependencies
-2. Retrieve the data that we have made available via Zenodo [/DOI/10.5281/zenodo.4179559](https://doi.org/10.5281/zenodo.4179559)
+2. Retrieve the data that we have made available via Zenodo [10.5281/zenodo.5524975](https://doi.org/10.5281/zenodo.5524975)
 3. Programmatically executing all Jupyter Notebooks leveraging the [papermill](https://papermill.readthedocs.io/en/latest/) library.
 
 You can find the file at [`./reproduce.sh`](reproduce.sh). 
