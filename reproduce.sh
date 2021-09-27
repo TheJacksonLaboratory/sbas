@@ -38,7 +38,7 @@ mamba install  gcsfs==0.2.3 --force-reinstall -y
 mamba install papermill -y
 
 # update the isolated environment for the analysis
-#mamba env update --name sbas -f environment.yml
+mamba env update --name sbas -f environment.yml
 
 # install the interactive r kernel for the jupyterlab notebooks
 mamba install -c r r-irkernel -y

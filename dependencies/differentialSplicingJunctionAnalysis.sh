@@ -8,3 +8,5 @@ mamba install -c conda-forge r-statmod -y
 mamba install -c conda-forge r-snakecase -y
 mamba install -c bioconda bioconductor-multtest -y
 mamba install -c r r-stringi -y
+mamba install -c bioconda r-r.utils -y
+mamba install -c conda-forge r-data.table -y
